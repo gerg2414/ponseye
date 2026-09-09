@@ -1,0 +1,12 @@
+{
+  "name": "ponseye",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "build": "npm run build --workspace=@ponseye/dashboard && npm run build --workspace=@ponseye/recorder",
+    "dev:dashboard": "npm run dev --workspace=@ponseye/dashboard",
+    "dev:recorder": "npm run dev --workspace=@ponseye/recorder",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": { "node": ">=22" }
+}
