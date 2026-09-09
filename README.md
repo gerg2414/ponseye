@@ -17,11 +17,11 @@ PonsEye records PONS V2 launches and bonding curve trades on Robinhood Chain so 
 
 ## Railway
 
-Create a service from this repository and set the root directory to `apps/recorder`. Add the four required secrets shown in `.env.example`. Railway uses `npm run start` and the recorder exposes `/health` on `PORT`.
+Create a service from this repository and set the root directory to `apps/recorder`. Add the four required secrets shown in `.env.example`. Use a current Supabase `sb_secret_...` key, not a browser key. Railway uses `npm run start` and the recorder exposes `/health` on `PORT`.
 
 ## Vercel
 
-Import the same repository and set the root directory to `apps/dashboard`. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as server-only environment variables.
+Import the same repository and set the root directory to `apps/dashboard`. Add `SUPABASE_URL` and `SUPABASE_SECRET_KEY` as server-only environment variables.
 
 ## Data policy
 

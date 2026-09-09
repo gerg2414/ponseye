@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
 import { argumentMap, decodeLaunchMetadata, eventId, ipfsUrl, launchAddresses } from "./parser.js";
 
-const db = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
+const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 

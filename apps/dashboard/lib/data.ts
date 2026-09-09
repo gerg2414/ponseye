@@ -21,7 +21,7 @@ export type StreamStatus = {
 
 export async function getDashboardData() {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return { launches: [] as Launch[], streams: [] as StreamStatus[], launchCount: 0, tradeCount: 0 };
 
   const db = createClient(url, key, { auth: { persistSession: false } });
