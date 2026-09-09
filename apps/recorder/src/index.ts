@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
-import { CURVE_TRADES, FACTORY_EVENTS, LAUNCH_CALLS } from "./queries.js";
+import { CURVE_TRADES, LAUNCH_ACTIVITY } from "./queries.js";
 import { saveFactoryEvent, saveLaunchCall, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
@@ -10,13 +10,20 @@ let connectedAt: string | null = null;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function subscribe(client: Client, feed: string, query: string, handler: (row: never) => Promise<void>) {
+function subscribe(
+  client: Client,
+  feed: string,
+  query: string,
+  handler: (row: never, collection: string) => Promise<void>,
+) {
   client.subscribe({ query }, {
     next: async (result) => {
       try {
         const evm = (result.data as { EVM?: Record<string, never[]> } | undefined)?.EVM;
-        const rows = evm ? Object.values(evm).flat() : [];
-        for (const row of rows) await handler(row as never);
+        const collections = evm ? Object.entries(evm) : [];
+        for (const [collection, rows] of collections) {
+          for (const row of rows) await handler(row as never, collection);
+        }
         await updateStreamStatus(feed, "connected");
       } catch (error) {
         console.error(`[${feed}] processing failed`, error);
@@ -39,8 +46,10 @@ async function recordingCycle() {
     console.log("Bitquery WebSocket connected");
   });
 
-  subscribe(client, "launch_calls", LAUNCH_CALLS, saveLaunchCall);
-  subscribe(client, "factory_events", FACTORY_EVENTS, saveFactoryEvent);
+  subscribe(client, "launch_activity", LAUNCH_ACTIVITY, async (row, collection) => {
+    if (collection === "Calls") await saveLaunchCall(row);
+    if (collection === "Events") await saveFactoryEvent(row);
+  });
   subscribe(client, "curve_trades", CURVE_TRADES, saveTrade);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;

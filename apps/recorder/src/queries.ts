@@ -1,5 +1,5 @@
-export const LAUNCH_CALLS = `
-  subscription PonsLaunchCalls {
+export const LAUNCH_ACTIVITY = `
+  subscription PonsLaunchActivity {
     EVM(network: robinhood) {
       Calls(where: {Call: {
         To: {in: [
@@ -13,13 +13,6 @@ export const LAUNCH_CALLS = `
         Transaction { Hash From }
         Call { To Value Input Output }
       }
-    }
-  }
-`;
-
-export const FACTORY_EVENTS = `
-  subscription PonsFactoryEvents {
-    EVM(network: robinhood) {
       Events(where: {
         LogHeader: {Address: {is: "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e"}}
         Log: {Signature: {Name: {in: ["TokenLaunched", "LaunchSwept", "PoolGraduated"]}}}
