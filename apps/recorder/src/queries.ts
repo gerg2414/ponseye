@@ -13,23 +13,6 @@ export const LAUNCH_ACTIVITY = `
         Transaction { Hash From }
         Call { To Value Input Output }
       }
-      Events(where: {
-        LogHeader: {Address: {is: "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e"}}
-        Log: {Signature: {Name: {in: ["TokenLaunched", "LaunchSwept", "PoolGraduated"]}}}
-      }) {
-        Block { Time Number }
-        Transaction { Hash From }
-        LogHeader { Address }
-        Log { Signature { Name } }
-        Arguments {
-          Name
-          Value {
-            ... on EVM_ABI_Address_Value_Arg { address }
-            ... on EVM_ABI_BigInt_Value_Arg { bigInteger }
-            ... on EVM_ABI_Integer_Value_Arg { integer }
-          }
-        }
-      }
     }
   }
 `;

@@ -3,7 +3,7 @@ import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { CURVE_TRADES, LAUNCH_ACTIVITY } from "./queries.js";
-import { saveFactoryEvent, saveLaunchCall, saveTrade, updateStreamStatus } from "./store.js";
+import { saveLaunchCall, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -46,10 +46,7 @@ async function recordingCycle() {
     console.log("Bitquery WebSocket connected");
   });
 
-  subscribe(client, "launch_activity", LAUNCH_ACTIVITY, async (row, collection) => {
-    if (collection === "Calls") await saveLaunchCall(row);
-    if (collection === "Events") await saveFactoryEvent(row);
-  });
+  subscribe(client, "launch_activity", LAUNCH_ACTIVITY, saveLaunchCall);
   subscribe(client, "curve_trades", CURVE_TRADES, saveTrade);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
