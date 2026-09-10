@@ -260,7 +260,7 @@ export default async function Home() {
 
       <section className="consolePrelude" aria-label="Ponseye system status">
         <div className="consoleSignal">
-          <span className="consoleNode">Ponseye system trace // session 0847</span>
+          <span className="consoleNode">System trace // session 0847</span>
           <div className="consoleLog">
             <span><time>00:00:01</time><b>Optic array initialised</b></span>
             <span><time>00:00:03</time><b>Robinhood feed linked</b></span>
