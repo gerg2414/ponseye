@@ -274,6 +274,15 @@ export default async function Home() {
       </section>
 
       <div className="boardStage">
+        <Link href="/targets" className="capitalCircuitLink">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 18.5V5.5M3 18.5H21" />
+            <path className="circuitTrace" d="M5.5 15.5L9 12l3 2 6.5-7" />
+            <path className="circuitArrow" d="M15.5 7h3v3" />
+          </svg>
+          <span>Capital circuit</span>
+          <b>↗</b>
+        </Link>
         <div className="boardWatcher" aria-hidden="true">
           <Image src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
         </div>
