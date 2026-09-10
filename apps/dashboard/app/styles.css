@@ -114,11 +114,8 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .launchLane.completing .laneHead { background: linear-gradient(90deg,rgba(165,108,255,.07),transparent 58%),#0a0c0f; }
 .launchLane.completed .laneHead { background: linear-gradient(90deg,rgba(154,255,79,.07),transparent 58%),#0a0c0f; }
 .launchLaneBody { height: 760px; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
-.launchCard { position: relative; overflow: hidden; padding: 17px; border: 1px solid #272b35; background: radial-gradient(circle at 100% 0,rgba(165,108,255,.07),transparent 13rem),#101218; transition: border-color .18s ease,background .18s ease,transform .18s ease,box-shadow .18s ease; }
-.launchCard::before { content: ""; position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: #563779; opacity: .8; }
-.launchCard:hover { border-color: #604589; background-color: #13151c; transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.28),0 0 24px rgba(165,108,255,.08); }
+.launchCard { position: relative; overflow: hidden; padding: 17px; border: 1px solid #272b35; background: radial-gradient(circle at 100% 0,rgba(165,108,255,.07),transparent 13rem),#101218; }
 .launchCard.isAcquired { border-color: rgba(154,255,79,.34); background: radial-gradient(circle at 100% 0,rgba(154,255,79,.12),transparent 14rem),#101418; box-shadow: inset 0 0 28px rgba(154,255,79,.025); }
-.launchCard.isAcquired::before { background: var(--green); box-shadow: 0 0 15px rgba(154,255,79,.65); }
 .cardTop { display: flex; align-items: flex-start; gap: 15px; }
 .cardTop .tokenImage { width: 68px; height: 68px; flex-basis: 68px; border-radius: 13px; }
 .cardTop .tokenImage img { border-radius: 8px; }
@@ -132,19 +129,22 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .cardMarketCap { margin-top: 17px; padding: 13px 14px; display: flex; align-items: end; justify-content: space-between; gap: 12px; border: 1px solid #242833; background: rgba(7,9,12,.72); }
 .cardMarketCap span { color: #777e8c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .cardMarketCap strong { overflow: hidden; color: #f1f2f6; font-family: Arial,sans-serif; font-size: 24px; letter-spacing: -.035em; white-space: nowrap; text-overflow: ellipsis; }
+.acquiredMetrics { margin-top: 17px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid #242833; background: rgba(7,9,12,.72); }
+.acquiredMetrics > div { min-width: 0; padding: 12px 10px; display: grid; gap: 7px; border-right: 1px solid #242833; }
+.acquiredMetrics > div:last-child { border-right: 0; }
+.acquiredMetrics span { color: #777e8c; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
+.acquiredMetrics strong { overflow: hidden; color: #eceef3; font-family: Arial,sans-serif; font-size: 16px; letter-spacing: -.025em; white-space: nowrap; text-overflow: ellipsis; }
+.acquiredMetrics .gainMetric strong { color: var(--green); }
 .targetLock { margin-top: 10px; padding: 14px; border: 1px solid #292d37; background: linear-gradient(rgba(165,108,255,.025),rgba(165,108,255,.008)),#0a0c10; }
-.targetLockHead { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
-.targetLockHead > div { display: grid; gap: 6px; }
-.targetLockHead span { color: #6f7582; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
+.targetLockHead { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .targetLockHead strong { color: #d8dbe4; font-family: Arial,sans-serif; font-size: 14px; }
 .targetLockHead > b { color: var(--purple); font-family: Arial,sans-serif; font-size: 34px; line-height: .82; letter-spacing: -.05em; }
 .targetLockHead > b small { margin-left: 2px; color: #737987; font-size: 13px; }
 .lockSegments { height: 18px; margin-top: 15px; display: grid; grid-template-columns: repeat(16,1fr); gap: 3px; }
 .lockSegments i { position: relative; overflow: hidden; border: 1px solid #2b2f39; background: #161921; }
-.lockSegments i.filled { border-color: rgba(165,108,255,.55); background: linear-gradient(180deg,#bd85ff,#7d43cb); box-shadow: 0 0 8px rgba(165,108,255,.3); }
+.lockSegments i.filled { border-color: rgba(165,108,255,.55); }
 .lockSegments i.filled::after { content: ""; position: absolute; inset: 2px; border-top: 1px solid rgba(255,255,255,.35); }
 .launchCard.isAcquired .targetLockHead > b,.launchCard.isAcquired .targetLockHead strong { color: var(--green); }
-.launchCard.isAcquired .lockSegments i.filled { border-color: rgba(154,255,79,.7); background: linear-gradient(180deg,#c7ff85,#65cf27); box-shadow: 0 0 9px rgba(154,255,79,.32); }
 .lockFooter { min-height: 29px; margin-top: 13px; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #22262e; }
 .lockFooter > span { color: #777d8b; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
 .lockFooter .signalPrivate { color: #5d6370; text-align: right; }
