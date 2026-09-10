@@ -84,8 +84,8 @@ tbody tr { transition: background .15s ease; }
 tbody tr:hover { background: rgba(165,108,255,.045); }
 .token { display: flex; align-items: center; gap: 12px; }
 .rowNumber { width: 20px; color: #4e5360; font-size: 8px; }
-.tokenImage { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; background: #1b1e26; color: var(--purple); overflow: hidden; clip-path: polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px); }
-.tokenImage img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.tokenImage { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; padding: 3px; border: 1px solid rgba(165,108,255,.58); border-radius: 10px; background: linear-gradient(145deg,#24202f,#12141a); color: var(--purple); overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.025), 0 7px 18px rgba(0,0,0,.28), 0 0 16px rgba(165,108,255,.1); }
+.tokenImage img { width: 100%; height: 100%; border-radius: 7px; object-fit: cover; }
 .token > div:last-child { display: grid; gap: 4px; }
 .token strong { color: var(--white); font-family: Arial, sans-serif; font-size: 12px; }
 .token span { color: var(--purple); font-size: 9px; }
@@ -117,7 +117,8 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .launchCard { padding: 16px; border: 1px solid #232630; background: #101218; transition: border-color .15s ease, background .15s ease; }
 .launchCard:hover { border-color: #4d3a6b; background: #13151c; }
 .cardTop { display: flex; align-items: center; gap: 13px; }
-.cardTop .tokenImage { width: 60px; height: 60px; flex-basis: 60px; }
+.cardTop .tokenImage { width: 64px; height: 64px; flex-basis: 64px; border-radius: 13px; }
+.cardTop .tokenImage img { border-radius: 9px; }
 .tokenIdentity { flex: 1; min-width: 0; display: grid; gap: 7px; }
 .tokenIdentity > div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .tokenIdentity strong { overflow: hidden; color: var(--white); font-family: Arial, sans-serif; font-size: 16px; white-space: nowrap; text-overflow: ellipsis; }
