@@ -277,7 +277,7 @@ export async function getHolderCandidates(): Promise<HolderCandidate[]> {
     .gte("last_trade_at", activeSince)
     .order("last_trade_at", { ascending: false })
     .limit(1000)
-    .abortSignal(AbortSignal.timeout(10_000));
+    .abortSignal(AbortSignal.timeout(30_000));
   assertOk(error, "load holder candidates");
   return (data ?? []).flatMap((row) => {
     const launch = Array.isArray(row.launches) ? row.launches[0] : row.launches;
