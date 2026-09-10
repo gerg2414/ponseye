@@ -17,7 +17,15 @@ export default async function Home() {
     <main>
       <header className="header">
         <div className="brand" aria-label="PonsEye">
-          <span>P</span><span className="brandEye"><i /></span><span>NS</span><b>EYE</b>
+          <Image
+            className="brandLogo"
+            src="/ponseye-logo-transparent.webp"
+            alt="PonsEye"
+            width={2048}
+            height={768}
+            priority
+            sizes="(max-width: 620px) 176px, 208px"
+          />
         </div>
         <div className="systemMeta">
           <span>Robinhood Chain</span>
