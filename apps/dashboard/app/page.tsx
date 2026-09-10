@@ -34,10 +34,10 @@ function MetricIcon({ type }: { type: "cap" | "volume" | "peak" | "holders" | "c
 function TokenCard({ launch }: { launch: Launch }) {
   const progress = launch.progress_pct;
   const market = launchMarket(launch);
-  const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : "Collecting";
-  const usdVolume = launch.volume_usd ? quoteValue(launch.volume_usd, "USDG") : "Collecting";
+  const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
+  const usdVolume = launch.volume_usd ? quoteValue(launch.volume_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const holderChange = launch.holder_change_5m == null
-    ? "Collecting"
+    ? "First snapshot due"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
 
   return (
@@ -56,13 +56,13 @@ function TokenCard({ launch }: { launch: Launch }) {
         <div className="metrics">
           <div><small><MetricIcon type="cap" /> MC</small><strong>{usdMarketCap}</strong></div>
           <div><small><MetricIcon type="volume" /> Volume</small><strong>{usdVolume}</strong></div>
-          <div><small><MetricIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "Collecting"}</strong></div>
-          <div><small><MetricIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Collecting"}</strong></div>
+          <div><small><MetricIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></div>
+          <div><small><MetricIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Snapshot due"}</strong></div>
           <div><small><MetricIcon type="change" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "buyMetric" : "sellMetric"}>{holderChange}</strong></div>
           <div><small><MetricIcon type="traders" /> Traders</small><strong>{launch.unique_traders}</strong></div>
           <div><small><MetricIcon type="buy" /> Buys</small><strong className="buyMetric">{launch.buys}</strong></div>
           <div><small><MetricIcon type="sell" /> Sells</small><strong className="sellMetric">{launch.sells}</strong></div>
-          <div><small><MetricIcon type="pressure" /> Buy pressure</small><strong>{launch.buy_pressure_pct == null ? "Collecting" : `${launch.buy_pressure_pct.toFixed(0)}%`}</strong></div>
+          <div><small><MetricIcon type="pressure" /> Buy pressure</small><strong>{launch.buy_pressure_pct == null ? "No trades yet" : `${launch.buy_pressure_pct.toFixed(0)}%`}</strong></div>
         </div>
 
         <div className="bonding">
