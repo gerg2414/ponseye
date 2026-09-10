@@ -212,6 +212,7 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
       if (!signal.aborted) {
         console.error("[holder_snapshots] cycle failed", error);
         await updateStreamStatus("holder_snapshots", "error", error instanceof Error ? error.message : String(error));
+        await delay(10_000, signal);
       }
     }
   }
