@@ -65,8 +65,9 @@ const MARKET_TRADE_FIELDS = `
 `;
 
 export function marketTrades(tokenAddresses: string[]) {
+  if (!tokenAddresses.length) throw new Error("Market feed requires at least one watched token");
   const addresses = tokenAddresses.map((address) => JSON.stringify(address.toLowerCase())).join(",");
-  const poolTrades = addresses ? `
+  const poolTrades = `
       PoolTrades: Trades(where: {
         Pair: {
           Market: {Protocol: {is: "uniswap_v4"} Network: {is: "Robinhood"}}
@@ -75,13 +76,16 @@ export function marketTrades(tokenAddresses: string[]) {
       }) {
         ${MARKET_TRADE_FIELDS}
       }
-  ` : "";
+  `;
 
   return `
     subscription PonsMarketTrades {
       Trading {
         CurveTrades: Trades(where: {
-          Pair: {Market: {Protocol: {is: "pons_v2"} Network: {is: "Robinhood"}}}
+          Pair: {
+            Market: {Protocol: {is: "pons_v2"} Network: {is: "Robinhood"}}
+            Token: {Address: {in: [${addresses}]}}
+          }
         }) {
           ${MARKET_TRADE_FIELDS}
         }

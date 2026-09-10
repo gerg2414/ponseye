@@ -58,8 +58,8 @@ function subscribe(
 }
 
 function createPoolFeedController(client: Client, signal: AbortSignal) {
-  let disposeMarketFeed = subscribe(client, "market_trades", marketTrades([]), saveMarketTrade);
-  let addressSignature = "";
+  let disposeMarketFeed: (() => void) | null = null;
+  let addressSignature: string | null = null;
   let refreshQueue = Promise.resolve();
 
   const refresh = () => {
@@ -69,10 +69,13 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
       const nextSignature = addresses.join(",");
       if (nextSignature === addressSignature) return;
 
-      disposeMarketFeed();
-      disposeMarketFeed = subscribe(client, "market_trades", marketTrades(addresses), saveMarketTrade);
+      disposeMarketFeed?.();
+      disposeMarketFeed = addresses.length
+        ? subscribe(client, "market_trades", marketTrades(addresses), saveMarketTrade)
+        : null;
       addressSignature = nextSignature;
-      console.log(`Market feed tracking ${addresses.length} Pons tokens in one filtered stream`);
+      if (!addresses.length) await updateStreamStatus("market_trades", "connected", "No active watchlist tokens");
+      console.log(`Market feed tracking ${addresses.length} watched Pons tokens in one filtered stream`);
     }).catch(async (error) => {
       console.error("Pool market feed refresh failed", error);
       await updateStreamStatus("market_trades", "error", error instanceof Error ? error.message : String(error));
@@ -83,7 +86,7 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
   const maintenance = (async () => {
     await refresh();
     while (!signal.aborted) {
-      await delayOrAbort(addressSignature ? 5 * 60_000 : 10_000, signal);
+      await delayOrAbort(addressSignature === null ? 10_000 : 30_000, signal);
       if (!signal.aborted) await refresh();
     }
   })();
@@ -92,7 +95,7 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
     refresh,
     async stop() {
       await refreshQueue;
-      disposeMarketFeed();
+      disposeMarketFeed?.();
       await maintenance;
     },
   };

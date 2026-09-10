@@ -99,18 +99,18 @@ function LaunchLane({ title, count, tone, launches, empty }: {
 }
 
 export default async function Home() {
-  const { launches, streams } = await getDashboardData();
+  const { launches, streams, launchCount, researchCounts } = await getDashboardData();
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
-  const completed = launches
-    .filter((launch) => launch.status === "graduated")
-    .sort((a, b) => new Date(b.graduated_at ?? b.launched_at).getTime() - new Date(a.graduated_at ?? a.launched_at).getTime());
-  const completing = launches
-    .filter((launch) => launch.status !== "graduated" && (launch.status === "swept" || (launch.progress_pct ?? 0) >= 10))
-    .sort((a, b) => (b.progress_pct ?? 0) - (a.progress_pct ?? 0));
-  const newCreations = launches
-    .filter((launch) => launch.status !== "graduated" && launch.status !== "swept" && (launch.progress_pct == null || launch.progress_pct < 10))
+  const targetLocked = launches
+    .filter((launch) => launch.research_state === "target_locked")
+    .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
+  const underWatch = launches
+    .filter((launch) => launch.research_state === "under_watch")
+    .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
+  const sightings = launches
+    .filter((launch) => launch.research_state === "sighted")
     .sort((a, b) => new Date(b.launched_at).getTime() - new Date(a.launched_at).getTime());
 
   return (
@@ -137,12 +137,12 @@ export default async function Home() {
           <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
         ) : (
           <div className="launchBoard">
-            <LaunchLane title="New Creation" count={newCreations.length} tone="new" launches={newCreations.slice(0, 12)} empty="No fresh launches yet" />
-            <LaunchLane title="Completing" count={completing.length} tone="completing" launches={completing.slice(0, 12)} empty="No launches near graduation" />
-            <LaunchLane title="Completed" count={completed.length} tone="completed" launches={completed.slice(0, 12)} empty="Graduated launches will appear here" />
+            <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" launches={sightings} empty="Watching for a new launch" />
+            <LaunchLane title="Under Watch" count={researchCounts.under_watch} tone="completing" launches={underWatch} empty="No launches have passed screening" />
+            <LaunchLane title="Target Locked" count={researchCounts.target_locked} tone="completed" launches={targetLocked} empty="No research signals have fired" />
           </div>
         )}
-        <footer className="panelFoot"><span>Tracking {launches.length} recent launches</span><span>Raw evidence retained</span></footer>
+        <footer className="panelFoot"><span>Tracking {launchCount.toLocaleString("en-GB")} launches</span><span>Signals recorded at detection</span></footer>
       </section>
     </main>
   );

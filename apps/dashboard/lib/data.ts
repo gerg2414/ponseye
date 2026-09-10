@@ -43,6 +43,10 @@ export type Launch = {
   market_cap_usd: number | null;
   ath_market_cap_usd: number | null;
   usd_price_at: string | null;
+  research_state: "sighted" | "under_watch" | "target_locked";
+  research_state_at: string;
+  research_rule_version: string;
+  research_reasons: string[];
 };
 
 export type Trade = {
@@ -87,6 +91,11 @@ export type StreamStatus = {
 type DashboardPayload = {
   launches: Launch[];
   streams: StreamStatus[];
+  researchCounts: {
+    sighted: number;
+    under_watch: number;
+    target_locked: number;
+  };
   launchCount: number;
   tradeCount: number;
 };
@@ -96,6 +105,7 @@ const emptyData = {
   streams: [] as StreamStatus[],
   launchCount: 0,
   tradeCount: 0,
+  researchCounts: { sighted: 0, under_watch: 0, target_locked: 0 },
   dataConnected: false,
 };
 
@@ -109,7 +119,7 @@ async function loadDashboardData() {
     db: { retry: false },
   });
   const dashboardResult = await db
-    .rpc("get_dashboard_home", { p_limit: 50 })
+    .rpc("get_dashboard_home", { p_limit: 12 })
     .abortSignal(AbortSignal.timeout(8_000));
 
   if (dashboardResult.error || !dashboardResult.data) {
@@ -137,6 +147,11 @@ async function loadDashboardData() {
   return {
     launches,
     streams: payload.streams ?? [],
+    researchCounts: {
+      sighted: Number(payload.researchCounts?.sighted ?? 0),
+      under_watch: Number(payload.researchCounts?.under_watch ?? 0),
+      target_locked: Number(payload.researchCounts?.target_locked ?? 0),
+    },
     launchCount: Number(payload.launchCount ?? 0),
     tradeCount: Number(payload.tradeCount ?? 0),
     dataConnected: true,

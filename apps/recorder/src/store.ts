@@ -240,6 +240,7 @@ export async function getActiveMarketTokens(): Promise<string[]> {
   const activeResult = await db
     .from("launch_metrics")
     .select("token_address")
+    .in("research_state", ["under_watch", "target_locked"])
     .gte("last_trade_at", activeSince)
     .order("last_trade_at", { ascending: false })
     .limit(1000)
@@ -276,6 +277,7 @@ export async function getHolderCandidates(): Promise<HolderCandidate[]> {
   const { data, error } = await db
     .from("launch_metrics")
     .select("token_address,last_trade_at,holder_snapshot_at,launches!inner(curve_address,deployer_address,status,launched_at)")
+    .in("research_state", ["under_watch", "target_locked"])
     .gte("last_trade_at", activeSince)
     .order("last_trade_at", { ascending: false })
     .limit(1000)
