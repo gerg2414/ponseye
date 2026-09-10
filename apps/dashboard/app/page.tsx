@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { Launch } from "../lib/data";
 import { getDashboardData } from "../lib/data";
+import { AutoRefresh } from "./auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,7 @@ export default async function Home() {
 
   return (
     <main>
+      <AutoRefresh />
       <header className="header">
         <div className="systemMeta">
           <span>Robinhood Chain</span>
