@@ -62,7 +62,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
   const percent = (value: number | null, fallback = "Pending data") => value == null ? fallback : `${value.toFixed(1)}%`;
   const holderDelta = launch.holder_change_5m == null
-    ? launch.holder_count == null ? "First snapshot due" : "Baseline recorded"
+    ? "Pending"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
   const bondingTone = launch.status === "graduated"
     ? "completed"
@@ -72,7 +72,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
 
   return (
     <main className="launchPage">
-      <AutoRefresh />
+      <AutoRefresh intervalMs={3_000} />
       <header className="launchNav">
         <Link href="/" className="backLink"><span>←</span> All launches</Link>
         <div className="detailLive"><i /> Live record</div>
@@ -120,7 +120,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
               <div className="progressTrack"><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
             </div>
           </header>
-          <PonsEyeChart trades={marketTrades} />
+          <PonsEyeChart trades={marketTrades} tokenAddress={launch.token_address} graduatedAt={launch.graduated_at} />
         </div>
         <aside className="metricRail">
           <header><span>Token telemetry</span><b><i /> Live</b></header>
@@ -130,9 +130,9 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
             <article><small><PixelIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></article>
             <article><small><PixelIcon type="drop" /> Drawdown</small><strong className="negative">{percent(launch.drawdown_from_peak_pct, "No peak yet")}</strong></article>
             <article><small><PixelIcon type="volume" /> Volume</small><strong>{usd(launch.volume_usd)}</strong></article>
-            <article><small><PixelIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Snapshot due"}</strong></article>
+            <article><small><PixelIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Pending"}</strong></article>
             <article><small><PixelIcon type="holders" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "positive" : "negative"}>{holderDelta}</strong></article>
-            <article><small><PixelIcon type="holders" /> Top 10</small><strong>{percent(launch.top_10_holder_pct, "Snapshot due")}</strong></article>
+            <article><small><PixelIcon type="holders" /> Top 10</small><strong>{percent(launch.top_10_holder_pct, "Pending")}</strong></article>
             <article><small><PixelIcon type="traders" /> Traders</small><strong>{launch.unique_traders.toLocaleString("en-GB")}</strong></article>
             <article><small><PixelIcon type="buy" /> Buy pressure</small><strong className="positive">{percent(launch.buy_pressure_pct, "No trades yet")}</strong></article>
             <article><small><PixelIcon type="traders" /> First minute</small><strong>{launch.first_minute_buyers.toLocaleString("en-GB")}</strong></article>

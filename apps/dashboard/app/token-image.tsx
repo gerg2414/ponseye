@@ -29,7 +29,7 @@ export function TokenImage({
       width={size}
       height={size}
       priority={priority}
-      unoptimized
+      sizes={`${size}px`}
       onError={() => setCandidateIndex((index) => index + 1)}
     />
   );

@@ -178,7 +178,7 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
       const firstSnapshots = dueCandidates
         .filter((candidate) => !candidate.holder_snapshot_at)
         .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime());
-      const candidates = [...repeats.slice(0, 8), ...firstSnapshots.slice(0, 8)];
+      const candidates = [...repeats.slice(0, 8), ...firstSnapshots.slice(0, 16)];
 
       let rateLimited = false;
       for (const candidate of candidates) {
@@ -192,11 +192,11 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
             break;
           }
         }
-        await delay(2_500, signal);
+        await delay(2_000, signal);
       }
 
       if (!signal.aborted) await updateStreamStatus("holder_snapshots", "connected");
-      await delay(rateLimited ? 30_000 : 15_000, signal);
+      await delay(rateLimited ? 30_000 : 10_000, signal);
     } catch (error) {
       if (!signal.aborted) {
         console.error("[holder_snapshots] cycle failed", error);

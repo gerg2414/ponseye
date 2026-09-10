@@ -117,14 +117,17 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .launchCardLink { display: block; color: inherit; text-decoration: none; }
 .launchCard { padding: 18px; border: 1px solid #232630; background: #101218; transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease; }
 .launchCard:hover { border-color: #604589; background: #13151c; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,.25), 0 0 20px rgba(165,108,255,.07); }
-.cardTop { display: flex; align-items: center; gap: 15px; }
+.cardTop { display: flex; align-items: flex-start; gap: 15px; }
 .cardTop .tokenImage { width: 72px; height: 72px; flex-basis: 72px; border-radius: 14px; }
 .cardTop .tokenImage img { border-radius: 9px; }
-.tokenIdentity { flex: 1; min-width: 0; display: grid; gap: 7px; }
-.tokenIdentity > div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.tokenIdentity { flex: 1; min-width: 0; display: grid; gap: 7px; padding-top: 3px; }
 .tokenIdentity strong { overflow: hidden; color: var(--white); font-family: Arial, sans-serif; font-size: 19px; white-space: nowrap; text-overflow: ellipsis; }
-.tokenIdentity time { flex: 0 0 auto; color: #8a909e; font-size: 11px; }
 .tokenIdentity > span { color: var(--purple); font-size: 13px; }
+.cardTiming { width: 108px; flex: 0 0 108px; display: grid; gap: 7px; text-align: right; }
+.cardTiming time { color: #8a909e; font-size: 11px; }
+.cardBonding { display: flex; justify-content: space-between; gap: 8px; color: #777e8d; font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+.cardBonding strong { color: #b0b4bf; font-size: 9px; font-weight: 500; }
+.cardTiming .progressTrack { width: 100%; height: 5px; }
 .metrics { display: grid; grid-template-columns: repeat(3,1fr); margin: 14px 0; border: 1px solid #20232b; }
 .metrics > div { min-height: 60px; padding: 11px; display: grid; align-content: center; gap: 7px; border-right: 1px solid #20232b; }
 .metrics > div:nth-child(-n+3) { border-bottom: 1px solid #20232b; }
@@ -135,14 +138,10 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .metrics strong b { color: var(--green); font-weight: 500; }
 .metrics .buyMetric { color: var(--green); }
 .metrics .sellMetric { color: #ff718c; }
-.bonding { display: grid; gap: 8px; }
-.bonding > div:first-child { display: flex; justify-content: space-between; color: #8a909d; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-.bonding strong { color: #aaaebb; font-weight: 500; }
 .progressTrack { height: 6px; overflow: hidden; background: #242732; }
 .progressTrack i { display: block; height: 100%; max-width: 100%; background: linear-gradient(90deg,var(--purple),#d56fff); box-shadow: 0 0 9px rgba(165,108,255,.55); }
 .completing .progressTrack i { background: linear-gradient(90deg,#ff7f50,#ffbf69); box-shadow: 0 0 9px rgba(255,159,67,.5); }
 .completed .progressTrack i { background: var(--green); box-shadow: 0 0 9px rgba(154,255,79,.5); }
-.cardFoot { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; color: #7d8391; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 .laneEmpty { min-height: 130px; display: grid; place-items: center; padding: 22px; border: 1px dashed #252833; color: #5f6572; font-family: Arial, sans-serif; font-size: 11px; text-align: center; }
 .targetsPage { padding-bottom: 80px; }
 .targetsNav { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }

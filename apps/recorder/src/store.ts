@@ -217,6 +217,8 @@ export async function saveMarketTrade(row: MarketTradeRow) {
   const marketEventId = eventId([
     transactionHash,
     tokenAddress,
+    row.Pair.Pool?.Address,
+    row.Pair.Market?.Protocol,
     side,
     traderAddress,
     row.Amounts?.Base,

@@ -4,11 +4,13 @@ import {
   CandlestickSeries,
   ColorType,
   CrosshairMode,
+  LineStyle,
   PriceScaleMode,
   createChart,
   createTextWatermark,
   type CandlestickData,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -43,16 +45,98 @@ function buildCandles(trades: MarketTrade[], interval: number) {
     }
   }
 
-  return [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time)).slice(-500);
+  const candles = [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time)).slice(-500);
+
+  for (let index = 1; index < candles.length; index += 1) {
+    const previousClose = candles[index - 1].close;
+    candles[index].open = previousClose;
+    candles[index].high = Math.max(candles[index].high, previousClose);
+    candles[index].low = Math.min(candles[index].low, previousClose);
+  }
+
+  return candles;
 }
 
-export function PonsEyeChart({ trades }: { trades: MarketTrade[] }) {
+function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
+  const byId = new Map(current.map((trade) => [trade.market_event_id, trade]));
+  for (const trade of incoming) {
+    byId.set(trade.market_event_id, {
+      ...trade,
+      price_usd: trade.price_usd == null ? null : Number(trade.price_usd),
+      base_amount_usd: trade.base_amount_usd == null ? null : Number(trade.base_amount_usd),
+      quote_amount_usd: trade.quote_amount_usd == null ? null : Number(trade.quote_amount_usd),
+    });
+  }
+  return [...byId.values()]
+    .sort((a, b) => new Date(a.block_time).getTime() - new Date(b.block_time).getTime())
+    .slice(-2_500);
+}
+
+export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
+  trades: MarketTrade[];
+  tokenAddress: string;
+  graduatedAt: string | null;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const bondLineRef = useRef<IPriceLine | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
+  const latestTradeAtRef = useRef<string | null>(trades.at(-1)?.block_time ?? null);
+  const pollingRef = useRef(false);
+  const [liveTrades, setLiveTrades] = useState(trades);
   const [interval, setInterval] = useState(60_000);
-  const candles = useMemo(() => buildCandles(trades, interval), [interval, trades]);
+  const candles = useMemo(() => buildCandles(liveTrades, interval), [interval, liveTrades]);
+  const bondMarketCap = useMemo(() => {
+    if (!graduatedAt) return null;
+    const graduationTime = new Date(graduatedAt).getTime();
+    for (let index = liveTrades.length - 1; index >= 0; index -= 1) {
+      const trade = liveTrades[index];
+      if (trade.protocol === "pons_v2" && new Date(trade.block_time).getTime() <= graduationTime + 5_000 && trade.price_usd && trade.price_usd > 0) {
+        return trade.price_usd * 1_000_000_000;
+      }
+    }
+    return null;
+  }, [graduatedAt, liveTrades]);
+
+  useEffect(() => {
+    setLiveTrades((current) => mergeTrades(current, trades));
+  }, [trades]);
+
+  useEffect(() => {
+    latestTradeAtRef.current = liveTrades.at(-1)?.block_time ?? null;
+  }, [liveTrades]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function poll() {
+      if (pollingRef.current || document.visibilityState !== "visible") return;
+      pollingRef.current = true;
+      try {
+        const since = latestTradeAtRef.current ? `?since=${encodeURIComponent(latestTradeAtRef.current)}` : "";
+        const response = await fetch(`/api/launch/${tokenAddress}/trades${since}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = await response.json() as { trades?: MarketTrade[] };
+        if (payload.trades?.length) setLiveTrades((current) => mergeTrades(current, payload.trades ?? []));
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) console.error("Live chart refresh failed", error);
+      } finally {
+        pollingRef.current = false;
+      }
+    }
+
+    void poll();
+    const timer = window.setInterval(poll, 1_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      pollingRef.current = false;
+    };
+  }, [tokenAddress]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -145,6 +229,25 @@ export function PonsEyeChart({ trades }: { trades: MarketTrade[] }) {
       fittedIntervalRef.current = interval;
     }
   }, [candles, interval]);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    if (bondLineRef.current) {
+      series.removePriceLine(bondLineRef.current);
+      bondLineRef.current = null;
+    }
+    if (bondMarketCap) {
+      bondLineRef.current = series.createPriceLine({
+        price: bondMarketCap,
+        color: "#ff9f43",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "BOND",
+      });
+    }
+  }, [bondMarketCap]);
 
   return (
     <div className="tvChartShell">

@@ -75,6 +75,7 @@ export type MarketTrade = {
   price_usd: number | null;
   base_amount_usd: number | null;
   quote_amount_usd: number | null;
+  protocol: string | null;
 };
 
 export type StreamStatus = {
@@ -175,7 +176,7 @@ export async function getLaunchDetail(tokenAddress: string) {
       .order("block_time", { ascending: false })
       .limit(1000),
     db.from("trade_market_data")
-      .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd")
+      .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd,protocol")
       .eq("token_address", tokenAddress)
       .order("block_time", { ascending: false })
       .limit(2000),

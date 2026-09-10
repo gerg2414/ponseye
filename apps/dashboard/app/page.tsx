@@ -2,15 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Launch } from "../lib/data";
 import { getDashboardData } from "../lib/data";
-import { launchMarket, quoteValue } from "../lib/market";
+import { quoteValue } from "../lib/market";
 import { AutoRefresh } from "./auto-refresh";
 import { TokenImage } from "./token-image";
 
 export const dynamic = "force-dynamic";
 
 const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
-const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
-
 function age(value: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return `${seconds}s`;
@@ -33,11 +31,10 @@ function MetricIcon({ type }: { type: "cap" | "volume" | "peak" | "holders" | "c
 
 function TokenCard({ launch }: { launch: Launch }) {
   const progress = launch.progress_pct;
-  const market = launchMarket(launch);
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const usdVolume = launch.volume_usd ? quoteValue(launch.volume_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const holderChange = launch.holder_change_5m == null
-    ? launch.holder_count == null ? "First snapshot due" : "Baseline recorded"
+    ? "Pending"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
 
   return (
@@ -48,8 +45,13 @@ function TokenCard({ launch }: { launch: Launch }) {
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
           </div>
           <div className="tokenIdentity">
-            <div><strong>{launch.name ?? "Metadata pending"}</strong><time>{age(launch.launched_at)}</time></div>
+            <strong>{launch.name ?? "Metadata pending"}</strong>
             <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
+          </div>
+          <div className="cardTiming">
+            <time>{age(launch.launched_at)}</time>
+            <div className="cardBonding"><span>Bonding</span><strong>{progress == null ? "—" : `${progress.toFixed(1)}%`}</strong></div>
+            <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
           </div>
         </div>
 
@@ -57,7 +59,7 @@ function TokenCard({ launch }: { launch: Launch }) {
           <div><small><MetricIcon type="cap" /> MC</small><strong>{usdMarketCap}</strong></div>
           <div><small><MetricIcon type="volume" /> Volume</small><strong>{usdVolume}</strong></div>
           <div><small><MetricIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></div>
-          <div><small><MetricIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Snapshot due"}</strong></div>
+          <div><small><MetricIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Pending"}</strong></div>
           <div><small><MetricIcon type="change" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "buyMetric" : "sellMetric"}>{holderChange}</strong></div>
           <div><small><MetricIcon type="traders" /> Traders</small><strong>{launch.unique_traders}</strong></div>
           <div><small><MetricIcon type="buy" /> Buys</small><strong className="buyMetric">{launch.buys}</strong></div>
@@ -65,15 +67,6 @@ function TokenCard({ launch }: { launch: Launch }) {
           <div><small><MetricIcon type="pressure" /> Buy pressure</small><strong>{launch.buy_pressure_pct == null ? "No trades yet" : `${launch.buy_pressure_pct.toFixed(0)}%`}</strong></div>
         </div>
 
-        <div className="bonding">
-          <div><span>Bonding</span><strong>{progress == null ? "Awaiting threshold" : `${progress.toFixed(1)}%`}</strong></div>
-          <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
-        </div>
-
-        <footer className="cardFoot">
-          <span>{market.asset.symbol} pair</span>
-          <span>CA {short(launch.token_address)}</span>
-        </footer>
       </article>
     </Link>
   );
@@ -120,7 +113,7 @@ export default async function Home() {
 
   return (
     <main>
-      <AutoRefresh />
+      <AutoRefresh intervalMs={3_000} />
       <header className="header">
         <div className="systemMeta">
           <span>Robinhood Chain</span>

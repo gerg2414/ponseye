@@ -35,10 +35,10 @@ export function imageCandidates(value: string | null) {
     if (!match) return [safe];
     const path = match[1];
     return [
-      `https://ipfs.io/ipfs/${path}`,
-      `https://gateway.pinata.cloud/ipfs/${path}`,
-      `https://cloudflare-ipfs.com/ipfs/${path}`,
       `https://dweb.link/ipfs/${path}`,
+      `https://gateway.pinata.cloud/ipfs/${path}`,
+      `https://ipfs.io/ipfs/${path}`,
+      `https://cloudflare-ipfs.com/ipfs/${path}`,
     ];
   } catch {
     return [];
