@@ -11,6 +11,18 @@ let connectedAt: string | null = null;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function warmCacheUntilReady(signal: AbortSignal) {
+  while (!signal.aborted) {
+    try {
+      await warmTokenCache();
+      return;
+    } catch (error) {
+      if (!signal.aborted) console.error("Token cache warmup failed", error);
+      await delay(10_000);
+    }
+  }
+}
+
 function subscribe(
   client: Client,
   feed: string,
@@ -42,8 +54,8 @@ function subscribe(
 
 async function recordingCycle() {
   const auth = await getAccessToken();
-  await warmTokenCache();
   const collectorAbort = new AbortController();
+  const cacheWarmup = warmCacheUntilReady(collectorAbort.signal);
   const client = createBitqueryClient(auth.access_token, () => {
     healthy = true;
     connectedAt = new Date().toISOString();
@@ -61,6 +73,7 @@ async function recordingCycle() {
   healthy = false;
   collectorAbort.abort();
   await holderCollector;
+  await cacheWarmup;
   await client.dispose();
 }
 
