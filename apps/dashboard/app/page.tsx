@@ -1,25 +1,14 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { Launch } from "../lib/data";
 import { getDashboardData } from "../lib/data";
+import { safeImageUrl } from "../lib/images";
+import { launchMarket, quoteValue } from "../lib/market";
 import { AutoRefresh } from "./auto-refresh";
 
 export const dynamic = "force-dynamic";
 
-const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
 const currentFeeds = new Set(["launch_activity", "curve_trades"]);
-const imageHosts = new Set([
-  "ipfs.io",
-  "gateway.pinata.cloud",
-  "gmgn.ai",
-  "pbs.twimg.com",
-  "img.koyen.fun",
-  "m.rapidlaunch.io",
-  "j7m.io",
-  "unavatar.io",
-  "www.copybara.run",
-  "i.postimg.cc",
-  "axiomtrading-v2.axiom-cdn.io",
-]);
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
 
 function age(value: string) {
@@ -30,50 +19,53 @@ function age(value: string) {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function safeImageUrl(value: string | null) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && imageHosts.has(url.hostname)
-      ? value
-      : null;
-  } catch {
-    return null;
-  }
+function MetricIcon({ type }: { type: "cap" | "volume" | "tx" | "traders" | "buy" | "sell" }) {
+  if (type === "cap") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13V9l3-3 3 2 5-5" /><path d="M10 3h3v3" /></svg>;
+  if (type === "volume") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V9M8 13V4M13 13V7" /></svg>;
+  if (type === "traders") return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2" /><path d="M2.5 13c.3-2.5 1.5-4 3.5-4s3.2 1.5 3.5 4M11 5.5c1.5.2 2.3 1.3 2.5 3" /></svg>;
+  if (type === "buy") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg>;
+  if (type === "sell") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" /></svg>;
+  return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9M8 2l3 3-3 3M14 11H5M8 8l-3 3 3 3" /></svg>;
 }
 
 function TokenCard({ launch }: { launch: Launch }) {
   const imageUrl = safeImageUrl(launch.image_url);
   const progress = launch.progress_pct;
+  const market = launchMarket(launch);
 
   return (
-    <article className="launchCard">
-      <div className="cardTop">
-        <div className="tokenImage">
-          {imageUrl ? <Image src={imageUrl} alt="" width={64} height={64} unoptimized /> : <span>?</span>}
+    <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
+      <article className="launchCard">
+        <div className="cardTop">
+          <div className="tokenImage">
+            {imageUrl ? <Image src={imageUrl} alt="" width={64} height={64} unoptimized /> : <span>?</span>}
+          </div>
+          <div className="tokenIdentity">
+            <div><strong>{launch.name ?? "Metadata pending"}</strong><time>{age(launch.launched_at)}</time></div>
+            <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
+          </div>
         </div>
-        <div className="tokenIdentity">
-          <div><strong>{launch.name ?? "Metadata pending"}</strong><time>{age(launch.launched_at)}</time></div>
-          <span>{launch.symbol ? `$${launch.symbol}` : "Unknown ticker"}</span>
+
+        <div className="metrics">
+          <div><small><MetricIcon type="cap" /> MC</small><strong>{quoteValue(market.marketCap, market.asset.symbol)}</strong></div>
+          <div><small><MetricIcon type="volume" /> Volume</small><strong>{quoteValue(market.volume, market.asset.symbol)}</strong></div>
+          <div><small><MetricIcon type="tx" /> TX</small><strong>{launch.trade_count}</strong></div>
+          <div><small><MetricIcon type="traders" /> Traders</small><strong>{launch.unique_traders}</strong></div>
+          <div><small><MetricIcon type="buy" /> Buys</small><strong className="buyMetric">{launch.buys}</strong></div>
+          <div><small><MetricIcon type="sell" /> Sells</small><strong className="sellMetric">{launch.sells}</strong></div>
         </div>
-      </div>
 
-      <div className="metrics">
-        <div><small>TX</small><strong>{launch.trade_count}</strong></div>
-        <div><small>Traders</small><strong>{launch.unique_traders}</strong></div>
-        <div><small>B / S</small><strong><b>{launch.buys}</b> / {launch.sells}</strong></div>
-      </div>
+        <div className="bonding">
+          <div><span>Bonding</span><strong>{progress == null ? "Awaiting threshold" : `${progress.toFixed(1)}%`}</strong></div>
+          <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
+        </div>
 
-      <div className="bonding">
-        <div><span>Bonding</span><strong>{progress == null ? "Awaiting threshold" : `${progress.toFixed(1)}%`}</strong></div>
-        <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
-      </div>
-
-      <footer className="cardFoot">
-        <span>{launch.pair_token_address?.toLowerCase() === NATIVE_TOKEN ? "ETH pair" : "Token pair"}</span>
-        <span>CA {short(launch.token_address)}</span>
-      </footer>
-    </article>
+        <footer className="cardFoot">
+          <span>{market.asset.symbol} pair</span>
+          <span>CA {short(launch.token_address)}</span>
+        </footer>
+      </article>
+    </Link>
   );
 }
 
