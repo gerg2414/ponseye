@@ -109,6 +109,7 @@ function percentage(value: number, total: number) {
 }
 
 function due(candidate: HolderCandidate, now: number) {
+  if (!candidate.last_trade_at) return false;
   const launchedAt = new Date(candidate.launched_at).getTime();
   const lastTradeAt = candidate.last_trade_at ? new Date(candidate.last_trade_at).getTime() : launchedAt;
   const lastSnapshotAt = candidate.holder_snapshot_at ? new Date(candidate.holder_snapshot_at).getTime() : 0;
@@ -170,9 +171,14 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
   while (!signal.aborted) {
     try {
       const now = Date.now();
-      const candidates = (await getHolderCandidates())
-        .filter((candidate) => due(candidate, now))
-        .slice(0, 12);
+      const dueCandidates = (await getHolderCandidates()).filter((candidate) => due(candidate, now));
+      const repeats = dueCandidates
+        .filter((candidate) => candidate.holder_snapshot_at)
+        .sort((a, b) => new Date(a.holder_snapshot_at!).getTime() - new Date(b.holder_snapshot_at!).getTime());
+      const firstSnapshots = dueCandidates
+        .filter((candidate) => !candidate.holder_snapshot_at)
+        .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime());
+      const candidates = [...repeats.slice(0, 8), ...firstSnapshots.slice(0, 8)];
 
       let rateLimited = false;
       for (const candidate of candidates) {
@@ -186,18 +192,16 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
             break;
           }
         }
-        await delay(3_000, signal);
+        await delay(2_500, signal);
       }
 
       if (!signal.aborted) await updateStreamStatus("holder_snapshots", "connected");
-      if (rateLimited) await delay(30_000, signal);
+      await delay(rateLimited ? 30_000 : 15_000, signal);
     } catch (error) {
       if (!signal.aborted) {
         console.error("[holder_snapshots] cycle failed", error);
         await updateStreamStatus("holder_snapshots", "error", error instanceof Error ? error.message : String(error));
       }
     }
-
-    await delay(60_000, signal);
   }
 }
