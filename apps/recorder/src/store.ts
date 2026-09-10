@@ -265,8 +265,10 @@ export async function updateStreamStatus(feed: string, status: string, message?:
     message: message ?? null,
     last_seen_at: new Date().toISOString(),
   });
-  if (error) lastStatusWrite.delete(feed);
-  assertOk(error, "update stream status");
+  if (error) {
+    lastStatusWrite.delete(feed);
+    console.error(`[${feed}] status update failed`, error.message);
+  }
 }
 
 export async function getHolderCandidates(): Promise<HolderCandidate[]> {
