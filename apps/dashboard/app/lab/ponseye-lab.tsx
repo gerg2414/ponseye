@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LabToken } from "../../lib/lab-data";
 import { TokenImage } from "../token-image";
 
-type RuleKey = "trade_count" | "unique_traders" | "buy_pressure_pct" | "first_minute_buyers" | "momentum_multiple" | "peak_hold_pct" | "top_10_holder_pct";
+type RuleKey = "trade_count" | "unique_traders" | "buy_pressure_pct" | "first_minute_buyers" | "momentum_multiple" | "peak_hold_pct" | "top_10_holder_pct" | "signal_market_cap_usd" | "early_buyer_share_pct";
 type Rule = {
   key: RuleKey;
   label: string;
@@ -29,7 +29,7 @@ type LabSettings = {
   rules: Rule[];
 };
 
-type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x";
+type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x";
 type ControlTab = "models" | "rules" | "gates";
 type SavedModel = { name: string; settings: LabSettings };
 
@@ -41,7 +41,12 @@ type ScoredToken = LabToken & {
   availableRules: number;
 };
 
-const presets: Record<PresetName, LabSettings> = {
+const additionalRules: Rule[] = [
+  { key: "signal_market_cap_usd", label: "Signal market cap", short: "market cap", threshold: 5000, min: 1000, max: 30000, step: 500, weight: 0, direction: "min", suffix: "$" },
+  { key: "early_buyer_share_pct", label: "Early buyer share", short: "early share", threshold: 50, min: 10, max: 100, step: 5, weight: 0, direction: "min", suffix: "%" },
+];
+
+const basePresets: Record<PresetName, LabSettings> = {
   balanced: {
     scoreThreshold: 70,
     runnerTarget: 2,
@@ -214,7 +219,37 @@ const presets: Record<PresetName, LabSettings> = {
       { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 90, min: 30, max: 95, step: 5, weight: 10, direction: "max", suffix: "%" },
     ],
   },
+  market3x: {
+    scoreThreshold: 90,
+    runnerTarget: 3,
+    positionSizeUsd: 25,
+    stopLossPct: 10,
+    creatorGate: true,
+    concentrationGate: true,
+    rules: [
+      { key: "trade_count", label: "Trade depth", short: "trades", threshold: 12, min: 5, max: 60, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "unique_traders", label: "Trader spread", short: "traders", threshold: 12, min: 2, max: 30, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "buy_pressure_pct", label: "Buy pressure", short: "buy pressure", threshold: 65, min: 40, max: 75, step: 1, weight: 10, direction: "min", suffix: "%" },
+      { key: "first_minute_buyers", label: "Early buyers", short: "early buyers", threshold: 8, min: 1, max: 15, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "momentum_multiple", label: "Launch momentum", short: "momentum", threshold: 0.75, min: 0.4, max: 2, step: 0.05, weight: 20, direction: "min", suffix: "x" },
+      { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 70, min: 20, max: 100, step: 5, weight: 15, direction: "min", suffix: "%" },
+      { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 90, min: 30, max: 95, step: 5, weight: 10, direction: "max", suffix: "%" },
+    ],
+  },
 };
+
+const presets = Object.fromEntries(
+  (Object.entries(basePresets) as Array<[PresetName, LabSettings]>).map(([name, settings]) => [
+    name,
+    {
+      ...settings,
+      rules: [
+        ...settings.rules,
+        ...additionalRules.map((rule) => name === "market3x" ? { ...rule, weight: 25 } : { ...rule }),
+      ],
+    },
+  ]),
+) as Record<PresetName, LabSettings>;
 
 const presetDetails: Array<{ name: PresetName; label: string; description: string }> = [
   { name: "discovery", label: "Discovery", description: "Wide net for finding missed runners" },
@@ -227,6 +262,7 @@ const presetDetails: Array<{ name: PresetName; label: string; description: strin
   { name: "runner3x", label: "Tested 3x", description: "35 signals · selective runner search" },
   { name: "wide3x", label: "Wider 3x", description: "56 signals · broader tested search" },
   { name: "tight3x", label: "Tight 3x", description: "33 signals · stop fill stress tested" },
+  { name: "market3x", label: "Market 3x", description: "28 signals · market and early crowd rules" },
 ];
 
 const savedModelsKey = "ponseye-lab-saved-models-v1";
@@ -256,15 +292,25 @@ function isLabSettings(value: unknown): value is LabSettings {
 function normaliseLabSettings(value: unknown): LabSettings | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<LabSettings>;
+  const savedRules = Array.isArray(candidate.rules) ? candidate.rules : [];
+  const rules = presets.balanced.rules.map((template) => {
+    const saved = savedRules.find((rule) => rule?.key === template.key);
+    if (!saved || typeof saved.threshold !== "number" || typeof saved.weight !== "number") return { ...template };
+    return { ...template, threshold: saved.threshold, weight: saved.weight };
+  });
   const migrated = {
     ...candidate,
     positionSizeUsd: typeof candidate.positionSizeUsd === "number" ? candidate.positionSizeUsd : 25,
     stopLossPct: typeof candidate.stopLossPct === "number" ? candidate.stopLossPct : 50,
+    rules,
   };
   return isLabSettings(migrated) ? cloneSettings(migrated) : null;
 }
 
 function valueFor(token: LabToken, key: RuleKey) {
+  if (key === "early_buyer_share_pct") {
+    return token.unique_traders > 0 ? token.first_minute_buyers * 100 / token.unique_traders : null;
+  }
   return token[key];
 }
 
@@ -314,6 +360,7 @@ function formatMultiple(value: number | null) {
 
 function formatMetric(value: number | null, suffix: string) {
   if (value == null) return "No data";
+  if (suffix === "$") return formatMarketCap(value);
   const decimals = suffix === "x" ? 2 : Number.isInteger(value) ? 0 : 1;
   return `${value.toFixed(decimals)}${suffix}`;
 }
