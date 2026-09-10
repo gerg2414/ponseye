@@ -100,6 +100,9 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .status.graduated i { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .panelFoot { padding: 14px 18px; display: flex; justify-content: space-between; color: #555b68; background: #0a0c0f; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
 .boardSection { overflow: hidden; background: rgba(12,14,18,.94); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
+.boardWatcher { position: relative; height: 210px; overflow: hidden; border-bottom: 1px solid var(--line); background: radial-gradient(circle at 73% 100%,rgba(82,25,147,.2),transparent 34rem),#090a0d; }
+.boardWatcher::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg,#090a0d 0%,rgba(9,10,13,.9) 28%,transparent 62%),linear-gradient(0deg,#090a0d 0%,transparent 38%); }
+.boardWatcher img { position: absolute; z-index: 1; right: -35px; bottom: -205px; width: min(1050px,70vw); height: auto; object-fit: contain; image-rendering: auto; opacity: .82; }
 .boardHead { min-height: 90px; padding: 22px 24px; display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid var(--line); position: relative; }
 .boardHead::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 170px; background: var(--purple); box-shadow: 0 0 16px rgba(165,108,255,.42); }
 .boardHead h2 { margin: 0; font-family: Arial, sans-serif; font-size: 22px; letter-spacing: -.03em; color: var(--white); }
@@ -497,6 +500,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .panelHead h2 { font-size: 19px; }
   .panelStatus { display: none; }
   .panelFoot span:last-child { display: none; }
+  .boardWatcher { height: 130px; }
+  .boardWatcher::after { background: linear-gradient(90deg,#090a0d 0%,rgba(9,10,13,.74) 18%,transparent 55%),linear-gradient(0deg,#090a0d 0%,transparent 42%); }
+  .boardWatcher img { right: -40px; bottom: -92px; width: 620px; max-width: none; opacity: .8; }
   .boardHead { min-height: 82px; padding: 19px 17px; }
   .boardHead h2 { font-size: 19px; }
   .launchBoard { margin-right: -1px; padding: 8px; gap: 8px; }
