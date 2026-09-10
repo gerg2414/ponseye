@@ -266,21 +266,23 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="boardSection">
+      <div className="boardStage">
         <div className="boardWatcher" aria-hidden="true">
           <Image src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
         </div>
-        {visibleLaunches.length === 0 ? (
-          <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
-        ) : (
-          <div className="launchBoard">
-            <LaunchLane title="Sighted" count={showingPreview ? sightings.length : researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" preview={showingPreview} />
-            <LaunchLane title="Surveilling" count={showingPreview ? surveillance.length : researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" preview={showingPreview} />
-            <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" preview={showingPreview} />
-          </div>
-        )}
-        <footer className="panelFoot"><span>{showingPreview ? "Sample tokens shown for design" : `Ponseye is watching ${launchCount.toLocaleString("en-GB")} launches`}</span><span>{showingPreview ? "Interface preview only" : "Buys appear after confirmation"}</span></footer>
-      </section>
+        <section className="boardSection">
+          {visibleLaunches.length === 0 ? (
+            <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
+          ) : (
+            <div className="launchBoard">
+              <LaunchLane title="Sighted" count={showingPreview ? sightings.length : researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" preview={showingPreview} />
+              <LaunchLane title="Surveilling" count={showingPreview ? surveillance.length : researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" preview={showingPreview} />
+              <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" preview={showingPreview} />
+            </div>
+          )}
+          <footer className="panelFoot"><span>{showingPreview ? "Sample tokens shown for design" : `Ponseye is watching ${launchCount.toLocaleString("en-GB")} launches`}</span><span>{showingPreview ? "Interface preview only" : "Buys appear after confirmation"}</span></footer>
+        </section>
+      </div>
     </main>
   );
 }
