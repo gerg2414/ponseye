@@ -85,6 +85,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
   entryMarketCap: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const entryMarkerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const bondLineRef = useRef<IPriceLine | null>(null);
@@ -96,19 +97,18 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
   const [liveTrades, setLiveTrades] = useState(trades);
   const [interval, setInterval] = useState(60_000);
   const candles = useMemo(() => buildCandles(liveTrades, interval), [interval, liveTrades]);
+  const nearestCandle = (value: string | null) => {
+    if (!value || !candles.length) return null;
+    const target = new Date(value).getTime() / 1_000;
+    return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
+  };
+  const entryCandle = useMemo(() => nearestCandle(acquiredAt), [acquiredAt, candles]);
   const positionMarkers = useMemo(() => {
     const markers: SeriesMarker<Time>[] = [];
-    const nearestCandle = (value: string | null) => {
-      if (!value || !candles.length) return null;
-      const target = new Date(value).getTime() / 1_000;
-      return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
-    };
-    const entry = nearestCandle(acquiredAt);
     const exit = nearestCandle(closedAt);
-    if (entry) markers.push({ id: "ponseye-entry", time: entry.time, position: "belowBar", shape: "arrowUp", color: "#9aff4f", text: "PONSEYE BUY", size: 2 });
     if (exit) markers.push({ id: "ponseye-exit", time: exit.time, position: "aboveBar", shape: "arrowDown", color: "#ff718c", text: "POSITION CLOSED", size: 2 });
     return markers.sort((a, b) => Number(a.time) - Number(b.time));
-  }, [acquiredAt, candles, closedAt]);
+  }, [candles, closedAt]);
   const bondMarketCap = useMemo(() => {
     if (!graduatedAt) return null;
     const graduationTime = new Date(graduatedAt).getTime();
@@ -257,6 +257,39 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
   }, [candles, interval]);
 
   useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+    const container = containerRef.current;
+    const marker = entryMarkerRef.current;
+    if (!chart || !series || !container || !marker || !entryCandle) {
+      if (marker) marker.hidden = true;
+      return;
+    }
+
+    const updateMarker = () => {
+      const x = chart.timeScale().timeToCoordinate(entryCandle.time);
+      const y = series.priceToCoordinate(entryCandle.low);
+      if (x == null || y == null) {
+        marker.hidden = true;
+        return;
+      }
+      marker.hidden = false;
+      marker.style.left = `${x}px`;
+      marker.style.top = `${container.offsetTop + y}px`;
+    };
+
+    const frame = window.requestAnimationFrame(updateMarker);
+    const resizeObserver = new ResizeObserver(updateMarker);
+    resizeObserver.observe(container);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(updateMarker);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateMarker);
+    };
+  }, [entryCandle]);
+
+  useEffect(() => {
     positionMarkersRef.current?.setMarkers(positionMarkers);
   }, [positionMarkers]);
 
@@ -319,6 +352,13 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
         <b><i /> LIVE</b>
       </div>
       <div ref={containerRef} className="priceChart tradingViewCanvas" aria-label="TradingView Lightweight Chart showing PonsEye dollar market cap" />
+      <div ref={entryMarkerRef} className="chartEntryMarker" hidden>
+        <span className="chartEntryChevron">⌃</span>
+        <div className="chartEntryBadge">
+          <img src="/ponseye-acquired-icon.svg" alt="" />
+          <span><small>PonsEye</small><strong>Buy locked</strong></span>
+        </div>
+      </div>
       {!candles.length ? <div className="chartEmpty chartEmptyOverlay"><span>PRICE FEED</span>Waiting for the first dollar priced trade</div> : null}
     </div>
   );
