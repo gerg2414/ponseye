@@ -9,6 +9,12 @@ import { TokenImage } from "./token-image";
 export const dynamic = "force-dynamic";
 
 const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
+const targetMeterColours = [
+  "#552a94", "#6230a8", "#7036bc", "#7e3ccf",
+  "#8c43e1", "#9a49ef", "#aa4ff1", "#ba54e8",
+  "#ca58da", "#d95dc7", "#e663b1", "#f06b99",
+  "#f6767e", "#fb8265", "#fe914f", "#ff9f43",
+];
 
 function previewLaunch(overrides: Partial<Launch> & Pick<Launch, "token_address" | "name" | "symbol" | "research_state">): Launch {
   const now = new Date();
@@ -150,8 +156,9 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
           <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
             {Array.from({ length: 16 }, (_, index) => {
               const filled = index < filledSegments;
-              const colour = `hsl(${275 + index * 12} 100% 66%)`;
-              return <i className={filled ? "filled" : ""} style={filled ? { backgroundColor: colour, borderColor: colour, boxShadow: `0 0 8px ${colour}55` } : undefined} key={index} />;
+              const active = index === filledSegments - 1;
+              const colour = acquired ? "#9aff4f" : targetMeterColours[index];
+              return <i className={`${filled ? "filled" : ""}${active ? " active" : ""}`} style={filled ? { backgroundColor: colour, borderColor: colour, boxShadow: active ? `0 0 9px ${colour}88` : undefined } : undefined} key={index} />;
             })}
           </div>
           <div className="lockFooter">
