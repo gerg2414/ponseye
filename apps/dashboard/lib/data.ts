@@ -46,7 +46,7 @@ export async function getDashboardData() {
     db.from("launch_board").select("*").order("launched_at", { ascending: false }).limit(200),
     db.from("launches").select("token_address", { count: "exact", head: true }),
     db.from("stream_status").select("feed,status,last_seen_at").order("feed"),
-    db.from("trades").select("event_id", { count: "exact", head: true }),
+    db.from("trades").select("event_id", { count: "exact", head: true }).not("token_address", "is", null),
   ]);
 
   const launches = (launchesResult.data ?? []).map((launch) => ({
