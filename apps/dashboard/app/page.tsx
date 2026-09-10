@@ -37,7 +37,7 @@ function TokenCard({ launch }: { launch: Launch }) {
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const usdVolume = launch.volume_usd ? quoteValue(launch.volume_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const holderChange = launch.holder_change_5m == null
-    ? "First snapshot due"
+    ? launch.holder_count == null ? "First snapshot due" : "Baseline recorded"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
 
   return (
