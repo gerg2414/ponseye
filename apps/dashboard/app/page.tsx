@@ -258,6 +258,18 @@ export default async function Home() {
         </div>
       </header>
 
+      <section className="consolePrelude" aria-label="Ponseye system status">
+        <div className="consoleSignal">
+          <span className="consoleNode">Cybernetic observation node // 01</span>
+          <strong>The market blinks.<br />Ponseye does not.</strong>
+          <div className="consoleTelemetry">
+            <span><i />Vision array online</span>
+            <span>Threat index unresolved</span>
+            <span>Target state acquiring</span>
+          </div>
+        </div>
+      </section>
+
       <div className="boardStage">
         <div className="boardWatcher" aria-hidden="true">
           <Image src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
