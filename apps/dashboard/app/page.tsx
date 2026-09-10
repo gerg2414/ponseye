@@ -71,7 +71,7 @@ function designPreviewLaunches() {
     previewLaunch({ token_address: "preview-watch-one", name: "Signal Ghost", symbol: "EYE", research_state: "under_watch", market_cap_usd: 31_700, trade_count: 22, unique_traders: 11, first_minute_buyers: 5, peak_multiple: 1.05, buy_pressure_pct: 64 }),
     previewLaunch({ token_address: "preview-watch-two", name: "Night Circuit", symbol: "NITE", research_state: "under_watch", market_cap_usd: 26_300, trade_count: 16, unique_traders: 8, first_minute_buyers: 3, peak_multiple: 0.82, buy_pressure_pct: 59, drawdown_from_peak_pct: 24 }),
     previewLaunch({ token_address: "preview-acquired-one", name: "Open Signal", symbol: "OPEN", research_state: "target_locked", market_cap_usd: 48_600, entry_market_cap_usd: 33_200, position_status: "open" }),
-    previewLaunch({ token_address: "preview-acquired-two", name: "Watchtower", symbol: "WATCH", research_state: "target_locked", market_cap_usd: 72_100, entry_market_cap_usd: 41_800, position_status: "closed" }),
+    previewLaunch({ token_address: "preview-acquired-two", name: "Watchtower", symbol: "WATCH", research_state: "target_locked", market_cap_usd: 72_100, entry_market_cap_usd: 41_800, position_status: "closed", closed_at: new Date(Date.now() - 8 * 60 * 60_000).toISOString() }),
   ];
 }
 
@@ -229,9 +229,18 @@ export default async function Home() {
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
+  const recentClosedCutoff = Date.now() - 24 * 60 * 60_000;
   const acquired = visibleLaunches
     .filter((launch) => launch.research_state === "target_locked")
-    .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
+    .filter((launch) => launch.position_status !== "closed" || !launch.closed_at || new Date(launch.closed_at).getTime() >= recentClosedCutoff)
+    .sort((a, b) => {
+      const aClosed = a.position_status === "closed";
+      const bClosed = b.position_status === "closed";
+      if (aClosed !== bClosed) return aClosed ? 1 : -1;
+      const aTime = aClosed ? a.closed_at : a.acquired_at;
+      const bTime = bClosed ? b.closed_at : b.acquired_at;
+      return new Date(bTime ?? b.research_state_at).getTime() - new Date(aTime ?? a.research_state_at).getTime();
+    });
   const surveillance = visibleLaunches
     .filter((launch) => launch.research_state === "under_watch")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
@@ -265,7 +274,7 @@ export default async function Home() {
           <div className="launchBoard">
             <LaunchLane title="Sighted" count={showingPreview ? sightings.length : researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" preview={showingPreview} />
             <LaunchLane title="Surveillance" count={showingPreview ? surveillance.length : researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" preview={showingPreview} />
-            <LaunchLane title="Acquired" count={showingPreview ? acquired.length : researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" preview={showingPreview} />
+            <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" preview={showingPreview} />
           </div>
         )}
         <footer className="panelFoot"><span>{showingPreview ? "Sample tokens shown for design" : `Ponseye is watching ${launchCount.toLocaleString("en-GB")} launches`}</span><span>{showingPreview ? "Interface preview only" : "Buys appear after confirmation"}</span></footer>
