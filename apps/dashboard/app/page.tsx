@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import type { Launch } from "../lib/data";
 import { getDashboardData } from "../lib/data";
 import { quoteValue } from "../lib/market";
@@ -38,7 +37,7 @@ function TokenCard({ launch }: { launch: Launch }) {
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
 
   return (
-    <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
+    <a className="launchCardLink" href={`/launch/${launch.token_address}`}>
       <article className="launchCard">
         <div className="cardTop">
           <div className="tokenImage">
@@ -72,7 +71,7 @@ function TokenCard({ launch }: { launch: Launch }) {
         </div>
 
       </article>
-    </Link>
+    </a>
   );
 }
 
