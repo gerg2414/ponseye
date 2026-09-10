@@ -36,7 +36,7 @@ function TokenCard({ launch }: { launch: Launch }) {
     <article className="launchCard">
       <div className="cardTop">
         <div className="tokenImage">
-          {imageUrl ? <Image src={imageUrl} alt="" width={50} height={50} /> : <span>?</span>}
+          {imageUrl ? <Image src={imageUrl} alt="" width={60} height={60} /> : <span>?</span>}
         </div>
         <div className="tokenIdentity">
           <div><strong>{launch.name ?? "Metadata pending"}</strong><time>{age(launch.launched_at)}</time></div>
