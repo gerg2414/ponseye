@@ -260,13 +260,16 @@ export default async function Home() {
 
       <section className="consolePrelude" aria-label="Ponseye system status">
         <div className="consoleSignal">
-          <span className="consoleNode">Cybernetic observation node // 01</span>
-          <strong>The market blinks.<br />Ponseye does not.</strong>
-          <div className="consoleTelemetry">
-            <span><i />Vision array online</span>
-            <span>Threat index unresolved</span>
-            <span>Target state acquiring</span>
+          <span className="consoleNode">Ponseye system trace // session 0847</span>
+          <div className="consoleLog">
+            <span><time>00:00:01</time><b>Optic array initialised</b></span>
+            <span><time>00:00:03</time><b>Robinhood feed linked</b></span>
+            <span><time>00:00:07</time><b>Launch field mapped</b></span>
+            <span><time>00:00:09</time><b>Contract trace active</b></span>
+            <span><time>00:00:12</time><b>Signal memory loaded</b></span>
+            <span><time>00:00:15</time><b>Acquisition gate closed</b></span>
           </div>
+          <span className="consoleAwait"><i />No target selected // surveillance continues</span>
         </div>
       </section>
 
