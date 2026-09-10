@@ -105,9 +105,6 @@ export default async function Home() {
   return (
     <main>
       <header className="header">
-        <div className="brand" aria-label="PonsEye">
-          <Image className="brandLogo" src="/ponseye-logo-transparent.webp" alt="PonsEye" width={2048} height={768} priority sizes="(max-width: 620px) 220px, 280px" />
-        </div>
         <div className="systemMeta">
           <span>Robinhood Chain</span>
           <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {recorderLive ? "Recorder live" : "Recorder paused"}</div>
@@ -116,9 +113,11 @@ export default async function Home() {
 
       <section className="hero">
         <div className="heroCopy">
-          <p className="eyebrow"><span>01</span> PONS launch intelligence</p>
+          <div className="heroBrand">
+            <Image className="heroRobot" src="/ponseye-robot-scanning.webp" alt="" width={512} height={512} priority />
+            <Image className="heroWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
+          </div>
           <h1>Watch every launch.<br /><em>Find what repeats.</em></h1>
-          <p className="lede">PonsEye records launches and curve trades so we can test patterns against evidence, not guesswork.</p>
         </div>
         <div className="eyeConsole" aria-hidden="true">
           <div className="corner topLeft" /><div className="corner topRight" />
