@@ -133,7 +133,7 @@ export async function saveFactoryEvent(row: EventRow) {
       launched_at: row.Block.Time,
       block_number: row.Block.Number ?? null,
       raw_factory_event: row,
-    }, { onConflict: "curve_address", ignoreDuplicates: false });
+    }, { onConflict: "token_address", ignoreDuplicates: false });
     assertOk(error, "save TokenLaunched");
     tokenByCurve.set(String(args.curve).toLowerCase(), token);
     knownTokens.add(token);
