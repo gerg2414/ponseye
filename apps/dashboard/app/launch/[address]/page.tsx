@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLaunchDetail } from "../../../lib/data";
+import { getLaunchDetail, type LaunchRecord, type MarketTrade } from "../../../lib/data";
 import { launchMarket, quoteValue } from "../../../lib/market";
 import { TokenImage } from "../../token-image";
 import { CopyField } from "./copy-field";
@@ -13,6 +13,96 @@ export const metadata: Metadata = {
   title: "Launch Research | PonsEye",
   description: "Recorded PONS launch data and trade evidence.",
 };
+
+const previewPositions = {
+  "preview-acquired-one": { name: "Open Signal", symbol: "OPEN", entry: 33_200, current: 48_600, closed: false },
+  "preview-acquired-two": { name: "Watchtower", symbol: "WATCH", entry: 41_800, current: 72_100, closed: true },
+} as const;
+
+function previewLaunchDetail(address: keyof typeof previewPositions) {
+  const position = previewPositions[address];
+  const end = Date.now();
+  const start = end - 74 * 60_000;
+  const acquiredAt = new Date(start + 22 * 60_000).toISOString();
+  const closedAt = position.closed ? new Date(start + 62 * 60_000).toISOString() : null;
+  const marketTrades: MarketTrade[] = Array.from({ length: 75 }, (_, index) => {
+    const progress = index / 74;
+    const base = 17_800 + (position.current - 17_800) * progress;
+    const pulse = Math.sin(index * 0.72) * 2_600 + Math.sin(index * 0.19) * 1_400;
+    const lateMove = position.closed && index > 62 ? -(index - 62) * 320 : 0;
+    const marketCap = Math.max(12_000, base + pulse + lateMove);
+    return {
+      market_event_id: `preview-${index}`,
+      transaction_hash: `0x${index.toString(16).padStart(64, "0")}`,
+      block_time: new Date(start + index * 60_000).toISOString(),
+      side: index % 4 === 0 ? "sell" : "buy",
+      trader_address: null,
+      price_usd: marketCap / 1_000_000_000,
+      base_amount_usd: 250 + index * 11,
+      quote_amount_usd: 250 + index * 11,
+      protocol: "pons_v2",
+    };
+  });
+
+  const launch: LaunchRecord = {
+    token_address: address,
+    curve_address: "0x8e5d2dff0e240f331933c8a839e2df2d65d01ec4",
+    name: position.name,
+    symbol: position.symbol,
+    image_url: null,
+    deployer_address: "0x45d416dce3b69353fdbbdc9ebfc6e03194083c11",
+    pair_token_address: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    status: position.closed ? "closed" : "active",
+    launched_at: new Date(start).toISOString(),
+    swept_at: null,
+    graduated_at: null,
+    trade_count: 184,
+    buys: 132,
+    sells: 52,
+    unique_traders: 68,
+    net_quote_raw: "0",
+    last_trade_at: new Date(end).toISOString(),
+    graduation_threshold_raw: null,
+    progress_pct: 100,
+    volume_quote_raw: "0",
+    last_quote_amount_raw: null,
+    last_token_amount_raw: null,
+    peak_multiple: position.current / position.entry,
+    drawdown_from_peak_pct: position.closed ? 8.4 : 3.1,
+    buy_pressure_pct: 71.7,
+    creator_trades: 0,
+    creator_sells: 0,
+    first_minute_buyers: 14,
+    largest_buy_quote_raw: null,
+    holder_snapshot_at: new Date(end).toISOString(),
+    holder_count: 347,
+    holder_change_5m: 18,
+    largest_holder_pct: 8.1,
+    top_10_holder_pct: 42.6,
+    top_100_holder_pct: 78.4,
+    creator_balance_pct: 0,
+    price_usd: position.current / 1_000_000_000,
+    volume_usd: 186_400,
+    market_cap_usd: position.current,
+    ath_market_cap_usd: position.current * 1.08,
+    usd_price_at: new Date(end).toISOString(),
+    research_state: "target_locked",
+    research_state_at: acquiredAt,
+    research_rule_version: "design-preview",
+    research_reasons: [],
+    acquired_at: acquiredAt,
+    closed_at: closedAt,
+    entry_market_cap_usd: position.entry,
+    position_status: position.closed ? "closed" : "open",
+    description: "A sample PonsEye position showing the autonomous entry and position lifecycle on the market cap chart.",
+    twitter_url: null,
+    telegram_url: null,
+    discord_url: null,
+    website_url: null,
+  };
+
+  return { launch, trades: [], marketTrades };
+}
 
 function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" }) {
   const paths = {
@@ -44,9 +134,11 @@ function SocialIcon({ type }: { type: "website" | "x" | "telegram" }) {
 
 export default async function LaunchPage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = await params;
-  if (!/^0x[0-9a-f]{40}$/i.test(address)) notFound();
+  const previewAddress = address as keyof typeof previewPositions;
+  const isPreview = previewAddress in previewPositions;
+  if (!isPreview && !/^0x[0-9a-f]{40}$/i.test(address)) notFound();
 
-  const detail = await getLaunchDetail(address.toLowerCase());
+  const detail = isPreview ? previewLaunchDetail(previewAddress) : await getLaunchDetail(address.toLowerCase());
   if (!detail) notFound();
 
   const { launch, marketTrades } = detail;
