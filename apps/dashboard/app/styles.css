@@ -126,11 +126,13 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .tokenIdentity { flex: 1; min-width: 0; display: grid; gap: 7px; padding-top: 2px; }
 .tokenIdentity strong { overflow: hidden; color: var(--white); font-family: Arial,sans-serif; font-size: 19px; white-space: nowrap; text-overflow: ellipsis; }
 .tokenIdentity > span { color: var(--purple); font-size: 13px; }
-.cardMarketCap { margin-top: 17px; padding: 13px 14px; display: flex; align-items: end; justify-content: space-between; gap: 12px; border: 1px solid #242833; background: rgba(7,9,12,.72); }
+.cardMarketCap { margin-top: 22px; display: grid; gap: 8px; }
 .cardMarketCap span { color: #777e8c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.cardMarketCap strong { overflow: hidden; color: #f1f2f6; font-family: Arial,sans-serif; font-size: 24px; letter-spacing: -.035em; white-space: nowrap; text-overflow: ellipsis; }
-.acquiredMetrics { margin-top: 22px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.cardMarketCap strong { overflow: hidden; color: #f1f2f6; font-family: Arial,sans-serif; font-size: 29px; line-height: 1; letter-spacing: -.045em; white-space: nowrap; text-overflow: ellipsis; }
+.acquiredMetrics { margin-top: 22px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .acquiredMetrics > div { min-width: 0; display: grid; gap: 8px; }
+.acquiredMetrics > div:nth-child(2) { justify-items: center; text-align: center; }
+.acquiredMetrics > div:last-child { justify-items: end; text-align: right; }
 .acquiredMetrics span { color: #777e8c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .acquiredMetrics strong { overflow: hidden; color: #eceef3; font-family: Arial,sans-serif; font-size: 23px; line-height: 1; letter-spacing: -.04em; white-space: nowrap; text-overflow: ellipsis; }
 .acquiredMetrics .gainMetric strong { color: var(--green); }
