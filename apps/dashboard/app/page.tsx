@@ -169,7 +169,7 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
             </svg>
             <div className="positionMonitorFooter">
               <span><i />{launch.position_status === "closed" ? "Position closed" : "Position live"}</span>
-              {preview ? <span className="chartLink">View chart <b>↗</b></span> : <Link href={`/launch/${launch.token_address}`} className="chartLink">View chart <b>↗</b></Link>}
+              <Link href={`/launch/${launch.token_address}`} className="chartLink">View chart <b>↗</b></Link>
             </div>
           </div>
         ) : (
