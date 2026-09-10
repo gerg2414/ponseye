@@ -210,7 +210,19 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty, preview =
     <section className={`launchLane ${tone}`}>
       <header className="laneHead">
         <div><Image src={icon} alt="" width={38} height={38} /><strong>{title}</strong></div>
-        <span>{count}</span>
+        <div className="laneHeadActions">
+          {mode === "acquired" ? (
+            <Link href="/targets" className="capitalCircuitLink">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 18.5V5.5M3 18.5H21" />
+                <path className="circuitTrace" d="M5.5 15.5L9 12l3 2 6.5-7" />
+                <path className="circuitArrow" d="M15.5 7h3v3" />
+              </svg>
+              <span>Capital circuit</span>
+            </Link>
+          ) : null}
+          <span className="laneCount">{count}</span>
+        </div>
       </header>
       <div className="launchLaneBody">
         {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} preview={preview} />) : (
