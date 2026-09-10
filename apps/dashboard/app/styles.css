@@ -8,6 +8,10 @@
   --white: #f5f6fa;
   --purple: #a56cff;
   --green: #9aff4f;
+  --radius-shell: 16px;
+  --radius-panel: 14px;
+  --radius-card: 12px;
+  --radius-control: 8px;
 }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
@@ -346,6 +350,37 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .detailTradeTape { margin-top: 16px; }
 .detailTradeTape .tradeRows { max-height: 620px; }
 .detailTradeTape .tradeRow { grid-template-columns: 60px 1fr 1fr 190px; }
+
+/* Rounded shell study: keep the hierarchy clear without softening the pixel readouts. */
+.stats,
+.panel,
+.boardSection,
+.targetOverview,
+.targetsResults,
+.chartPanel,
+.metricRail,
+.launchInfo,
+.tradeTape { border-radius: var(--radius-shell); overflow: hidden; }
+
+.eyeConsole,
+.targetScanner,
+.launchLane { border-radius: var(--radius-panel); overflow: hidden; }
+
+.launchCard,
+.launchCardLink,
+.targetCard,
+.laneEmpty { border-radius: var(--radius-card); }
+
+.metrics,
+.targetValues,
+.status,
+.previewLabel,
+.laneHead > span,
+.tvToolbar span,
+.tradeRow b { border-radius: var(--radius-control); }
+
+.progressTrack { border-radius: 0; }
+
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; padding-right: 0; gap: 20px; }
   .eyeConsole { display: none; }
