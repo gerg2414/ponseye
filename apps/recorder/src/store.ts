@@ -54,7 +54,7 @@ export async function saveLaunchCall(row: LaunchCall) {
     initial_quote_in_raw: metadata.initialQuoteIn ?? null,
     raw_launch_call: row,
   };
-  const { error } = await db.from("launches").upsert(payload, { onConflict: "token_address" });
+  const { error } = await db.from("launches").upsert(payload, { onConflict: "curve_address" });
   assertOk(error, "save launch");
 }
 
@@ -76,7 +76,7 @@ export async function saveFactoryEvent(row: EventRow) {
       launched_at: row.Block.Time,
       block_number: row.Block.Number ?? null,
       raw_factory_event: row,
-    }, { onConflict: "token_address", ignoreDuplicates: false });
+    }, { onConflict: "curve_address", ignoreDuplicates: false });
     assertOk(error, "save TokenLaunched");
     return;
   }
@@ -100,9 +100,12 @@ export async function saveTrade(row: EventRow) {
     .eq("curve_address", curve)
     .maybeSingle();
 
+  // Ignore older or unrelated curves that are not part of this fresh PonsEye run.
+  if (!launch?.token_address) return;
+
   const { error } = await db.from("trades").upsert({
     event_id: id,
-    token_address: launch?.token_address ?? null,
+    token_address: launch.token_address,
     curve_address: curve,
     transaction_hash: row.Transaction.Hash.toLowerCase(),
     block_time: row.Block.Time,
