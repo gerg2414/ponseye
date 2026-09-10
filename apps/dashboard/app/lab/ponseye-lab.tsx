@@ -22,6 +22,7 @@ type Rule = {
 type LabSettings = {
   scoreThreshold: number;
   runnerTarget: number;
+  positionSizeUsd: number;
   creatorGate: boolean;
   concentrationGate: boolean;
   rules: Rule[];
@@ -43,6 +44,7 @@ const presets: Record<PresetName, LabSettings> = {
   balanced: {
     scoreThreshold: 70,
     runnerTarget: 2,
+    positionSizeUsd: 25,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -58,6 +60,7 @@ const presets: Record<PresetName, LabSettings> = {
   discovery: {
     scoreThreshold: 55,
     runnerTarget: 2,
+    positionSizeUsd: 25,
     creatorGate: true,
     concentrationGate: false,
     rules: [
@@ -73,6 +76,7 @@ const presets: Record<PresetName, LabSettings> = {
   strict: {
     scoreThreshold: 100,
     runnerTarget: 2,
+    positionSizeUsd: 25,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -88,6 +92,7 @@ const presets: Record<PresetName, LabSettings> = {
   early: {
     scoreThreshold: 65,
     runnerTarget: 2,
+    positionSizeUsd: 25,
     creatorGate: true,
     concentrationGate: false,
     rules: [
@@ -103,6 +108,7 @@ const presets: Record<PresetName, LabSettings> = {
   crowd: {
     scoreThreshold: 65,
     runnerTarget: 2,
+    positionSizeUsd: 25,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -118,6 +124,7 @@ const presets: Record<PresetName, LabSettings> = {
   quality: {
     scoreThreshold: 75,
     runnerTarget: 2,
+    positionSizeUsd: 25,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -145,6 +152,7 @@ const savedModelsKey = "ponseye-lab-saved-models-v1";
 const currentModelKey = "ponseye-lab-current-model-v1";
 
 const runnerOptions = [1.5, 2, 3, 5];
+const runnerLadderTargets = [2, 5, 10, 20, 50, 100];
 
 function cloneSettings(settings: LabSettings): LabSettings {
   return { ...settings, rules: settings.rules.map((rule) => ({ ...rule })) };
@@ -155,11 +163,19 @@ function isLabSettings(value: unknown): value is LabSettings {
   const candidate = value as Partial<LabSettings>;
   return typeof candidate.scoreThreshold === "number"
     && typeof candidate.runnerTarget === "number"
+    && typeof candidate.positionSizeUsd === "number"
     && typeof candidate.creatorGate === "boolean"
     && typeof candidate.concentrationGate === "boolean"
     && Array.isArray(candidate.rules)
     && candidate.rules.length === presets.balanced.rules.length
     && candidate.rules.every((rule) => rule && typeof rule.threshold === "number" && typeof rule.weight === "number");
+}
+
+function normaliseLabSettings(value: unknown): LabSettings | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<LabSettings>;
+  const migrated = typeof candidate.positionSizeUsd === "number" ? value : { ...candidate, positionSizeUsd: 25 };
+  return isLabSettings(migrated) ? cloneSettings(migrated) : null;
 }
 
 function valueFor(token: LabToken, key: RuleKey) {
@@ -226,6 +242,14 @@ function formatMarketCap(value: number | null) {
   }).format(value);
 }
 
+function formatUsd(value: number) {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  }).format(value);
+}
+
 function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget: number }) {
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
   return (
@@ -256,14 +280,17 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     try {
       const current = JSON.parse(window.localStorage.getItem(currentModelKey) ?? "null") as unknown;
       const saved = JSON.parse(window.localStorage.getItem(savedModelsKey) ?? "[]") as unknown;
-      if (isLabSettings(current)) {
-        setSettings(cloneSettings(current));
+      const restoredCurrent = normaliseLabSettings(current);
+      if (restoredCurrent) {
+        setSettings(restoredCurrent);
         setActivePreset("custom");
       }
       if (Array.isArray(saved)) {
-        setSavedModels(saved.filter((item): item is SavedModel => Boolean(
-          item && typeof item === "object" && typeof (item as SavedModel).name === "string" && isLabSettings((item as SavedModel).settings),
-        )));
+        setSavedModels(saved.flatMap((item) => {
+          if (!item || typeof item !== "object" || typeof (item as SavedModel).name !== "string") return [];
+          const restoredSettings = normaliseLabSettings((item as SavedModel).settings);
+          return restoredSettings ? [{ name: (item as SavedModel).name, settings: restoredSettings }] : [];
+        }));
       }
     } catch {
       // Ignore malformed browser storage and start with the balanced model.
@@ -284,6 +311,10 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     const misses = rejected.filter((token) => (token.future_peak_multiple ?? 0) >= settings.runnerTarget);
     const falsePositives = selected.filter((token) => (token.future_peak_multiple ?? 0) < 1.2);
     const graduated = selected.filter((token) => token.status === "graduated");
+    const pricedSignals = selected.filter((token) => token.future_peak_multiple != null);
+    const capitalTested = pricedSignals.length * settings.positionSizeUsd;
+    const recordedPeakValue = pricedSignals.reduce((total, token) => total + settings.positionSizeUsd * (token.future_peak_multiple ?? 0), 0);
+    const peakPotentialGain = recordedPeakValue - capitalTested;
     const orderedSignals = [...selected].sort((a, b) => (b.future_peak_multiple ?? 0) - (a.future_peak_multiple ?? 0));
     const orderedMisses = [...misses].sort((a, b) => (b.future_peak_multiple ?? 0) - (a.future_peak_multiple ?? 0));
     const bands = [
@@ -293,7 +324,12 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       selected.filter((token) => (token.future_peak_multiple ?? 0) >= 1.5 && (token.future_peak_multiple ?? 0) < 2).length,
       selected.filter((token) => (token.future_peak_multiple ?? 0) < 1.5).length,
     ];
-    return { selected, hits, misses, falsePositives, graduated, orderedSignals, orderedMisses, bands };
+    const runnerLadder = runnerLadderTargets.map((target) => ({
+      target,
+      caught: selected.filter((token) => (token.future_peak_multiple ?? 0) >= target).length,
+      total: scored.filter((token) => (token.future_peak_multiple ?? 0) >= target).length,
+    }));
+    return { selected, hits, misses, falsePositives, graduated, pricedSignals, capitalTested, recordedPeakValue, peakPotentialGain, orderedSignals, orderedMisses, bands, runnerLadder };
   }, [tokens, settings]);
 
   function choosePreset(name: PresetName) {
@@ -420,17 +456,48 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         <div className="labOutcomeTarget">
           <span>Measure a runner at</span>
           <div>{runnerOptions.map((target) => <button type="button" className={settings.runnerTarget === target ? "active" : ""} key={target} onClick={() => setSettings({ ...settings, runnerTarget: target })}>{target}x</button>)}</div>
+          <label className="labStakeControl">
+            <span>Position size</span>
+            <span><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={settings.positionSizeUsd} onChange={(event) => { setSettings({ ...settings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) }); setActivePreset("custom"); }} /></span>
+          </label>
           <small>Peak reached after the Surveillance timestamp</small>
         </div>
 
         <div className="labSummaryGrid">
-          <article className="primary"><small>Signals fired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} candidates</span></article>
+          <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
           <article><small>{settings.runnerTarget}x runners</small><strong>{analysis.hits.length}</strong><span>caught after signal</span></article>
           <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>including stalled tokens</span></article>
           <article><small>Missed runners</small><strong>{analysis.misses.length}</strong><span>rejected by this model</span></article>
           <article><small>Under 1.2x</small><strong>{analysis.falsePositives.length}</strong><span>selected but stalled</span></article>
           <article><small>Graduated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
         </div>
+
+        <section className="labRunnerLadder">
+          <header><div><small>Runner ladder</small><h2>Targets this model would acquire</h2></div><span>Caught from all Surveillance runners</span></header>
+          <div>
+            {analysis.runnerLadder.map((level) => {
+              const catchRate = level.total ? level.caught * 100 / level.total : 0;
+              return (
+                <article key={level.target}>
+                  <small>{level.target}x+</small>
+                  <strong>{level.caught}</strong>
+                  <span>of {level.total} runners</span>
+                  <i><b style={{ width: `${catchRate}%` }} /></i>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="labMoneyPanel">
+          <header><div><small>Position test</small><h2>If every acquired token received {formatUsd(settings.positionSizeUsd)}</h2></div><span>Recorded peak potential</span></header>
+          <div className="labMoneyGrid">
+            <article><small>Capital tested</small><strong>{formatUsd(analysis.capitalTested)}</strong><span>{analysis.pricedSignals.length} priced signals</span></article>
+            <article><small>Combined peak value</small><strong>{formatUsd(analysis.recordedPeakValue)}</strong><span>Each token measured at its own peak</span></article>
+            <article className={analysis.peakPotentialGain >= 0 ? "positive" : "negative"}><small>Peak potential gain</small><strong>{analysis.peakPotentialGain >= 0 ? "+" : ""}{formatUsd(analysis.peakPotentialGain)}</strong><span>Before fees and slippage</span></article>
+          </div>
+          <p>This is the maximum recorded potential, not a realised return. A sell strategy is needed before we can produce an honest profit figure.</p>
+        </section>
 
         <section className="labBreakdown">
           <header><div><small>Selected performance</small><h2>Peak after signal</h2></div><span>Curve + migrated pool</span></header>
@@ -444,8 +511,8 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         <section className="labResults">
           <header>
             <div className="labResultTabs">
-              <button type="button" className={resultView === "signals" ? "active" : ""} onClick={() => setResultView("signals")}>Selected signals <span>{analysis.selected.length}</span></button>
-              <button type="button" className={resultView === "misses" ? "active" : ""} onClick={() => setResultView("misses")}>Missed runners <span>{analysis.misses.length}</span></button>
+              <button type="button" className={resultView === "signals" ? "active" : ""} onClick={() => setResultView("signals")}>Would reach Acquired <span>{analysis.selected.length}</span></button>
+              <button type="button" className={resultView === "misses" ? "active" : ""} onClick={() => setResultView("misses")}>Rejected runners <span>{analysis.misses.length}</span></button>
             </div>
             <small>Sorted by peak performance</small>
           </header>
