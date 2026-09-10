@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLaunchDetail } from "../../../lib/data";
 import { launchMarket, quoteAsset, quoteValue } from "../../../lib/market";
-import { AutoRefresh } from "../../auto-refresh";
 import { TokenImage } from "../../token-image";
 import { CopyField } from "./copy-field";
 import { PonsEyeChart } from "./ponseye-chart";
@@ -72,7 +71,6 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
 
   return (
     <main className="launchPage">
-      <AutoRefresh intervalMs={3_000} />
       <header className="launchNav">
         <Link href="/" className="backLink"><span>←</span> All launches</Link>
         <div className="detailLive"><i /> Live record</div>

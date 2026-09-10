@@ -182,55 +182,46 @@ export async function getLaunchDetail(tokenAddress: string) {
     auth: { persistSession: false },
     db: { retry: false },
   });
-  const [boardResult, launchResult, tradesResult, curveMarketTradesResult, poolMarketTradesResult] = await Promise.all([
-    db.from("launch_board").select("*").eq("token_address", tokenAddress).maybeSingle(),
-    db.from("launches").select("description,twitter_url,telegram_url,discord_url,website_url").eq("token_address", tokenAddress).maybeSingle(),
-    db.from("trades")
-      .select("event_id,transaction_hash,block_time,side,trader_address,recipient_address,quote_amount_raw,token_amount_raw,fee_raw,tax_raw")
-      .eq("token_address", tokenAddress)
-      .order("block_time", { ascending: false })
-      .limit(1000),
-    db.from("trade_market_data")
-      .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd,protocol")
-      .eq("token_address", tokenAddress)
-      .eq("protocol", "pons_v2")
-      .order("block_time", { ascending: false })
-      .limit(2000),
-    db.from("trade_market_data")
-      .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd,protocol")
-      .eq("token_address", tokenAddress)
-      .eq("protocol", "uniswap_v4")
-      .order("block_time", { ascending: false })
-      .limit(2000),
-  ]);
+  const result = await db.rpc("get_launch_detail", {
+    p_token_address: tokenAddress,
+    p_trade_limit: 100,
+    p_market_limit: 1000,
+  }).abortSignal(AbortSignal.timeout(8_000));
 
-  if (!boardResult.data || boardResult.error) return null;
+  if (result.error || !result.data?.launch) {
+    console.error("[launch] detail request failed", result.error?.message ?? "Launch missing");
+    return null;
+  }
+
+  const payload = result.data as {
+    launch: LaunchRecord;
+    trades: Trade[];
+    marketTrades: MarketTrade[];
+  };
+  const launch = payload.launch;
 
   return {
     launch: {
-      ...boardResult.data,
-      ...launchResult.data,
-      progress_pct: boardResult.data.progress_pct == null ? null : Number(boardResult.data.progress_pct),
-      peak_multiple: boardResult.data.peak_multiple == null ? null : Number(boardResult.data.peak_multiple),
-      drawdown_from_peak_pct: boardResult.data.drawdown_from_peak_pct == null ? null : Number(boardResult.data.drawdown_from_peak_pct),
-      buy_pressure_pct: boardResult.data.buy_pressure_pct == null ? null : Number(boardResult.data.buy_pressure_pct),
-      largest_holder_pct: boardResult.data.largest_holder_pct == null ? null : Number(boardResult.data.largest_holder_pct),
-      top_10_holder_pct: boardResult.data.top_10_holder_pct == null ? null : Number(boardResult.data.top_10_holder_pct),
-      top_100_holder_pct: boardResult.data.top_100_holder_pct == null ? null : Number(boardResult.data.top_100_holder_pct),
-      creator_balance_pct: boardResult.data.creator_balance_pct == null ? null : Number(boardResult.data.creator_balance_pct),
-      price_usd: boardResult.data.price_usd == null ? null : Number(boardResult.data.price_usd),
-      volume_usd: boardResult.data.volume_usd == null ? null : Number(boardResult.data.volume_usd),
-      market_cap_usd: boardResult.data.market_cap_usd == null ? null : Number(boardResult.data.market_cap_usd),
-      ath_market_cap_usd: boardResult.data.ath_market_cap_usd == null ? null : Number(boardResult.data.ath_market_cap_usd),
+      ...launch,
+      progress_pct: launch.progress_pct == null ? null : Number(launch.progress_pct),
+      peak_multiple: launch.peak_multiple == null ? null : Number(launch.peak_multiple),
+      drawdown_from_peak_pct: launch.drawdown_from_peak_pct == null ? null : Number(launch.drawdown_from_peak_pct),
+      buy_pressure_pct: launch.buy_pressure_pct == null ? null : Number(launch.buy_pressure_pct),
+      largest_holder_pct: launch.largest_holder_pct == null ? null : Number(launch.largest_holder_pct),
+      top_10_holder_pct: launch.top_10_holder_pct == null ? null : Number(launch.top_10_holder_pct),
+      top_100_holder_pct: launch.top_100_holder_pct == null ? null : Number(launch.top_100_holder_pct),
+      creator_balance_pct: launch.creator_balance_pct == null ? null : Number(launch.creator_balance_pct),
+      price_usd: launch.price_usd == null ? null : Number(launch.price_usd),
+      volume_usd: launch.volume_usd == null ? null : Number(launch.volume_usd),
+      market_cap_usd: launch.market_cap_usd == null ? null : Number(launch.market_cap_usd),
+      ath_market_cap_usd: launch.ath_market_cap_usd == null ? null : Number(launch.ath_market_cap_usd),
     } as LaunchRecord,
-    trades: [...(tradesResult.data ?? [])].reverse() as Trade[],
-    marketTrades: [...(curveMarketTradesResult.data ?? []), ...(poolMarketTradesResult.data ?? [])]
-      .sort((a, b) => new Date(a.block_time).getTime() - new Date(b.block_time).getTime())
-      .map((trade) => ({
+    trades: payload.trades ?? [],
+    marketTrades: (payload.marketTrades ?? []).map((trade) => ({
       ...trade,
       price_usd: trade.price_usd == null ? null : Number(trade.price_usd),
       base_amount_usd: trade.base_amount_usd == null ? null : Number(trade.base_amount_usd),
       quote_amount_usd: trade.quote_amount_usd == null ? null : Number(trade.quote_amount_usd),
-      })) as MarketTrade[],
+    })) as MarketTrade[],
   };
 }
