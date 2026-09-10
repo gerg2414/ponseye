@@ -20,8 +20,9 @@ function subscribe(
   client.subscribe({ query }, {
     next: async (result) => {
       try {
-        const evm = (result.data as { EVM?: Record<string, never[]> } | undefined)?.EVM;
-        const collections = evm ? Object.entries(evm) : [];
+        const data = result.data as { EVM?: Record<string, never[]>; Trading?: Record<string, never[]> } | undefined;
+        const root = data?.EVM ?? data?.Trading;
+        const collections = root ? Object.entries(root) : [];
         for (const [collection, rows] of collections) {
           for (const row of rows) await handler(row as never, collection);
         }
