@@ -376,6 +376,44 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .metricRail strong { overflow: hidden; color: #f0f1f5; font-family: Arial,sans-serif; font-size: 18px; letter-spacing: -.015em; white-space: nowrap; text-overflow: ellipsis; }
 .metricRail .positive { color: var(--green); }
 .metricRail .negative { color: #ff718c; }
+.positionPage { padding-bottom: 56px; }
+.positionNavStatus { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.positionNavStatus i { width: 8px; height: 8px; display: block; }
+.positionNavStatus.live { color: var(--green); }
+.positionNavStatus.live i { background: var(--green); box-shadow: 0 0 12px rgba(154,255,79,.8); }
+.positionNavStatus.closed { color: #ff718c; }
+.positionNavStatus.closed i { background: #ff718c; box-shadow: 0 0 12px rgba(255,113,140,.65); }
+.positionHero { min-height: 225px; padding: 30px 4px; display: flex; align-items: center; justify-content: space-between; gap: 38px; }
+.positionHero .launchIdentity { align-items: center; }
+.positionHero h1 { max-width: none; margin: 0; overflow: hidden; font-size: clamp(42px,5.4vw,76px); white-space: nowrap; text-overflow: ellipsis; }
+.positionEyebrow { display: block; margin-bottom: 9px; color: var(--purple); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.positionMultiple { min-width: 270px; display: grid; justify-items: end; }
+.positionMultiple > span { color: #858b98; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.positionMultiple strong { margin: 3px 0 1px; color: var(--green); font-family: Arial,sans-serif; font-size: clamp(64px,8vw,118px); line-height: .95; letter-spacing: -.07em; text-shadow: 0 0 34px rgba(154,255,79,.18); }
+.positionMultiple.negative strong { color: #ff718c; text-shadow: 0 0 34px rgba(255,113,140,.18); }
+.positionMultiple small { color: #777e8c; font-size: 12px; }
+.positionStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border: 1px solid #343844; border-radius: 10px; background: rgba(12,14,18,.94); }
+.positionStats article { min-height: 112px; padding: 20px 24px; display: grid; align-content: center; gap: 8px; border-right: 1px solid #2b2e38; }
+.positionStats article:last-child { border-right: 0; }
+.positionStats span { color: #8e94a2; font-size: 14px; letter-spacing: .055em; text-transform: uppercase; }
+.positionStats strong { color: var(--white); font-family: Arial,sans-serif; font-size: clamp(29px,3vw,43px); letter-spacing: -.04em; }
+.positionStats article.positive strong { color: var(--green); }
+.positionStats article.negative strong { color: #ff718c; }
+.positionChartPanel { margin-top: 14px; overflow: hidden; border: 1px solid #343844; border-radius: 10px; background: radial-gradient(circle at 72% 0,rgba(165,108,255,.11),transparent 34rem),#0c0e12; box-shadow: 0 28px 90px rgba(0,0,0,.34); }
+.positionChartPanel > header { min-height: 84px; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; gap: 30px; border-bottom: 1px solid #292c35; }
+.positionChartPanel > header > div:first-child { display: grid; gap: 5px; }
+.positionChartKicker { color: var(--purple); font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.positionChartPanel > header strong { color: var(--white); font-family: Arial,sans-serif; font-size: 22px; }
+.positionLegend { display: flex; align-items: center; gap: 24px; color: #a3a8b3; font-size: 12px; text-transform: uppercase; }
+.positionLegend span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.positionLegend i { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 4px; font-size: 16px; font-style: normal; font-weight: 800; }
+.positionLegend .buy { color: var(--green); }
+.positionLegend .exit { color: #ff718c; }
+.positionLegend .tracking { color: var(--green); }
+.positionLegend .tracking i { width: 8px; height: 8px; border: 0; border-radius: 0; background: var(--green); box-shadow: 0 0 12px rgba(154,255,79,.8); }
+.positionChartFrame .priceChart { height: min(610px,55vw); min-height: 480px; }
+.positionChartFrame .tvToolbar { height: 48px; padding-inline: 18px; }
+.positionChartFrame .tvToolbar strong { font-size: 14px; }
 .detailColumns { display: grid; grid-template-columns: minmax(300px,.8fr) minmax(440px,1.2fr); gap: 16px; margin-top: 16px; }
 .launchInfo,.tradeTape { border: 1px solid var(--line); background: #0c0e12; }
 .launchInfo h2,.tradeTape h2 { margin: 0; color: var(--white); font-family: Arial,sans-serif; font-size: 17px; }
@@ -425,6 +463,11 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .launchTitle { grid-template-columns: 1fr; gap: 32px; }
   .launchMeta { padding: 24px 0 0; border-top: 1px solid var(--line); border-left: 0; }
   .copyField > span { font-size: 12px; }
+  .positionHero { min-height: 200px; }
+  .positionMultiple strong { font-size: 72px; }
+  .positionStats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .positionStats article:nth-child(2) { border-right: 0; }
+  .positionStats article:nth-child(-n+2) { border-bottom: 1px solid #2b2e38; }
 }
 @media (max-width: 620px) {
   main { width: 100%; padding: 0 12px 34px; }
@@ -484,6 +527,20 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .chartEmpty { min-height: 320px; }
   .tvOhlc { gap: 7px; }
   .marketBonding { width: min(230px,55%); }
+  .positionHero { padding: 25px 0; display: grid; gap: 25px; }
+  .positionHero .detailTokenImage { width: 66px; height: 66px; flex-basis: 66px; }
+  .positionHero h1 { font-size: clamp(34px,11vw,50px); }
+  .positionEyebrow { font-size: 10px; }
+  .positionMultiple { min-width: 0; justify-items: start; }
+  .positionMultiple strong { font-size: 72px; }
+  .positionStats article { min-height: 96px; padding: 15px; }
+  .positionStats span { font-size: 12px; }
+  .positionStats strong { font-size: 27px; }
+  .positionChartPanel > header { padding: 16px; align-items: flex-start; flex-direction: column; gap: 14px; }
+  .positionChartPanel > header strong { font-size: 19px; }
+  .positionLegend { width: 100%; gap: 15px; font-size: 10px; }
+  .positionLegend .tracking { margin-left: auto; }
+  .positionChartFrame .priceChart { height: 410px; min-height: 410px; }
   .tradeRow { grid-template-columns: 45px 1fr 72px; }
   .tradeRow span:nth-child(3) { display: none; }
   .detailTradeTape .tradeRow { grid-template-columns: 45px 1fr 125px; }
