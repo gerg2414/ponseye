@@ -6,7 +6,7 @@ import { quoteValue } from "../lib/market";
 import { AutoRefresh } from "./auto-refresh";
 import { TokenImage } from "./token-image";
 
-export const revalidate = 5;
+export const dynamic = "force-dynamic";
 
 const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
 function age(value: string) {
