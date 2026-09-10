@@ -44,14 +44,18 @@ function TokenCard({ launch }: { launch: Launch }) {
           <div className="tokenImage">
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
           </div>
-          <div className="tokenIdentity">
-            <strong>{launch.name ?? "Metadata pending"}</strong>
-            <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
-          </div>
-          <div className="cardTiming">
-            <time>{age(launch.launched_at)}</time>
-            <div className="cardBonding"><span>Bonding</span><strong>{progress == null ? "—" : `${progress.toFixed(1)}%`}</strong></div>
-            <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
+          <div className="cardContent">
+            <div className="cardTitleRow">
+              <div className="tokenIdentity">
+                <strong>{launch.name ?? "Metadata pending"}</strong>
+                <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
+              </div>
+              <time>{age(launch.launched_at)}</time>
+            </div>
+            <div className="cardBonding">
+              <div><span>Bonding</span><strong>{progress == null ? "—" : `${progress.toFixed(1)}%`}</strong></div>
+              <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
+            </div>
           </div>
         </div>
 

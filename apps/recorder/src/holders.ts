@@ -174,25 +174,29 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
       const dueCandidates = (await getHolderCandidates()).filter((candidate) => due(candidate, now));
       const repeats = dueCandidates
         .filter((candidate) => candidate.holder_snapshot_at)
-        .sort((a, b) => new Date(a.holder_snapshot_at!).getTime() - new Date(b.holder_snapshot_at!).getTime());
+        .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime());
       const firstSnapshots = dueCandidates
         .filter((candidate) => !candidate.holder_snapshot_at)
         .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime());
-      const candidates = [...repeats.slice(0, 8), ...firstSnapshots.slice(0, 16)];
+      const repeatBatch = repeats.slice(0, 12);
+      const firstBatch = firstSnapshots.slice(0, 12);
+      const candidates = Array.from({ length: Math.max(repeatBatch.length, firstBatch.length) })
+        .flatMap((_, index) => [repeatBatch[index], firstBatch[index]])
+        .filter((candidate): candidate is HolderCandidate => Boolean(candidate));
 
       let rateLimited = false;
-      for (const candidate of candidates) {
+      for (let index = 0; index < candidates.length; index += 4) {
         if (signal.aborted) break;
-        try {
-          await collectOne(accessToken, candidate, signal);
-        } catch (error) {
-          if (!signal.aborted) console.error(`[holder_snapshots] ${candidate.token_address} failed`, error);
-          if (error instanceof Error && error.message.includes("429")) {
-            rateLimited = true;
-            break;
+        const batch = candidates.slice(index, index + 4);
+        const results = await Promise.allSettled(batch.map((candidate) => collectOne(accessToken, candidate, signal)));
+        results.forEach((result, resultIndex) => {
+          if (result.status === "rejected" && !signal.aborted) {
+            console.error(`[holder_snapshots] ${batch[resultIndex].token_address} failed`, result.reason);
+            if (result.reason instanceof Error && result.reason.message.includes("429")) rateLimited = true;
           }
-        }
-        await delay(2_000, signal);
+        });
+        if (rateLimited) break;
+        if (index + 4 < candidates.length) await delay(3_000, signal);
       }
 
       if (!signal.aborted) await updateStreamStatus("holder_snapshots", "connected");

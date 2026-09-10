@@ -183,6 +183,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
       downColor: "#ff5f7f",
       wickUpColor: "#9aff4f",
       wickDownColor: "#ff5f7f",
+      wickVisible: false,
       borderVisible: false,
       priceLineColor: "#a56cff",
       priceLineWidth: 1,

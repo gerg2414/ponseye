@@ -167,7 +167,7 @@ export async function getLaunchDetail(tokenAddress: string) {
     auth: { persistSession: false },
     db: { retry: false },
   });
-  const [boardResult, launchResult, tradesResult, marketTradesResult] = await Promise.all([
+  const [boardResult, launchResult, tradesResult, curveMarketTradesResult, poolMarketTradesResult] = await Promise.all([
     db.from("launch_board").select("*").eq("token_address", tokenAddress).maybeSingle(),
     db.from("launches").select("description,twitter_url,telegram_url,discord_url,website_url").eq("token_address", tokenAddress).maybeSingle(),
     db.from("trades")
@@ -178,6 +178,13 @@ export async function getLaunchDetail(tokenAddress: string) {
     db.from("trade_market_data")
       .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd,protocol")
       .eq("token_address", tokenAddress)
+      .eq("protocol", "pons_v2")
+      .order("block_time", { ascending: false })
+      .limit(2000),
+    db.from("trade_market_data")
+      .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd,protocol")
+      .eq("token_address", tokenAddress)
+      .eq("protocol", "uniswap_v4")
       .order("block_time", { ascending: false })
       .limit(2000),
   ]);
@@ -202,11 +209,13 @@ export async function getLaunchDetail(tokenAddress: string) {
       ath_market_cap_usd: boardResult.data.ath_market_cap_usd == null ? null : Number(boardResult.data.ath_market_cap_usd),
     } as LaunchRecord,
     trades: [...(tradesResult.data ?? [])].reverse() as Trade[],
-    marketTrades: [...(marketTradesResult.data ?? [])].reverse().map((trade) => ({
+    marketTrades: [...(curveMarketTradesResult.data ?? []), ...(poolMarketTradesResult.data ?? [])]
+      .sort((a, b) => new Date(a.block_time).getTime() - new Date(b.block_time).getTime())
+      .map((trade) => ({
       ...trade,
       price_usd: trade.price_usd == null ? null : Number(trade.price_usd),
       base_amount_usd: trade.base_amount_usd == null ? null : Number(trade.base_amount_usd),
       quote_amount_usd: trade.quote_amount_usd == null ? null : Number(trade.quote_amount_usd),
-    })) as MarketTrade[],
+      })) as MarketTrade[],
   };
 }
