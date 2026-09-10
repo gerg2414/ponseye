@@ -128,6 +128,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
   }, [liveTrades]);
 
   useEffect(() => {
+    if (tokenAddress.startsWith("preview-")) return;
     const controller = new AbortController();
 
     async function poll() {
