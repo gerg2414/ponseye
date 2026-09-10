@@ -23,6 +23,7 @@ type LabSettings = {
   scoreThreshold: number;
   runnerTarget: number;
   positionSizeUsd: number;
+  stopLossPct: number;
   creatorGate: boolean;
   concentrationGate: boolean;
   rules: Rule[];
@@ -45,6 +46,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 70,
     runnerTarget: 2,
     positionSizeUsd: 25,
+    stopLossPct: 50,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -61,6 +63,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 55,
     runnerTarget: 2,
     positionSizeUsd: 25,
+    stopLossPct: 50,
     creatorGate: true,
     concentrationGate: false,
     rules: [
@@ -77,6 +80,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 100,
     runnerTarget: 2,
     positionSizeUsd: 25,
+    stopLossPct: 50,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -93,6 +97,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 65,
     runnerTarget: 2,
     positionSizeUsd: 25,
+    stopLossPct: 50,
     creatorGate: true,
     concentrationGate: false,
     rules: [
@@ -109,6 +114,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 65,
     runnerTarget: 2,
     positionSizeUsd: 25,
+    stopLossPct: 50,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -125,6 +131,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 75,
     runnerTarget: 2,
     positionSizeUsd: 25,
+    stopLossPct: 50,
     creatorGate: true,
     concentrationGate: true,
     rules: [
@@ -151,7 +158,7 @@ const presetDetails: Array<{ name: PresetName; label: string; description: strin
 const savedModelsKey = "ponseye-lab-saved-models-v1";
 const currentModelKey = "ponseye-lab-current-model-v1";
 
-const runnerOptions = [1.5, 2, 3, 5];
+const runnerOptions = [1.5, 2, 3, 5, 10, 20, 50, 100];
 const runnerLadderTargets = [2, 5, 10, 20, 50, 100];
 
 function cloneSettings(settings: LabSettings): LabSettings {
@@ -164,6 +171,7 @@ function isLabSettings(value: unknown): value is LabSettings {
   return typeof candidate.scoreThreshold === "number"
     && typeof candidate.runnerTarget === "number"
     && typeof candidate.positionSizeUsd === "number"
+    && typeof candidate.stopLossPct === "number"
     && typeof candidate.creatorGate === "boolean"
     && typeof candidate.concentrationGate === "boolean"
     && Array.isArray(candidate.rules)
@@ -174,7 +182,11 @@ function isLabSettings(value: unknown): value is LabSettings {
 function normaliseLabSettings(value: unknown): LabSettings | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<LabSettings>;
-  const migrated = typeof candidate.positionSizeUsd === "number" ? value : { ...candidate, positionSizeUsd: 25 };
+  const migrated = {
+    ...candidate,
+    positionSizeUsd: typeof candidate.positionSizeUsd === "number" ? candidate.positionSizeUsd : 25,
+    stopLossPct: typeof candidate.stopLossPct === "number" ? candidate.stopLossPct : 50,
+  };
   return isLabSettings(migrated) ? cloneSettings(migrated) : null;
 }
 
@@ -311,10 +323,22 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     const misses = rejected.filter((token) => (token.future_peak_multiple ?? 0) >= settings.runnerTarget);
     const falsePositives = selected.filter((token) => (token.future_peak_multiple ?? 0) < 1.2);
     const graduated = selected.filter((token) => token.status === "graduated");
-    const pricedSignals = selected.filter((token) => token.future_peak_multiple != null);
-    const capitalTested = pricedSignals.length * settings.positionSizeUsd;
-    const recordedPeakValue = pricedSignals.reduce((total, token) => total + settings.positionSizeUsd * (token.future_peak_multiple ?? 0), 0);
-    const peakPotentialGain = recordedPeakValue - capitalTested;
+    const replayable = selected.filter((token) => token.future_peak_multiple != null && token.final_multiple != null);
+    const stopMultiple = 1 - settings.stopLossPct / 100;
+    const strategyOutcomes = replayable.map((token) => {
+      const lowBeforeTarget = token.pre_target_low_multiples[String(settings.runnerTarget)];
+      const stopped = lowBeforeTarget != null && lowBeforeTarget <= stopMultiple;
+      const targetReached = (token.future_peak_multiple ?? 0) >= settings.runnerTarget;
+      const exitMultiple = stopped ? stopMultiple : targetReached ? settings.runnerTarget : Math.max(0, token.final_multiple ?? 0);
+      return { token, stopped, targetReached: targetReached && !stopped, openAtEnd: !stopped && !targetReached, exitMultiple };
+    });
+    const stopHits = strategyOutcomes.filter((outcome) => outcome.stopped).length;
+    const targetExits = strategyOutcomes.filter((outcome) => outcome.targetReached).length;
+    const openAtEnd = strategyOutcomes.filter((outcome) => outcome.openAtEnd).length;
+    const capitalTested = strategyOutcomes.length * settings.positionSizeUsd;
+    const simulatedEndValue = strategyOutcomes.reduce((total, outcome) => total + settings.positionSizeUsd * outcome.exitMultiple, 0);
+    const simulatedPnl = simulatedEndValue - capitalTested;
+    const simulatedRoi = capitalTested ? simulatedPnl * 100 / capitalTested : 0;
     const orderedSignals = [...selected].sort((a, b) => (b.future_peak_multiple ?? 0) - (a.future_peak_multiple ?? 0));
     const orderedMisses = [...misses].sort((a, b) => (b.future_peak_multiple ?? 0) - (a.future_peak_multiple ?? 0));
     const bands = [
@@ -326,10 +350,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     ];
     const runnerLadder = runnerLadderTargets.map((target) => ({
       target,
-      caught: selected.filter((token) => (token.future_peak_multiple ?? 0) >= target).length,
+      caught: selected.filter((token) => {
+        const lowBeforeTarget = token.pre_target_low_multiples[String(target)];
+        return (token.future_peak_multiple ?? 0) >= target && (lowBeforeTarget == null || lowBeforeTarget > stopMultiple);
+      }).length,
       total: scored.filter((token) => (token.future_peak_multiple ?? 0) >= target).length,
     }));
-    return { selected, hits, misses, falsePositives, graduated, pricedSignals, capitalTested, recordedPeakValue, peakPotentialGain, orderedSignals, orderedMisses, bands, runnerLadder };
+    return { selected, hits, misses, falsePositives, graduated, replayable, stopHits, targetExits, openAtEnd, capitalTested, simulatedEndValue, simulatedPnl, simulatedRoi, orderedSignals, orderedMisses, bands, runnerLadder };
   }, [tokens, settings]);
 
   function choosePreset(name: PresetName) {
@@ -453,19 +480,36 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       </aside>
 
       <section className="labOutput">
-        <div className="labOutcomeTarget">
-          <span>Measure a runner at</span>
-          <div>{runnerOptions.map((target) => <button type="button" className={settings.runnerTarget === target ? "active" : ""} key={target} onClick={() => setSettings({ ...settings, runnerTarget: target })}>{target}x</button>)}</div>
-          <label className="labStakeControl">
-            <span>Position size</span>
-            <span><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={settings.positionSizeUsd} onChange={(event) => { setSettings({ ...settings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) }); setActivePreset("custom"); }} /></span>
-          </label>
-          <small>Peak reached after the Surveillance timestamp</small>
-        </div>
+        <section className="labStrategyPanel">
+          <header><div><small>Trade replay</small><h2>Test the entry and exit</h2></div><span>From the Surveillance price</span></header>
+          <div className="labStrategyControls">
+            <div className="target">
+              <label>Take profit</label>
+              <strong>{settings.runnerTarget}x</strong>
+              <div>{runnerOptions.map((target) => <button type="button" className={settings.runnerTarget === target ? "active" : ""} key={target} onClick={() => { setSettings({ ...settings, runnerTarget: target }); setActivePreset("custom"); }}>{target}x</button>)}</div>
+            </div>
+            <div className="stop">
+              <label htmlFor="stopLoss">Stop loss</label>
+              <strong>−{settings.stopLossPct}%</strong>
+              <input id="stopLoss" aria-label="Stop loss percentage" type="range" min="10" max="90" step="5" value={settings.stopLossPct} onChange={(event) => { setSettings({ ...settings, stopLossPct: Number(event.target.value) }); setActivePreset("custom"); }} />
+            </div>
+            <label className="stake">
+              <span>Position size</span>
+              <strong><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={settings.positionSizeUsd} onChange={(event) => { setSettings({ ...settings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) }); setActivePreset("custom"); }} /></strong>
+              <small>Placed on every token that reaches Acquired</small>
+            </label>
+          </div>
+          <div className="labReplayCounts">
+            <article className="stopped"><small>Stop hit first</small><strong>{analysis.stopHits}</strong><span>sold at −{settings.stopLossPct}%</span></article>
+            <article className="target"><small>{settings.runnerTarget}x hit first</small><strong>{analysis.targetExits}</strong><span>sold at target</span></article>
+            <article className="open"><small>Neither hit</small><strong>{analysis.openAtEnd}</strong><span>valued at final recorded price</span></article>
+            <article className="unknown"><small>No replay data</small><strong>{analysis.selected.length - analysis.replayable.length}</strong><span>excluded from money result</span></article>
+          </div>
+        </section>
 
         <div className="labSummaryGrid">
           <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
-          <article><small>{settings.runnerTarget}x runners</small><strong>{analysis.hits.length}</strong><span>caught after signal</span></article>
+          <article><small>{settings.runnerTarget}x peak reached</small><strong>{analysis.hits.length}</strong><span>before applying the stop</span></article>
           <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>including stalled tokens</span></article>
           <article><small>Missed runners</small><strong>{analysis.misses.length}</strong><span>rejected by this model</span></article>
           <article><small>Under 1.2x</small><strong>{analysis.falsePositives.length}</strong><span>selected but stalled</span></article>
@@ -473,7 +517,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         </div>
 
         <section className="labRunnerLadder">
-          <header><div><small>Runner ladder</small><h2>Targets this model would acquire</h2></div><span>Caught from all Surveillance runners</span></header>
+          <header><div><small>Runner ladder</small><h2>Runners surviving the {settings.stopLossPct}% stop</h2></div><span>Caught from all Surveillance runners</span></header>
           <div>
             {analysis.runnerLadder.map((level) => {
               const catchRate = level.total ? level.caught * 100 / level.total : 0;
@@ -490,13 +534,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         </section>
 
         <section className="labMoneyPanel">
-          <header><div><small>Position test</small><h2>If every acquired token received {formatUsd(settings.positionSizeUsd)}</h2></div><span>Recorded peak potential</span></header>
+          <header><div><small>Strategy result</small><h2>{formatUsd(settings.positionSizeUsd)} per acquired token</h2></div><span>{settings.runnerTarget}x target · {settings.stopLossPct}% stop</span></header>
           <div className="labMoneyGrid">
-            <article><small>Capital tested</small><strong>{formatUsd(analysis.capitalTested)}</strong><span>{analysis.pricedSignals.length} priced signals</span></article>
-            <article><small>Combined peak value</small><strong>{formatUsd(analysis.recordedPeakValue)}</strong><span>Each token measured at its own peak</span></article>
-            <article className={analysis.peakPotentialGain >= 0 ? "positive" : "negative"}><small>Peak potential gain</small><strong>{analysis.peakPotentialGain >= 0 ? "+" : ""}{formatUsd(analysis.peakPotentialGain)}</strong><span>Before fees and slippage</span></article>
+            <article><small>Capital tested</small><strong>{formatUsd(analysis.capitalTested)}</strong><span>{analysis.replayable.length} replayed positions</span></article>
+            <article><small>End value</small><strong>{formatUsd(analysis.simulatedEndValue)}</strong><span>Targets, stops and open positions</span></article>
+            <article className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}><small>Strategy P&amp;L</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% return</span></article>
           </div>
-          <p>This is the maximum recorded potential, not a realised return. A sell strategy is needed before we can produce an honest profit figure.</p>
+          <p>Each position exits when the stop or take profit is reached first. Positions hitting neither are valued at their final recorded price. Figures exclude fees and slippage.</p>
         </section>
 
         <section className="labBreakdown">

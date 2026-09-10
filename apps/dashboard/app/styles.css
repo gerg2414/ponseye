@@ -408,7 +408,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .labControls > header { min-height: 82px; padding: 17px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .labControls > header div { display: grid; gap: 6px; }
 .labControls > header small,.labOutcomeTarget > span,.labOutcomeTarget > small,.labBreakdown header small,.labResults > header > small { color: #8d93a0; font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
-.labControls > header h2,.labBreakdown h2,.labMoneyPanel h2,.labRunnerLadder h2 { margin: 0; color: var(--white); font-size: 25px; letter-spacing: -.02em; }
+.labControls > header h2,.labBreakdown h2,.labMoneyPanel h2,.labRunnerLadder h2,.labStrategyPanel h2 { margin: 0; color: var(--white); font-size: 25px; letter-spacing: -.02em; }
 .labControls > header button { padding: 10px 13px; border: 0; border-radius: var(--radius-control); color: #a0a5b0; background: #151820; font: inherit; font-size: 13px; cursor: pointer; text-transform: uppercase; }
 .labControls > header button:hover { color: var(--white); }
 .labControlTabs { padding: 8px; display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; border-bottom: 1px solid var(--line); }
@@ -469,7 +469,39 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .labSafety input::after { content: ""; position: absolute; left: 2px; top: 2px; width: 9px; height: 9px; border-radius: 50%; background: #545a67; transition: transform .15s ease,background .15s ease; }
 .labSafety input:checked { border-color: rgba(154,255,79,.35); background: rgba(154,255,79,.07); }
 .labSafety input:checked::after { transform: translateX(13px); background: var(--green); box-shadow: 0 0 7px rgba(154,255,79,.65); }
-.labOutput { min-width: 0; display: grid; gap: 14px; }
+.labOutput { min-width: 0; display: grid; gap: 18px; }
+.labStrategyPanel > header { min-height: 82px; padding: 17px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.labStrategyPanel > header > div { display: grid; gap: 6px; }
+.labStrategyPanel > header small,.labStrategyPanel > header > span { color: #9298a4; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
+.labStrategyControls { display: grid; grid-template-columns: 1.35fr 1fr 1fr; background: #090b0f; }
+.labStrategyControls > div,.labStrategyControls > label { min-width: 0; min-height: 150px; padding: 20px; display: grid; align-content: center; gap: 12px; border-right: 1px solid var(--line); }
+.labStrategyControls > :last-child { border-right: 0; }
+.labStrategyControls label,.labStrategyControls > label > span { color: #9ba1ad; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
+.labStrategyControls strong { font-size: 30px; letter-spacing: -.04em; }
+.labStrategyControls .target { box-shadow: inset 0 3px 0 var(--purple); background: linear-gradient(180deg,rgba(165,108,255,.08),transparent 65%); }
+.labStrategyControls .target > strong { color: var(--purple); }
+.labStrategyControls .target > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.labStrategyControls .target button { min-width: 48px; padding: 8px 9px; border: 1px solid #292d36; border-radius: var(--radius-control); color: #9298a4; background: #11141a; font: inherit; font-size: 12px; cursor: pointer; }
+.labStrategyControls .target button:hover,.labStrategyControls .target button.active { border-color: rgba(165,108,255,.6); color: var(--white); background: rgba(165,108,255,.16); }
+.labStrategyControls .stop { box-shadow: inset 0 3px 0 #ff718c; background: linear-gradient(180deg,rgba(255,113,140,.07),transparent 65%); }
+.labStrategyControls .stop > strong { color: #ff718c; }
+.labStrategyControls .stop input { width: 100%; height: 5px; margin: 2px 0 0; appearance: none; border-radius: 0; outline: 0; background: #34303a; accent-color: #ff718c; cursor: pointer; }
+.labStrategyControls .stop input::-webkit-slider-thumb { width: 14px; height: 14px; appearance: none; border: 2px solid #090a0d; border-radius: 2px; background: #ff718c; box-shadow: 0 0 8px rgba(255,113,140,.55); }
+.labStrategyControls .stake { box-shadow: inset 0 3px 0 var(--green); background: linear-gradient(180deg,rgba(154,255,79,.06),transparent 65%); }
+.labStrategyControls .stake > strong { width: max-content; display: flex; align-items: center; color: var(--green); }
+.labStrategyControls .stake b { font-size: 20px; }
+.labStrategyControls .stake input { width: 110px; padding: 0 0 0 6px; border: 0; outline: 0; color: var(--white); background: transparent; font: inherit; font-size: 30px; }
+.labStrategyControls .stake small { color: #858b98; font-size: 11px; line-height: 1.45; }
+.labReplayCounts { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--line); }
+.labReplayCounts article { min-height: 106px; padding: 16px 18px; display: grid; align-content: center; gap: 6px; border-right: 1px solid var(--line); }
+.labReplayCounts article:last-child { border-right: 0; }
+.labReplayCounts small { color: #989eaa; font-size: 11px; text-transform: uppercase; }
+.labReplayCounts strong { color: var(--white); font-size: 30px; }
+.labReplayCounts span { color: #858b98; font-size: 11px; }
+.labReplayCounts .stopped strong { color: #ff718c; }
+.labReplayCounts .target strong { color: var(--green); }
+.labReplayCounts .open strong { color: #ffb454; }
+.labReplayCounts .unknown strong { color: #7f8694; }
 .labOutcomeTarget { min-height: 72px; padding: 12px 15px; display: grid; grid-template-columns: auto auto auto 1fr; align-items: center; gap: 20px; }
 .labOutcomeTarget > div { display: flex; gap: 5px; }
 .labOutcomeTarget button { min-width: 56px; padding: 11px 12px; font-size: 14px; text-transform: none; }
@@ -644,6 +676,13 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   .labRules { display: block; }
   .labRule { grid-template-columns: 1fr 90px 60px; padding-inline: 13px; }
   .labRule:nth-child(odd) { border-right: 0; }
+  .labStrategyPanel > header > span { display: none; }
+  .labStrategyControls { grid-template-columns: 1fr; }
+  .labStrategyControls > div,.labStrategyControls > label { min-height: 132px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .labStrategyControls > :last-child { border-bottom: 0; }
+  .labReplayCounts { grid-template-columns: repeat(2,1fr); }
+  .labReplayCounts article:nth-child(2n) { border-right: 0; }
+  .labReplayCounts article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .labOutcomeTarget { grid-template-columns: 1fr; gap: 10px; }
   .labOutcomeTarget > small { text-align: left; }
   .labSummaryGrid { grid-template-columns: repeat(2,1fr); }

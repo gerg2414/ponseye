@@ -30,12 +30,20 @@ export type LabToken = {
   followup_trades: number;
   outcome_scope: "full_market" | "curve_only";
   future_peak_multiple: number | null;
+  future_low_multiple: number | null;
+  final_multiple: number | null;
+  pre_target_low_multiples: Record<string, number | null>;
 };
 
 function numberOrNull(value: unknown) {
   if (value == null || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function numericRecord(value: unknown) {
+  if (!value || typeof value !== "object") return {} as Record<string, number | null>;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, numberOrNull(item)]));
 }
 
 async function loadPonsEyeLabData(): Promise<LabToken[]> {
@@ -75,12 +83,15 @@ async function loadPonsEyeLabData(): Promise<LabToken[]> {
     followup_trades: Number(token.followup_trades ?? 0),
     outcome_scope: token.outcome_scope === "full_market" ? "full_market" : "curve_only",
     future_peak_multiple: numberOrNull(token.future_peak_multiple),
+    future_low_multiple: numberOrNull(token.future_low_multiple),
+    final_multiple: numberOrNull(token.final_multiple),
+    pre_target_low_multiples: numericRecord(token.pre_target_low_multiples),
   })) as LabToken[];
 }
 
 const getCachedPonsEyeLabData = unstable_cache(
   loadPonsEyeLabData,
-  ["ponseye-lab-dataset-v2"],
+  ["ponseye-lab-dataset-v3"],
   { revalidate: 600 },
 );
 
