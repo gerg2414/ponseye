@@ -114,7 +114,7 @@ export default async function Home() {
       <section className="hero">
         <div className="heroCopy">
           <div className="heroBrand">
-            <Image className="heroRobot" src="/ponseye-robot-scanning.webp" alt="" width={512} height={512} priority />
+            <Image className="heroRobot" src="/ponseye-robot-scanning.gif" alt="" width={512} height={512} priority unoptimized />
             <Image className="heroWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
           </div>
           <h1>Watch every launch.<br /><em>Find what repeats.</em></h1>
