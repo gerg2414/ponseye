@@ -210,19 +210,7 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty, preview =
     <section className={`launchLane ${tone}`}>
       <header className="laneHead">
         <div><Image src={icon} alt="" width={38} height={38} /><strong>{title}</strong></div>
-        <div className="laneHeadActions">
-          {mode === "acquired" ? (
-            <Link href="/targets" className="capitalCircuitLink">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M3 18.5V5.5M3 18.5H21" />
-                <path className="circuitTrace" d="M5.5 15.5L9 12l3 2 6.5-7" />
-                <path className="circuitArrow" d="M15.5 7h3v3" />
-              </svg>
-              <span>Capital circuit</span>
-            </Link>
-          ) : null}
-          <span className="laneCount">{count}</span>
-        </div>
+        <span>{count}</span>
       </header>
       <div className="launchLaneBody">
         {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} preview={preview} />) : (
@@ -286,6 +274,14 @@ export default async function Home() {
       </section>
 
       <div className="boardStage">
+        <Link href="/targets" className="capitalCircuitLink">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 18.5V5.5M3 18.5H21" />
+            <path className="circuitTrace" d="M5.5 15.5L9 12l3 2 6.5-7" />
+            <path className="circuitArrow" d="M15.5 7h3v3" />
+          </svg>
+          <span>Capital circuit</span>
+        </Link>
         <div className="boardWatcher" aria-hidden="true">
           <Image src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
         </div>
