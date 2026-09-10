@@ -105,15 +105,13 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .panelStatus.offline { color: #8b91a0; }
 .panelStatus.offline i { background: #555a68; box-shadow: none; }
 .launchBoard { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 12px; background: #090a0d; }
-.launchLane { min-width: 0; overflow: hidden; border: 1px solid #242833; background: #0d0f13; }
-.laneHead { height: 72px; padding: 0 17px 0 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #242833; background: linear-gradient(90deg,rgba(165,108,255,.055),transparent 58%),#0a0c0f; }
+.launchLane { min-width: 0; background: transparent; }
+.laneHead { height: 72px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; }
 .laneHead > div { display: flex; align-items: center; gap: 10px; }
 .laneHead img { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
 .laneHead strong { color: var(--white); font-family: Arial,sans-serif; font-size: 16px; letter-spacing: -.01em; }
 .laneHead > span { min-width: 34px; padding: 7px 8px; border: 1px solid #282c36; color: #a5aab6; background: #11141a; font-size: 11px; text-align: center; }
-.launchLane.completing .laneHead { background: linear-gradient(90deg,rgba(165,108,255,.07),transparent 58%),#0a0c0f; }
-.launchLane.completed .laneHead { background: linear-gradient(90deg,rgba(154,255,79,.07),transparent 58%),#0a0c0f; }
-.launchLaneBody { height: 760px; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
+.launchLaneBody { height: 760px; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; border: 1px solid #242833; background: #0d0f13; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
 .launchCard { position: relative; height: 306px; overflow: hidden; padding: 17px; display: flex; flex-direction: column; border: 1px solid #272b35; background: radial-gradient(circle at 100% 0,rgba(165,108,255,.07),transparent 13rem),#101218; }
 .launchCard.isAcquired { border-color: rgba(154,255,79,.34); background: radial-gradient(circle at 100% 0,rgba(154,255,79,.12),transparent 14rem),#101418; box-shadow: inset 0 0 28px rgba(154,255,79,.025); }
 .cardTop { display: flex; align-items: flex-start; gap: 15px; }
