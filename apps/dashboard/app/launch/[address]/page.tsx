@@ -59,7 +59,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
   const detail = await getLaunchDetail(address.toLowerCase());
   if (!detail) notFound();
 
-  const { launch, trades, marketTrades } = detail;
+  const { launch, trades, marketTrades, chartCandles, bondPriceUsd } = detail;
   const market = launchMarket(launch);
   const recentTrades = trades.slice(-30).reverse();
   const marketByHash = new Map(marketTrades.map((trade) => [trade.transaction_hash, trade]));
@@ -123,7 +123,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
               <div className={`progressTrack ${progressTone(launch.progress_pct)}`}><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
             </div>
           </header>
-          <PonsEyeChart trades={marketTrades} tokenAddress={launch.token_address} graduatedAt={launch.graduated_at} />
+          <PonsEyeChart trades={marketTrades} candles={chartCandles} tokenAddress={launch.token_address} graduatedAt={launch.graduated_at} bondPriceUsd={bondPriceUsd} />
         </div>
         <aside className="metricRail">
           <header><span>Token telemetry</span><b><i /> Live</b></header>

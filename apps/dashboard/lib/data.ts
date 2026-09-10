@@ -82,6 +82,14 @@ export type MarketTrade = {
   protocol: string | null;
 };
 
+export type ChartCandle = {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
 export type StreamStatus = {
   feed: string;
   status: string;
@@ -198,13 +206,15 @@ export async function getLaunchDetail(tokenAddress: string) {
       return null;
     }
     console.warn("[launch] using dashboard fallback", result.error?.message ?? "Detail response missing");
-    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[] };
+    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[], chartCandles: [] as ChartCandle[], bondPriceUsd: null as number | null };
   }
 
   const payload = result.data as {
     launch: LaunchRecord;
     trades: Trade[];
     marketTrades: MarketTrade[];
+    chartCandles: ChartCandle[];
+    bondPriceUsd: number | null;
   };
   const launch = payload.launch;
 
@@ -231,5 +241,13 @@ export async function getLaunchDetail(tokenAddress: string) {
       base_amount_usd: trade.base_amount_usd == null ? null : Number(trade.base_amount_usd),
       quote_amount_usd: trade.quote_amount_usd == null ? null : Number(trade.quote_amount_usd),
     })) as MarketTrade[],
+    chartCandles: (payload.chartCandles ?? []).map((candle) => ({
+      ...candle,
+      open: Number(candle.open),
+      high: Number(candle.high),
+      low: Number(candle.low),
+      close: Number(candle.close),
+    })) as ChartCandle[],
+    bondPriceUsd: payload.bondPriceUsd == null ? null : Number(payload.bondPriceUsd),
   };
 }

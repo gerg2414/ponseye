@@ -143,6 +143,16 @@ function formatMetric(value: number | null, suffix: string) {
   return `${value.toFixed(decimals)}${suffix}`;
 }
 
+function formatMarketCap(value: number | null) {
+  if (value == null || value <= 0) return "Pending";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget: number }) {
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
   return (
@@ -152,7 +162,7 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
         <span><strong>{token.name ?? "Unknown token"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "No ticker"}</small></span>
       </div>
       <div><small>Lab score</small><strong>{token.labScore.toFixed(0)}%</strong></div>
-      <div><small>Signal</small><strong>{token.trade_count}T · {token.unique_traders}M</strong></div>
+      <div><small>Signal market cap</small><strong>{formatMarketCap(token.signal_market_cap_usd)}</strong></div>
       <div><small>Peak after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
       <div><small>Recorded state</small><strong>{token.actual_acquired ? "Acquired" : token.actual_binned ? "Terminated" : "Surveillance"}</strong></div>
       <b>→</b>

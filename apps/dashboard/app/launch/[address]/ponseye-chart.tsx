@@ -15,7 +15,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketTrade } from "../../../lib/data";
+import type { ChartCandle, MarketTrade } from "../../../lib/data";
 import { compact } from "../../../lib/market";
 
 const INTERVALS = [
@@ -25,10 +25,29 @@ const INTERVALS = [
   { label: "1h", value: 60 * 60_000 },
 ] as const;
 
-function buildCandles(trades: MarketTrade[], interval: number) {
+function buildCandles(seedCandles: ChartCandle[], trades: MarketTrade[], interval: number) {
   const buckets = new Map<number, CandlestickData<UTCTimestamp>>();
 
-  for (const trade of trades) {
+  for (const seed of seedCandles) {
+    const timestamp = new Date(seed.time).getTime();
+    const bucket = Math.floor(timestamp / interval) * interval;
+    const time = Math.floor(bucket / 1_000) as UTCTimestamp;
+    const open = seed.open * 1_000_000_000;
+    const high = seed.high * 1_000_000_000;
+    const low = seed.low * 1_000_000_000;
+    const close = seed.close * 1_000_000_000;
+    const candle = buckets.get(bucket);
+
+    if (candle) {
+      candle.high = Math.max(candle.high, high);
+      candle.low = Math.min(candle.low, low);
+      candle.close = close;
+    } else {
+      buckets.set(bucket, { time, open, high, low, close });
+    }
+  }
+
+  for (const trade of [...trades].sort((a, b) => new Date(a.block_time).getTime() - new Date(b.block_time).getTime())) {
     if (!trade.price_usd || trade.price_usd <= 0) continue;
     const price = trade.price_usd * 1_000_000_000;
     const timestamp = new Date(trade.block_time).getTime();
@@ -45,7 +64,7 @@ function buildCandles(trades: MarketTrade[], interval: number) {
     }
   }
 
-  const candles = [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time)).slice(-500);
+  const candles = [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time));
 
   for (let index = 1; index < candles.length; index += 1) {
     const previousClose = candles[index - 1].close;
@@ -72,10 +91,12 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
+export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, bondPriceUsd }: {
   trades: MarketTrade[];
+  candles: ChartCandle[];
   tokenAddress: string;
   graduatedAt: string | null;
+  bondPriceUsd: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -86,8 +107,9 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
   const pollingRef = useRef(false);
   const [liveTrades, setLiveTrades] = useState(trades);
   const [interval, setInterval] = useState(60_000);
-  const candles = useMemo(() => buildCandles(liveTrades, interval), [interval, liveTrades]);
+  const candles = useMemo(() => buildCandles(seedCandles, liveTrades, interval), [interval, liveTrades, seedCandles]);
   const bondMarketCap = useMemo(() => {
+    if (bondPriceUsd && bondPriceUsd > 0) return bondPriceUsd * 1_000_000_000;
     if (!graduatedAt) return null;
     const graduationTime = new Date(graduatedAt).getTime();
     for (let index = liveTrades.length - 1; index >= 0; index -= 1) {
@@ -97,7 +119,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
       }
     }
     return null;
-  }, [graduatedAt, liveTrades]);
+  }, [bondPriceUsd, graduatedAt, liveTrades]);
 
   useEffect(() => {
     setLiveTrades((current) => mergeTrades(current, trades));
