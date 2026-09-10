@@ -82,6 +82,13 @@ export type StreamStatus = {
   last_seen_at: string;
 };
 
+type DashboardPayload = {
+  launches: Launch[];
+  streams: StreamStatus[];
+  launchCount: number;
+  tradeCount: number;
+};
+
 const emptyData = {
   launches: [] as Launch[],
   streams: [] as StreamStatus[],
@@ -95,14 +102,22 @@ export async function getDashboardData() {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return emptyData;
 
-  const db = createClient(url, key, { auth: { persistSession: false } });
-  const [launchesResult, totalsResult, streamsResult] = await Promise.all([
-    db.from("launch_board").select("*").order("launched_at", { ascending: false }).limit(200),
-    db.from("dashboard_totals").select("launch_count,trade_count").single(),
-    db.from("stream_status").select("feed,status,last_seen_at").order("feed"),
-  ]);
+  const db = createClient(url, key, {
+    auth: { persistSession: false },
+    db: { retry: false },
+  });
+  const dashboardResult = await db
+    .rpc("get_dashboard_home", { p_limit: 200 })
+    .abortSignal(AbortSignal.timeout(8_000));
 
-  const launches = (launchesResult.data ?? []).map((launch) => ({
+  if (dashboardResult.error || !dashboardResult.data) {
+    console.error("[dashboard] data request failed", dashboardResult.error?.message ?? "No data returned");
+    return emptyData;
+  }
+
+  const payload = dashboardResult.data as DashboardPayload;
+
+  const launches = (payload.launches ?? []).map((launch) => ({
     ...launch,
     progress_pct: launch.progress_pct == null ? null : Number(launch.progress_pct),
     peak_multiple: launch.peak_multiple == null ? null : Number(launch.peak_multiple),
@@ -120,10 +135,10 @@ export async function getDashboardData() {
 
   return {
     launches,
-    streams: (streamsResult.data ?? []) as StreamStatus[],
-    launchCount: Number(totalsResult.data?.launch_count ?? 0),
-    tradeCount: Number(totalsResult.data?.trade_count ?? 0),
-    dataConnected: !launchesResult.error && !totalsResult.error && !streamsResult.error,
+    streams: payload.streams ?? [],
+    launchCount: Number(payload.launchCount ?? 0),
+    tradeCount: Number(payload.tradeCount ?? 0),
+    dataConnected: true,
   };
 }
 
