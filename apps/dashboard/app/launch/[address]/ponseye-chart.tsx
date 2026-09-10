@@ -81,7 +81,7 @@ export function PonsEyeChart({ trades }: { trades: MarketTrade[] }) {
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 4,
-        barSpacing: 9,
+        barSpacing: 6,
         minBarSpacing: 3,
       },
       crosshair: {
@@ -134,7 +134,14 @@ export function PonsEyeChart({ trades }: { trades: MarketTrade[] }) {
     if (!seriesRef.current || !chartRef.current) return;
     seriesRef.current.setData(candles);
     if (candles.length && fittedIntervalRef.current !== interval) {
-      chartRef.current.timeScale().fitContent();
+      if (candles.length < 40) {
+        chartRef.current.timeScale().setVisibleLogicalRange({
+          from: candles.length - 40,
+          to: candles.length + 2,
+        });
+      } else {
+        chartRef.current.timeScale().fitContent();
+      }
       fittedIntervalRef.current = interval;
     }
   }, [candles, interval]);
