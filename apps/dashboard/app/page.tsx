@@ -107,6 +107,9 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
   const acquired = mode === "acquired";
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
+  const gainMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
+    ? launch.market_cap_usd / launch.entry_market_cap_usd
+    : null;
   const filledSegments = Math.ceil(lockScore / 6.25);
 
   return (
@@ -126,18 +129,30 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
           </div>
         </div>
 
-        <div className="cardMarketCap">
-          <span>{entryMarketCap ? "Entry market cap" : "Market cap"}</span>
-          <strong>{entryMarketCap ?? usdMarketCap}</strong>
-        </div>
+        {acquired ? (
+          <div className="acquiredMetrics">
+            <div><span>Entry MC</span><strong>{entryMarketCap ?? "Pending"}</strong></div>
+            <div><span>Current MC</span><strong>{usdMarketCap}</strong></div>
+            <div className="gainMetric"><span>Gains</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></div>
+          </div>
+        ) : (
+          <div className="cardMarketCap">
+            <span>Market cap</span>
+            <strong>{usdMarketCap}</strong>
+          </div>
+        )}
 
         <div className="targetLock">
           <div className="targetLockHead">
-            <div><span>Target lock</span><strong>{lockLabel(launch, lockScore)}</strong></div>
+            <strong>{lockLabel(launch, lockScore)}</strong>
             <b>{lockScore}<small>%</small></b>
           </div>
           <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
-            {Array.from({ length: 16 }, (_, index) => <i className={index < filledSegments ? "filled" : ""} key={index} />)}
+            {Array.from({ length: 16 }, (_, index) => {
+              const filled = index < filledSegments;
+              const colour = `hsl(${275 + index * 12} 100% 66%)`;
+              return <i className={filled ? "filled" : ""} style={filled ? { backgroundColor: colour, borderColor: colour, boxShadow: `0 0 8px ${colour}55` } : undefined} key={index} />;
+            })}
           </div>
           <div className="lockFooter">
             <span>{launch.research_state === "target_locked" && !acquired ? "Awaiting execution" : acquired ? (launch.position_status === "closed" ? "Position closed" : "Position live") : "Ponseye monitoring"}</span>
