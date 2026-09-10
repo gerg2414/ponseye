@@ -99,12 +99,10 @@ function LaunchLane({ title, count, tone, launches, empty }: {
 }
 
 export default async function Home() {
-  const { launches, streams, launchCount, tradeCount } = await getDashboardData();
+  const { launches, streams } = await getDashboardData();
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
-  const newestLaunch = launches[0];
-
   const completed = launches
     .filter((launch) => launch.status === "graduated")
     .sort((a, b) => new Date(b.graduated_at ?? b.launched_at).getTime() - new Date(a.graduated_at ?? a.launched_at).getTime());
@@ -132,13 +130,6 @@ export default async function Home() {
             <Image className="heroWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
           </div>
         </div>
-      </section>
-
-      <section className="stats">
-        <article><span className="statIndex">01</span><div><small>Launches captured</small><strong>{launchCount.toLocaleString("en-GB")}</strong></div><i className="statLight" /></article>
-        <article><span className="statIndex">02</span><div><small>Curve trades</small><strong>{tradeCount.toLocaleString("en-GB")}</strong></div><i className="statLight" /></article>
-        <article><span className="statIndex">03</span><div><small>Data feeds</small><strong>{liveFeeds}<b> / {currentFeeds.size}</b></strong></div><i className={`statLight ${recorderLive ? "" : "dim"}`} /></article>
-        <article><span className="statIndex">04</span><div><small>Latest launch</small><strong className="latestTime">{newestLaunch ? `${age(newestLaunch.launched_at)} ago` : "Waiting"}</strong></div><i className="statLight purple" /></article>
       </section>
 
       <section className="boardSection">
