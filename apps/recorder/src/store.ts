@@ -280,13 +280,26 @@ export async function updateStreamStatus(feed: string, status: string, message?:
 export async function getHolderCandidates(): Promise<HolderCandidate[]> {
   const activeSince = new Date(Date.now() - 60 * 60_000).toISOString();
   const { data, error } = await db
-    .from("launch_board")
-    .select("token_address,curve_address,deployer_address,status,launched_at,last_trade_at,holder_snapshot_at")
+    .from("launch_metrics")
+    .select("token_address,last_trade_at,holder_snapshot_at,launches!inner(curve_address,deployer_address,status,launched_at)")
     .gte("last_trade_at", activeSince)
     .order("last_trade_at", { ascending: false })
-    .limit(1000);
+    .limit(1000)
+    .abortSignal(AbortSignal.timeout(10_000));
   assertOk(error, "load holder candidates");
-  return (data ?? []) as HolderCandidate[];
+  return (data ?? []).flatMap((row) => {
+    const launch = Array.isArray(row.launches) ? row.launches[0] : row.launches;
+    if (!launch) return [];
+    return [{
+      token_address: row.token_address,
+      curve_address: launch.curve_address,
+      deployer_address: launch.deployer_address,
+      status: launch.status,
+      launched_at: launch.launched_at,
+      last_trade_at: row.last_trade_at,
+      holder_snapshot_at: row.holder_snapshot_at,
+    }];
+  });
 }
 
 export async function saveHolderSnapshot(snapshot: HolderSnapshot) {
