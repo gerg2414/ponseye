@@ -182,15 +182,23 @@ export async function getLaunchDetail(tokenAddress: string) {
     auth: { persistSession: false },
     db: { retry: false },
   });
-  const result = await db.rpc("get_launch_detail", {
-    p_token_address: tokenAddress,
-    p_trade_limit: 100,
-    p_market_limit: 1000,
-  }).abortSignal(AbortSignal.timeout(8_000));
+  const [result, dashboard] = await Promise.all([
+    db.rpc("get_launch_detail", {
+      p_token_address: tokenAddress,
+      p_trade_limit: 100,
+      p_market_limit: 1000,
+    }).abortSignal(AbortSignal.timeout(3_000)),
+    getDashboardData(),
+  ]);
 
   if (result.error || !result.data?.launch) {
-    console.error("[launch] detail request failed", result.error?.message ?? "Launch missing");
-    return null;
+    const fallback = dashboard.launches.find((launch) => launch.token_address === tokenAddress);
+    if (!fallback) {
+      console.error("[launch] detail request failed", result.error?.message ?? "Launch missing");
+      return null;
+    }
+    console.warn("[launch] using dashboard fallback", result.error?.message ?? "Detail response missing");
+    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[] };
   }
 
   const payload = result.data as {
