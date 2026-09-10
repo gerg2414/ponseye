@@ -231,6 +231,11 @@ export async function saveMarketTrade(row: MarketTradeRow) {
 }
 
 export async function warmTokenCache() {
+  const tokens = await getActiveMarketTokens();
+  console.log(`Loaded ${tokens.length} active tokens (${knownTokens.size} total tracked) into memory`);
+}
+
+export async function getActiveMarketTokens(): Promise<string[]> {
   const activeSince = new Date(Date.now() - 60 * 60_000).toISOString();
   const activeResult = await db
     .from("launch_metrics")
@@ -241,9 +246,11 @@ export async function warmTokenCache() {
     .abortSignal(AbortSignal.timeout(10_000));
   assertOk(activeResult.error, "warm active token cache");
 
-  for (const launch of activeResult.data ?? []) knownTokens.add(String(launch.token_address).toLowerCase());
+  const tokens = [...new Set((activeResult.data ?? []).map((launch) => String(launch.token_address).toLowerCase()))]
+    .sort();
+  for (const token of tokens) knownTokens.add(token);
 
-  console.log(`Loaded ${knownTokens.size} tracked tokens into memory`);
+  return tokens;
 }
 
 export async function updateStreamStatus(feed: string, status: string, message?: string) {
