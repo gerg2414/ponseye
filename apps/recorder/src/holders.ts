@@ -172,13 +172,20 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
     try {
       const now = Date.now();
       const dueCandidates = (await getHolderCandidates()).filter((candidate) => due(candidate, now));
-      const repeats = dueCandidates
-        .filter((candidate) => candidate.holder_snapshot_at)
-        .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime());
+      const repeatCandidates = dueCandidates.filter((candidate) => candidate.holder_snapshot_at);
+      const activeRepeats = [...repeatCandidates]
+        .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime())
+        .slice(0, 6);
+      const overdueRepeats = [...repeatCandidates]
+        .sort((a, b) => new Date(a.holder_snapshot_at!).getTime() - new Date(b.holder_snapshot_at!).getTime())
+        .slice(0, 6);
+      const repeats = [...new Map(
+        [...activeRepeats, ...overdueRepeats].map((candidate) => [candidate.token_address, candidate]),
+      ).values()];
       const firstSnapshots = dueCandidates
         .filter((candidate) => !candidate.holder_snapshot_at)
         .sort((a, b) => new Date(b.last_trade_at!).getTime() - new Date(a.last_trade_at!).getTime());
-      const repeatBatch = repeats.slice(0, 12);
+      const repeatBatch = repeats;
       const firstBatch = firstSnapshots.slice(0, 12);
       const candidates = Array.from({ length: Math.max(repeatBatch.length, firstBatch.length) })
         .flatMap((_, index) => [repeatBatch[index], firstBatch[index]])
