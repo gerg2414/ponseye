@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useTransition } from "react";
 
 export function AutoRefresh({ intervalMs = 5_000 }: { intervalMs?: number }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     let pauseUntil = 0;
@@ -15,14 +16,17 @@ export function AutoRefresh({ intervalMs = 5_000 }: { intervalMs?: number }) {
 
     document.addEventListener("click", pauseForNavigation, true);
     const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible" && Date.now() >= pauseUntil) router.refresh();
+      const linkIsActive = document.querySelector("a:hover, a:focus-visible");
+      if (document.visibilityState === "visible" && Date.now() >= pauseUntil && !linkIsActive && !isPending) {
+        startTransition(() => router.refresh());
+      }
     }, intervalMs);
 
     return () => {
       document.removeEventListener("click", pauseForNavigation, true);
       window.clearInterval(interval);
     };
-  }, [intervalMs, router]);
+  }, [intervalMs, isPending, router]);
 
   return null;
 }
