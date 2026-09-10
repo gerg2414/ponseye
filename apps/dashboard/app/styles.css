@@ -142,10 +142,11 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .targetLockHead > b { color: var(--purple); font-family: Arial,sans-serif; font-size: 34px; line-height: .82; letter-spacing: -.05em; }
 .targetLockHead > b small { margin-left: 2px; color: #737987; font-size: 13px; }
 .launchLane.completing .targetLockHead > b { color: #ff9f43; }
-.lockSegments { height: 18px; margin-top: 15px; display: grid; grid-template-columns: repeat(16,1fr); gap: 3px; }
-.lockSegments i { position: relative; overflow: hidden; border: 1px solid #2b2f39; background: #161921; }
-.lockSegments i.filled { border-color: rgba(165,108,255,.55); }
-.lockSegments i.filled::after { content: ""; position: absolute; inset: 2px; border-top: 1px solid rgba(255,255,255,.35); }
+.lockSegments { height: 19px; margin-top: 15px; display: grid; grid-template-columns: repeat(16,1fr); gap: 3px; }
+.lockSegments i { position: relative; overflow: hidden; border: 1px solid #303540; background: #12151b; box-shadow: inset 0 -3px 0 rgba(0,0,0,.32); clip-path: polygon(0 0,calc(100% - 3px) 0,100% 3px,100% 100%,3px 100%,0 calc(100% - 3px)); }
+.lockSegments i.filled::before { content: ""; position: absolute; inset: 2px 2px auto; height: 2px; background: rgba(255,255,255,.28); }
+.lockSegments i.filled::after { content: ""; position: absolute; inset: auto 2px 2px; height: 3px; background: rgba(0,0,0,.28); }
+.lockSegments i.active { z-index: 1; }
 .launchCard.isAcquired .targetLockHead > b,.launchCard.isAcquired .targetLockHead strong { color: var(--green); }
 .lockFooter { min-height: 29px; margin-top: 13px; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #22262e; }
 .lockFooter > span { color: #777d8b; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
