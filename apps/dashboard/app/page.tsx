@@ -17,29 +17,40 @@ function age(value: string) {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function MetricIcon({ type }: { type: "cap" | "volume" | "peak" | "holders" | "change" | "traders" | "buy" | "sell" | "pressure" }) {
-  if (type === "cap") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13V9l3-3 3 2 5-5" /><path d="M10 3h3v3" /></svg>;
-  if (type === "volume") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V9M8 13V4M13 13V7" /></svg>;
-  if (type === "peak") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13l4-7 2 3 3-6 3 10" /></svg>;
-  if (type === "holders") return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2" /><circle cx="11.5" cy="6" r="1.5" /><path d="M2.5 13c.3-2.5 1.5-4 3.5-4s3.2 1.5 3.5 4M10 9.5c2.1 0 3.2 1.2 3.5 3.5" /></svg>;
-  if (type === "change") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg>;
-  if (type === "traders") return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2" /><path d="M2.5 13c.3-2.5 1.5-4 3.5-4s3.2 1.5 3.5 4M11 5.5c1.5.2 2.3 1.3 2.5 3" /></svg>;
-  if (type === "buy") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg>;
-  if (type === "sell") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" /></svg>;
-  return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" /><path d="M8 8l3-3M8 3v2M13 8h-2" /></svg>;
+function targetLockScore(launch: Launch) {
+  if (launch.acquired_at || launch.research_state === "target_locked") return 100;
+
+  const tradeDepth = Math.min(1, launch.trade_count / 30) * 15;
+  const traderDepth = Math.min(1, launch.unique_traders / 15) * 15;
+  const pressure = Math.min(1, Math.max(0, (launch.buy_pressure_pct ?? 0) / 60)) * 15;
+  const creatorClear = launch.creator_sells === 0 ? 10 : 0;
+  const earlyBuyers = Math.min(1, launch.first_minute_buyers / 6) * 15;
+  const momentum = Math.min(1, (launch.peak_multiple ?? 0) / 1.2) * 10;
+  const peakHeld = launch.drawdown_from_peak_pct == null || launch.drawdown_from_peak_pct <= 40 ? 10 : 0;
+  const holderSpread = launch.top_10_holder_pct == null || launch.top_10_holder_pct <= 70 ? 5 : 0;
+  const creatorBalance = launch.creator_balance_pct == null || launch.creator_balance_pct <= 5 ? 5 : 0;
+  const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
+
+  return Math.round(launch.research_state === "under_watch" ? Math.max(48, score) : Math.min(47, score));
 }
 
-function TokenCard({ launch }: { launch: Launch }) {
-  const progress = launch.progress_pct;
+function lockLabel(launch: Launch, score: number) {
+  if (launch.acquired_at) return "Position acquired";
+  if (launch.research_state === "target_locked") return "Target locked";
+  if (score >= 80) return "Final checks";
+  if (score >= 48) return "Tracking";
+  return "Scanning";
+}
+
+function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired" }) {
+  const lockScore = targetLockScore(launch);
+  const acquired = mode === "acquired";
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
-  const usdVolume = launch.volume_usd ? quoteValue(launch.volume_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
-  const holderChange = launch.holder_change_5m == null
-    ? "Pending"
-    : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
+  const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
+  const filledSegments = Math.ceil(lockScore / 6.25);
 
   return (
-    <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
-      <article className="launchCard">
+      <article className={`launchCard ${acquired ? "isAcquired" : ""}`}>
         <div className="cardTop">
           <div className="tokenImage">
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
@@ -52,45 +63,48 @@ function TokenCard({ launch }: { launch: Launch }) {
               </div>
               <time>{age(launch.launched_at)}</time>
             </div>
-            <div className="cardBonding">
-              <div><span>Bonding</span><strong>{progress == null ? "—" : `${progress.toFixed(1)}%`}</strong></div>
-              <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
-            </div>
           </div>
         </div>
 
-        <div className="metrics">
-          <div><small><MetricIcon type="cap" /> MC</small><strong>{usdMarketCap}</strong></div>
-          <div><small><MetricIcon type="volume" /> Volume</small><strong>{usdVolume}</strong></div>
-          <div><small><MetricIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></div>
-          <div><small><MetricIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Pending"}</strong></div>
-          <div><small><MetricIcon type="change" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "buyMetric" : "sellMetric"}>{holderChange}</strong></div>
-          <div><small><MetricIcon type="traders" /> Traders</small><strong>{launch.unique_traders}</strong></div>
-          <div><small><MetricIcon type="buy" /> Buys</small><strong className="buyMetric">{launch.buys}</strong></div>
-          <div><small><MetricIcon type="sell" /> Sells</small><strong className="sellMetric">{launch.sells}</strong></div>
-          <div><small><MetricIcon type="pressure" /> Buy pressure</small><strong>{launch.buy_pressure_pct == null ? "No trades yet" : `${launch.buy_pressure_pct.toFixed(0)}%`}</strong></div>
+        <div className="cardMarketCap">
+          <span>{entryMarketCap ? "Entry market cap" : "Market cap"}</span>
+          <strong>{entryMarketCap ?? usdMarketCap}</strong>
         </div>
 
+        <div className="targetLock">
+          <div className="targetLockHead">
+            <div><span>Target lock</span><strong>{lockLabel(launch, lockScore)}</strong></div>
+            <b>{lockScore}<small>%</small></b>
+          </div>
+          <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
+            {Array.from({ length: 16 }, (_, index) => <i className={index < filledSegments ? "filled" : ""} key={index} />)}
+          </div>
+          <div className="lockFooter">
+            <span>{launch.research_state === "target_locked" && !acquired ? "Awaiting execution" : acquired ? (launch.position_status === "closed" ? "Position closed" : "Position live") : "Ponseye monitoring"}</span>
+            {acquired ? <Link href={`/launch/${launch.token_address}`}>View chart <b>↗</b></Link> : <span className="signalPrivate">Signal engine active</span>}
+          </div>
+        </div>
       </article>
-    </Link>
   );
 }
 
-function LaunchLane({ title, count, tone, launches, empty }: {
+function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
   title: string;
   count: number;
   tone: "new" | "completing" | "completed";
+  icon: string;
+  mode: "sighted" | "surveillance" | "acquired";
   launches: Launch[];
   empty: string;
 }) {
   return (
     <section className={`launchLane ${tone}`}>
       <header className="laneHead">
-        <div><i /><strong>{title}</strong></div>
+        <div><Image src={icon} alt="" width={38} height={38} /><strong>{title}</strong></div>
         <span>{count}</span>
       </header>
       <div className="launchLaneBody">
-        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} />) : (
+        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} />) : (
           <div className="laneEmpty">{empty}</div>
         )}
       </div>
@@ -103,10 +117,10 @@ export default async function Home() {
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
-  const targetLocked = launches
+  const acquired = launches
     .filter((launch) => launch.research_state === "target_locked")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
-  const underWatch = launches
+  const surveillance = launches
     .filter((launch) => launch.research_state === "under_watch")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
   const sightings = launches
@@ -137,12 +151,12 @@ export default async function Home() {
           <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
         ) : (
           <div className="launchBoard">
-            <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" launches={sightings} empty="Watching for a new launch" />
-            <LaunchLane title="Under Watch" count={researchCounts.under_watch} tone="completing" launches={underWatch} empty="No launches have passed screening" />
-            <LaunchLane title="Target Locked" count={researchCounts.target_locked} tone="completed" launches={targetLocked} empty="No research signals have fired" />
+            <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
+            <LaunchLane title="Surveillance" count={researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
+            <LaunchLane title="Acquired" count={researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" />
           </div>
         )}
-        <footer className="panelFoot"><span>Tracking {launchCount.toLocaleString("en-GB")} launches</span><span>Signals recorded at detection</span></footer>
+        <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Buys appear after confirmation</span></footer>
       </section>
     </main>
   );
