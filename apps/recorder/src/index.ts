@@ -3,7 +3,7 @@ import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { runHolderCollector } from "./holders.js";
-import { CURVE_MARKET_TRADES, CURVE_TRADES, LAUNCH_ACTIVITY, poolMarketTrades } from "./queries.js";
+import { marketTrades, PONS_ACTIVITY } from "./queries.js";
 import { getActiveMarketTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
@@ -27,10 +27,12 @@ function delayOrAbort(ms: number, signal: AbortSignal) {
 
 function subscribe(
   client: Client,
-  feed: string,
+  feed: string | string[],
   query: string,
   handler: (row: never, collection: string) => Promise<void>,
 ) {
+  const feeds = Array.isArray(feed) ? feed : [feed];
+  const label = feeds.join("+");
   return client.subscribe({ query }, {
     next: async (result) => {
       try {
@@ -40,27 +42,23 @@ function subscribe(
         for (const [collection, rows] of collections) {
           for (const row of rows) await handler(row as never, collection);
         }
-        await updateStreamStatus(feed, "connected");
+        await Promise.all(feeds.map((name) => updateStreamStatus(name, "connected")));
       } catch (error) {
-        console.error(`[${feed}] processing failed`, error);
-        await updateStreamStatus(feed, "error", error instanceof Error ? error.message : String(error));
+        console.error(`[${label}] processing failed`, error);
+        await Promise.all(feeds.map((name) =>
+          updateStreamStatus(name, "error", error instanceof Error ? error.message : String(error))));
       }
     },
     error: async (error) => {
-      console.error(`[${feed}] subscription error`, error);
-      await updateStreamStatus(feed, "error", JSON.stringify(error));
+      console.error(`[${label}] subscription error`, error);
+      await Promise.all(feeds.map((name) => updateStreamStatus(name, "error", JSON.stringify(error))));
     },
-    complete: () => console.log(`[${feed}] subscription completed`),
+    complete: () => console.log(`[${label}] subscription completed`),
   });
 }
 
-function chunks<T>(items: T[], size: number): T[][] {
-  return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
-    items.slice(index * size, (index + 1) * size));
-}
-
 function createPoolFeedController(client: Client, signal: AbortSignal) {
-  let disposers: Array<() => void> = [];
+  let disposeMarketFeed = subscribe(client, "market_trades", marketTrades([]), saveMarketTrade);
   let addressSignature = "";
   let refreshQueue = Promise.resolve();
 
@@ -71,11 +69,10 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
       const nextSignature = addresses.join(",");
       if (nextSignature === addressSignature) return;
 
-      for (const dispose of disposers) dispose();
-      disposers = chunks(addresses, 100).map((batch) =>
-        subscribe(client, "market_trades", poolMarketTrades(batch), saveMarketTrade));
+      disposeMarketFeed();
+      disposeMarketFeed = subscribe(client, "market_trades", marketTrades(addresses), saveMarketTrade);
       addressSignature = nextSignature;
-      console.log(`Pool market feed tracking ${addresses.length} Pons tokens across ${disposers.length} filtered streams`);
+      console.log(`Market feed tracking ${addresses.length} Pons tokens in one filtered stream`);
     }).catch(async (error) => {
       console.error("Pool market feed refresh failed", error);
       await updateStreamStatus("market_trades", "error", error instanceof Error ? error.message : String(error));
@@ -95,8 +92,7 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
     refresh,
     async stop() {
       await refreshQueue;
-      for (const dispose of disposers) dispose();
-      disposers = [];
+      disposeMarketFeed();
       await maintenance;
     },
   };
@@ -112,14 +108,13 @@ async function recordingCycle() {
   });
   const poolFeeds = createPoolFeedController(client, collectorAbort.signal);
 
-  subscribe(client, "launch_activity", LAUNCH_ACTIVITY, async (row, collection) => {
-    if (collection !== "Events") return saveLaunchCall(row);
+  subscribe(client, ["launch_activity", "curve_trades"], PONS_ACTIVITY, async (row, collection) => {
+    if (collection === "Calls") return saveLaunchCall(row);
+    if (collection === "CurveEvents") return saveTrade(row);
     await saveFactoryEvent(row);
     const event = row as { Log?: { Signature?: { Name?: string } } };
     if (event.Log?.Signature?.Name === "PoolGraduated") await poolFeeds.refresh();
   });
-  subscribe(client, "curve_trades", CURVE_TRADES, saveTrade);
-  subscribe(client, "market_trades", CURVE_MARKET_TRADES, saveMarketTrade);
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
