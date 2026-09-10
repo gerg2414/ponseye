@@ -130,7 +130,10 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
                 <strong>{launch.name ?? "Metadata pending"}</strong>
                 <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
               </div>
-              <time>{age(launch.launched_at)}</time>
+              <div className="cardMetaStack">
+                <time>{age(launch.launched_at)}</time>
+                {acquired ? <span className={`positionBadge ${launch.position_status === "closed" ? "closed" : launch.position_status === "open" ? "live" : "pending"}`}>{launch.position_status === "closed" ? "Closed" : launch.position_status === "open" ? "Live" : "Pending"}</span> : null}
+              </div>
             </div>
           </div>
         </div>
@@ -148,24 +151,40 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
           </div>
         )}
 
-        <div className="targetLock">
-          <div className="targetLockHead">
-            <strong>{lockLabel(launch, lockScore)}</strong>
-            <b>{lockScore}<small>%</small></b>
+        {acquired ? (
+          <div className={`positionMonitor ${launch.position_status === "closed" ? "closed" : "live"}`}>
+            <svg viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true">
+              <path className="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
+              <path className="positionFill" d={launch.position_status === "closed" ? "M0 58L32 49L64 52L96 34L128 40L160 24L192 30L224 15L256 20L288 29L320 27V72H0Z" : "M0 58L32 51L64 54L96 40L128 45L160 31L192 36L224 20L256 25L288 13L320 9V72H0Z"} />
+              <polyline className="positionLine" points={launch.position_status === "closed" ? "0,58 32,49 64,52 96,34 128,40 160,24 192,30 224,15 256,20 288,29 320,27" : "0,58 32,51 64,54 96,40 128,45 160,31 192,36 224,20 256,25 288,13 320,9"} />
+              <circle className="positionEntry" cx="2" cy="58" r="4" />
+              <circle className="positionEnd" cx="318" cy={launch.position_status === "closed" ? "27" : "9"} r="4" />
+            </svg>
+            <div className="positionMonitorFooter">
+              <span><i />{launch.position_status === "closed" ? "Position closed" : "Position live"}</span>
+              {preview ? <span className="chartLink">View chart <b>↗</b></span> : <Link href={`/launch/${launch.token_address}`} className="chartLink">View chart <b>↗</b></Link>}
+            </div>
           </div>
-          <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
-            {Array.from({ length: 16 }, (_, index) => {
-              const filled = index < filledSegments;
-              const active = index === filledSegments - 1;
-              const colour = acquired ? "#9aff4f" : targetMeterColours[index];
-              return <i className={`${filled ? "filled" : ""}${active ? " active" : ""}`} style={filled ? { backgroundColor: colour, borderColor: colour, boxShadow: active ? `0 0 9px ${colour}88` : undefined } : undefined} key={index} />;
-            })}
+        ) : (
+          <div className="targetLock">
+            <div className="targetLockHead">
+              <strong>{lockLabel(launch, lockScore)}</strong>
+              <b>{lockScore}<small>%</small></b>
+            </div>
+            <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
+              {Array.from({ length: 16 }, (_, index) => {
+                const filled = index < filledSegments;
+                const active = index === filledSegments - 1;
+                const colour = targetMeterColours[index];
+                return <i className={`${filled ? "filled" : ""}${active ? " active" : ""}`} style={filled ? { backgroundColor: colour, borderColor: colour, boxShadow: active ? `0 0 9px ${colour}88` : undefined } : undefined} key={index} />;
+              })}
+            </div>
+            <div className="lockFooter">
+              <span>{launch.research_state === "target_locked" ? "Awaiting execution" : "Ponseye monitoring"}</span>
+              <span className="signalPrivate">Signal engine active</span>
+            </div>
           </div>
-          <div className="lockFooter">
-            <span>{launch.research_state === "target_locked" && !acquired ? "Awaiting execution" : acquired ? (launch.position_status === "closed" ? "Position closed" : "Position live") : "Ponseye monitoring"}</span>
-            {acquired ? (preview ? <span className="chartLink">View chart <b>↗</b></span> : <Link href={`/launch/${launch.token_address}`} className="chartLink">View chart <b>↗</b></Link>) : <span className="signalPrivate">Signal engine active</span>}
-          </div>
-        </div>
+        )}
       </article>
   );
 }
