@@ -172,18 +172,23 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
       const now = Date.now();
       const candidates = (await getHolderCandidates()).filter((candidate) => due(candidate, now));
 
-      for (let index = 0; index < candidates.length && !signal.aborted; index += 2) {
-        const batch = candidates.slice(index, index + 2);
-        await Promise.all(batch.map(async (candidate) => {
-          try {
-            await collectOne(accessToken, candidate, signal);
-          } catch (error) {
-            if (!signal.aborted) console.error(`[holder_snapshots] ${candidate.token_address} failed`, error);
+      let rateLimited = false;
+      for (const candidate of candidates) {
+        if (signal.aborted) break;
+        try {
+          await collectOne(accessToken, candidate, signal);
+        } catch (error) {
+          if (!signal.aborted) console.error(`[holder_snapshots] ${candidate.token_address} failed`, error);
+          if (error instanceof Error && error.message.includes("429")) {
+            rateLimited = true;
+            break;
           }
-        }));
+        }
+        await delay(1_250, signal);
       }
 
       if (!signal.aborted) await updateStreamStatus("holder_snapshots", "connected");
+      if (rateLimited) await delay(30_000, signal);
     } catch (error) {
       if (!signal.aborted) {
         console.error("[holder_snapshots] cycle failed", error);
