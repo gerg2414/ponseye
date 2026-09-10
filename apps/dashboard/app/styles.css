@@ -34,7 +34,7 @@ main { width: 100%; margin: 0; padding: 0 22px 72px; }
 .hero { min-height: 250px; padding: 0 0 16px; display: grid; grid-template-columns: 1fr; align-items: center; }
 .heroBrand { display: flex; align-items: center; gap: 0; margin: 0; transform: translateX(-12px); }
 .heroRobot { display: block; width: 210px; height: 210px; object-fit: contain; image-rendering: pixelated; transform: translateY(-8px); }
-.heroWordmark { display: block; width: min(520px,calc(100% - 156px)); height: auto; margin-left: -34px; image-rendering: pixelated; }
+.heroWordmark { display: block; width: min(470px,calc(100% - 156px)); height: auto; margin-left: -34px; image-rendering: pixelated; }
 .eyebrow { color: #8c92a2; letter-spacing: .13em; font-size: 10px; font-weight: 700; text-transform: uppercase; margin: 0 0 18px; }
 .eyebrow span { color: var(--purple); margin-right: 12px; }
 h1 { color: var(--white); font-family: Arial, sans-serif; font-size: clamp(42px, 6vw, 78px); line-height: .96; letter-spacing: -.065em; margin: 0; max-width: 850px; }
