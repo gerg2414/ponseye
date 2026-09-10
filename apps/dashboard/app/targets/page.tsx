@@ -17,12 +17,12 @@ const summaries: Record<Period, { acquired: number; best: string; counts: string
 };
 
 const targets = [
-  { name: "Night Shift", symbol: "NIGHT", multiple: 100, found: "$12.4K", peak: "$1.24M", spotted: "4m after launch", signal: "Rapid maker expansion", tone: "green" },
-  { name: "Common Ground", symbol: "GROUND", multiple: 63, found: "$21.8K", peak: "$1.37M", spotted: "7m after launch", signal: "Wallet cluster return", tone: "purple" },
-  { name: "Velocity", symbol: "VELO", multiple: 51, found: "$18.1K", peak: "$923K", spotted: "3m after launch", signal: "Curve acceleration", tone: "pink" },
-  { name: "Good Company", symbol: "GOOD", multiple: 37, found: "$15.6K", peak: "$577K", spotted: "6m after launch", signal: "Organic buyer spread", tone: "orange" },
-  { name: "Open Season", symbol: "OPEN", multiple: 28, found: "$27.2K", peak: "$762K", spotted: "11m after launch", signal: "Sustained holder growth", tone: "green" },
-  { name: "Signal Fire", symbol: "FIRE", multiple: 18, found: "$31.5K", peak: "$567K", spotted: "8m after launch", signal: "Sell pressure absorbed", tone: "purple" },
+  { name: "Night Shift", symbol: "NIGHT", multiple: 100, entry: "$12.4K", exit: "$1.24M", closed: "2d ago" },
+  { name: "Common Ground", symbol: "GROUND", multiple: 63, entry: "$21.8K", exit: "$1.37M", closed: "3d ago" },
+  { name: "Velocity", symbol: "VELO", multiple: 51, entry: "$18.1K", exit: "$923K", closed: "4d ago" },
+  { name: "Good Company", symbol: "GOOD", multiple: 37, entry: "$15.6K", exit: "$577K", closed: "5d ago" },
+  { name: "Open Season", symbol: "OPEN", multiple: 28, entry: "$27.2K", exit: "$762K", closed: "6d ago" },
+  { name: "Signal Fire", symbol: "FIRE", multiple: 18, entry: "$31.5K", exit: "$567K", closed: "7d ago" },
 ];
 
 const periodLabels: Array<[Period, string]> = [["1d", "1D"], ["7d", "7D"], ["30d", "30D"], ["all", "All time"]];
@@ -83,31 +83,31 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
 
       <section className="targetsResults">
         <header>
-          <div><p className="eyebrow"><span>04</span> Top sightings</p><h2>Biggest verified runners</h2></div>
+          <div><p className="eyebrow"><span>04</span> Targets history</p><h2>Closed positions</h2></div>
           <div className="verifiedKey"><i /> Onchain timestamp verified</div>
         </header>
 
-        <div className="targetGrid">
+        <div className="targetHistory" role="table" aria-label="Closed positions">
+          <div className="targetHistoryHead" role="row">
+            <span role="columnheader">Target</span>
+            <span role="columnheader">Entry MC</span>
+            <span role="columnheader">Exit MC</span>
+            <span role="columnheader">Return</span>
+            <span role="columnheader">Closed</span>
+            <span role="columnheader" aria-label="Chart" />
+          </div>
           {targets.map((target, index) => (
-            <article className={`targetCard ${target.tone}`} key={target.symbol}>
-              <div className="targetCardTop">
+            <article className="targetHistoryRow" role="row" key={target.symbol}>
+              <div className="targetHistoryToken" role="cell">
                 <span className="targetRank">{String(index + 1).padStart(2, "0")}</span>
-                <span className="verifiedBadge"><i /> Verified</span>
-              </div>
-              <div className="multiple"><strong>{target.multiple}</strong><span>x</span></div>
-              <div className="targetToken">
-                <div>{target.symbol.slice(0, 2)}</div>
+                <div className="historyTokenThumb">{target.symbol.slice(0, 2)}</div>
                 <span><strong>{target.name}</strong><small>{"$"}{target.symbol}</small></span>
               </div>
-              <div className="targetValues">
-                <div><small>Acquired at</small><strong>{target.found}</strong></div>
-                <div><small>Peak market cap</small><strong>{target.peak}</strong></div>
-              </div>
-              <div className="targetSignal">
-                <span>{target.signal}</span>
-                <small>{target.spotted}</small>
-              </div>
-              <footer><span>View evidence</span><b>→</b></footer>
+              <strong role="cell" data-label="Entry MC">{target.entry}</strong>
+              <strong role="cell" data-label="Exit MC">{target.exit}</strong>
+              <strong className="historyReturn" role="cell" data-label="Return">{target.multiple.toFixed(2)}x</strong>
+              <span className="historyClosed" role="cell" data-label="Closed"><i />{target.closed}</span>
+              <Link className="historyChartLink" href="#" role="cell" aria-label={`View ${target.name} chart`}>View chart <b>↗</b></Link>
             </article>
           ))}
         </div>
