@@ -18,6 +18,12 @@ function short(value: string) {
   return `${value.slice(0, 7)}…${value.slice(-5)}`;
 }
 
+function progressTone(value: number | null) {
+  if ((value ?? 0) >= 75) return "progressHigh";
+  if ((value ?? 0) >= 30) return "progressMid";
+  return "progressLow";
+}
+
 function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" }) {
   const paths = {
     contract: "M3 2h8l4 4v10H3zM11 2v4h4M6 10h6M6 13h4",
@@ -114,7 +120,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
             <div><small>Live market cap</small><strong>{usd(launch.market_cap_usd)}</strong></div>
             <div className={`marketBonding ${bondingTone}`}>
               <div><small>Bonding progress</small><strong>{launch.progress_pct == null ? "Awaiting threshold" : `${launch.progress_pct.toFixed(1)}%`}</strong></div>
-              <div className="progressTrack"><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
+              <div className={`progressTrack ${progressTone(launch.progress_pct)}`}><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
             </div>
           </header>
           <PonsEyeChart trades={marketTrades} tokenAddress={launch.token_address} graduatedAt={launch.graduated_at} />

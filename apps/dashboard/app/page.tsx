@@ -17,6 +17,12 @@ function age(value: string) {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
+function progressTone(value: number | null) {
+  if ((value ?? 0) >= 75) return "progressHigh";
+  if ((value ?? 0) >= 30) return "progressMid";
+  return "progressLow";
+}
+
 function MetricIcon({ type }: { type: "cap" | "volume" | "peak" | "holders" | "change" | "traders" | "buy" | "sell" | "pressure" }) {
   if (type === "cap") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13V9l3-3 3 2 5-5" /><path d="M10 3h3v3" /></svg>;
   if (type === "volume") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V9M8 13V4M13 13V7" /></svg>;
@@ -54,7 +60,7 @@ function TokenCard({ launch }: { launch: Launch }) {
             </div>
             <div className="cardBonding">
               <div><span>Bonding</span><strong>{progress == null ? "—" : `${progress.toFixed(1)}%`}</strong></div>
-              <div className="progressTrack"><i style={{ width: `${progress ?? 0}%` }} /></div>
+              <div className={`progressTrack ${progressTone(progress)}`}><i style={{ width: `${progress ?? 0}%` }} /></div>
             </div>
           </div>
         </div>

@@ -140,10 +140,11 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .metrics strong b { color: var(--green); font-weight: 500; }
 .metrics .buyMetric { color: var(--green); }
 .metrics .sellMetric { color: #ff718c; }
-.progressTrack { height: 6px; overflow: hidden; background: #242732; }
-.progressTrack i { display: block; height: 100%; max-width: 100%; background: linear-gradient(90deg,var(--purple),#d56fff); box-shadow: 0 0 9px rgba(165,108,255,.55); }
-.completing .progressTrack i { background: linear-gradient(90deg,#ff7f50,#ffbf69); box-shadow: 0 0 9px rgba(255,159,67,.5); }
-.completed .progressTrack i { background: var(--green); box-shadow: 0 0 9px rgba(154,255,79,.5); }
+.progressTrack { position: relative; height: 8px; overflow: hidden; border: 1px solid #343846; background: #0b0d12; box-shadow: inset 0 0 0 1px #050609; }
+.progressTrack::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(90deg,transparent 0 9px,rgba(5,6,9,.92) 9px 11px); }
+.progressTrack i { display: block; position: relative; z-index: 1; height: 100%; max-width: 100%; background: #9b63ff; box-shadow: 0 0 5px rgba(155,99,255,.42); }
+.progressTrack.progressMid i { background: #f28a38; box-shadow: 0 0 5px rgba(242,138,56,.4); }
+.progressTrack.progressHigh i { background: #8ee84d; box-shadow: 0 0 5px rgba(142,232,77,.4); }
 .laneEmpty { min-height: 130px; display: grid; place-items: center; padding: 22px; border: 1px dashed #252833; color: #5f6572; font-family: Arial, sans-serif; font-size: 11px; text-align: center; }
 .targetsPage { padding-bottom: 80px; }
 .targetsNav { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
