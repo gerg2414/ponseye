@@ -172,12 +172,12 @@ export async function getLaunchDetail(tokenAddress: string) {
     db.from("trades")
       .select("event_id,transaction_hash,block_time,side,trader_address,recipient_address,quote_amount_raw,token_amount_raw,fee_raw,tax_raw")
       .eq("token_address", tokenAddress)
-      .order("block_time", { ascending: true })
+      .order("block_time", { ascending: false })
       .limit(1000),
     db.from("trade_market_data")
       .select("market_event_id,transaction_hash,block_time,side,trader_address,price_usd,base_amount_usd,quote_amount_usd")
       .eq("token_address", tokenAddress)
-      .order("block_time", { ascending: true })
+      .order("block_time", { ascending: false })
       .limit(2000),
   ]);
 
@@ -200,8 +200,8 @@ export async function getLaunchDetail(tokenAddress: string) {
       market_cap_usd: boardResult.data.market_cap_usd == null ? null : Number(boardResult.data.market_cap_usd),
       ath_market_cap_usd: boardResult.data.ath_market_cap_usd == null ? null : Number(boardResult.data.ath_market_cap_usd),
     } as LaunchRecord,
-    trades: (tradesResult.data ?? []) as Trade[],
-    marketTrades: (marketTradesResult.data ?? []).map((trade) => ({
+    trades: [...(tradesResult.data ?? [])].reverse() as Trade[],
+    marketTrades: [...(marketTradesResult.data ?? [])].reverse().map((trade) => ({
       ...trade,
       price_usd: trade.price_usd == null ? null : Number(trade.price_usd),
       base_amount_usd: trade.base_amount_usd == null ? null : Number(trade.base_amount_usd),
