@@ -357,7 +357,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
       <div ref={exitMarkerRef} className="chartEntryMarker chartExitMarker" hidden>
         <div className="chartEntryBadge">
           <span className="chartSoldIcon" aria-hidden="true">×</span>
-          <strong>PONSEYE SOLD</strong>
+          <strong>PONSEYE SELL</strong>
         </div>
         <span className="chartEntryChevron">⌄</span>
       </div>
