@@ -4,7 +4,13 @@ import { argumentMap, decodeLaunchMetadata, eventId, ipfsUrl, launchAddresses } 
 
 const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
+  db: { retry: false },
 });
+
+const tokenByCurve = new Map<string, string>();
+const knownTokens = new Set<string>();
+const unknownTokenUntil = new Map<string, number>();
+const lastStatusWrite = new Map<string, { status: string; at: number }>();
 
 type LaunchCall = {
   Block: { Time: string; Number?: string };
@@ -106,6 +112,9 @@ export async function saveLaunchCall(row: LaunchCall) {
   };
   const { error } = await db.from("launches").upsert(payload, { onConflict: "curve_address" });
   assertOk(error, "save launch");
+  tokenByCurve.set(addresses.curveAddress, addresses.tokenAddress);
+  knownTokens.add(addresses.tokenAddress);
+  unknownTokenUntil.delete(addresses.tokenAddress);
 }
 
 export async function saveFactoryEvent(row: EventRow) {
@@ -128,6 +137,9 @@ export async function saveFactoryEvent(row: EventRow) {
       raw_factory_event: row,
     }, { onConflict: "curve_address", ignoreDuplicates: false });
     assertOk(error, "save TokenLaunched");
+    tokenByCurve.set(String(args.curve).toLowerCase(), token);
+    knownTokens.add(token);
+    unknownTokenUntil.delete(token);
     return;
   }
 
@@ -144,18 +156,26 @@ export async function saveTrade(row: EventRow) {
   const curve = row.LogHeader.Address.toLowerCase();
   const trader = String(args.buyer ?? args.seller ?? row.Transaction.From ?? "").toLowerCase();
   const id = eventId([row.Transaction.Hash, curve, side, row.Arguments]);
-  const { data: launch } = await db
-    .from("launches")
-    .select("token_address")
-    .eq("curve_address", curve)
-    .maybeSingle();
+  let tokenAddress = tokenByCurve.get(curve);
+  if (!tokenAddress) {
+    const { data: launch } = await db
+      .from("launches")
+      .select("token_address")
+      .eq("curve_address", curve)
+      .maybeSingle();
+    tokenAddress = launch?.token_address;
+    if (tokenAddress) {
+      tokenByCurve.set(curve, tokenAddress);
+      knownTokens.add(tokenAddress);
+    }
+  }
 
   // Ignore older or unrelated curves that are not part of this fresh PonsEye run.
-  if (!launch?.token_address) return;
+  if (!tokenAddress) return;
 
   const { error } = await db.from("trades").upsert({
     event_id: id,
-    token_address: launch.token_address,
+    token_address: tokenAddress,
     curve_address: curve,
     transaction_hash: row.Transaction.Hash.toLowerCase(),
     block_time: row.Block.Time,
@@ -176,12 +196,20 @@ export async function saveMarketTrade(row: MarketTradeRow) {
   const tokenAddress = row.Pair.Token.Address?.toLowerCase();
   if (!tokenAddress) return;
 
-  const { data: launch } = await db
-    .from("launches")
-    .select("token_address")
-    .eq("token_address", tokenAddress)
-    .maybeSingle();
-  if (!launch?.token_address) return;
+  if (!knownTokens.has(tokenAddress)) {
+    if ((unknownTokenUntil.get(tokenAddress) ?? 0) > Date.now()) return;
+    const { data: launch } = await db
+      .from("launches")
+      .select("token_address")
+      .eq("token_address", tokenAddress)
+      .maybeSingle();
+    if (!launch?.token_address) {
+      unknownTokenUntil.set(tokenAddress, Date.now() + 5 * 60_000);
+      return;
+    }
+    knownTokens.add(tokenAddress);
+    unknownTokenUntil.delete(tokenAddress);
+  }
 
   const side = row.Side.toLowerCase() === "buy" ? "buy" : "sell";
   const transactionHash = row.TransactionHeader.Hash.toLowerCase();
@@ -218,12 +246,18 @@ export async function saveMarketTrade(row: MarketTradeRow) {
 }
 
 export async function updateStreamStatus(feed: string, status: string, message?: string) {
+  const now = Date.now();
+  const prior = lastStatusWrite.get(feed);
+  if (status === "connected" && prior?.status === status && now - prior.at < 30_000) return;
+  lastStatusWrite.set(feed, { status, at: now });
+
   const { error } = await db.from("stream_status").upsert({
     feed,
     status,
     message: message ?? null,
     last_seen_at: new Date().toISOString(),
   });
+  if (error) lastStatusWrite.delete(feed);
   assertOk(error, "update stream status");
 }
 
