@@ -9,7 +9,6 @@ const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
 
 const tokenByCurve = new Map<string, string>();
 const knownTokens = new Set<string>();
-const unknownTokenUntil = new Map<string, number>();
 const lastStatusWrite = new Map<string, { status: string; at: number }>();
 
 type LaunchCall = {
@@ -114,7 +113,6 @@ export async function saveLaunchCall(row: LaunchCall) {
   assertOk(error, "save launch");
   tokenByCurve.set(addresses.curveAddress, addresses.tokenAddress);
   knownTokens.add(addresses.tokenAddress);
-  unknownTokenUntil.delete(addresses.tokenAddress);
 }
 
 export async function saveFactoryEvent(row: EventRow) {
@@ -139,7 +137,6 @@ export async function saveFactoryEvent(row: EventRow) {
     assertOk(error, "save TokenLaunched");
     tokenByCurve.set(String(args.curve).toLowerCase(), token);
     knownTokens.add(token);
-    unknownTokenUntil.delete(token);
     return;
   }
 
@@ -195,21 +192,7 @@ export async function saveTrade(row: EventRow) {
 export async function saveMarketTrade(row: MarketTradeRow) {
   const tokenAddress = row.Pair.Token.Address?.toLowerCase();
   if (!tokenAddress) return;
-
-  if (!knownTokens.has(tokenAddress)) {
-    if ((unknownTokenUntil.get(tokenAddress) ?? 0) > Date.now()) return;
-    const { data: launch } = await db
-      .from("launches")
-      .select("token_address")
-      .eq("token_address", tokenAddress)
-      .maybeSingle();
-    if (!launch?.token_address) {
-      unknownTokenUntil.set(tokenAddress, Date.now() + 5 * 60_000);
-      return;
-    }
-    knownTokens.add(tokenAddress);
-    unknownTokenUntil.delete(tokenAddress);
-  }
+  if (!knownTokens.has(tokenAddress)) return;
 
   const side = row.Side.toLowerCase() === "buy" ? "buy" : "sell";
   const transactionHash = row.TransactionHeader.Hash.toLowerCase();
@@ -245,6 +228,32 @@ export async function saveMarketTrade(row: MarketTradeRow) {
     raw_trade: row,
   }, { onConflict: "market_event_id", ignoreDuplicates: true });
   assertOk(error, "save market trade");
+}
+
+export async function warmTokenCache() {
+  const pageSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await db
+      .from("launches")
+      .select("token_address,curve_address")
+      .order("launched_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    assertOk(error, "warm token cache");
+
+    for (const launch of data ?? []) {
+      const token = String(launch.token_address).toLowerCase();
+      const curve = String(launch.curve_address).toLowerCase();
+      knownTokens.add(token);
+      tokenByCurve.set(curve, token);
+    }
+
+    if (!data || data.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  console.log(`Loaded ${knownTokens.size} tracked tokens into memory`);
 }
 
 export async function updateStreamStatus(feed: string, status: string, message?: string) {
