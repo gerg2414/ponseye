@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLaunchDetail, type MarketTrade } from "../../../lib/data";
-import { compact, launchMarket, quoteAsset, quoteValue } from "../../../lib/market";
+import { getLaunchDetail } from "../../../lib/data";
+import { launchMarket, quoteAsset, quoteValue } from "../../../lib/market";
 import { AutoRefresh } from "../../auto-refresh";
 import { TokenImage } from "../../token-image";
+import { CopyField } from "./copy-field";
+import { PonsEyeChart } from "./ponseye-chart";
 
 export const dynamic = "force-dynamic";
 
@@ -17,69 +19,22 @@ function short(value: string) {
   return `${value.slice(0, 7)}…${value.slice(-5)}`;
 }
 
-function MarketCapChart({ trades }: { trades: MarketTrade[] }) {
-  const values = trades
-    .slice(-600)
-    .flatMap((trade) => trade.price_usd && trade.price_usd > 0
-      ? [{ value: trade.price_usd * 1_000_000_000, time: new Date(trade.block_time).getTime() }]
-      : []);
-
-  if (values.length < 2) {
-    return <div className="chartEmpty">Collecting dollar market cap data</div>;
-  }
-
-  const logs = values.map((point) => Math.log10(point.value));
-  const min = Math.min(...logs);
-  const max = Math.max(...logs);
-  const spread = Math.max(max - min, 0.000001);
-  const firstTime = values[0].time;
-  const lastTime = values.at(-1)?.time ?? firstTime;
-  const timeSpread = Math.max(lastTime - firstTime, 1);
-  const left = 94;
-  const right = 1170;
-  const top = 30;
-  const bottom = 348;
-  const points = logs.map((value, index) => {
-    const x = left + ((values[index].time - firstTime) / timeSpread) * (right - left);
-    const y = bottom - ((value - min) / spread) * (bottom - top);
-    return [x, y] as const;
-  });
-  const line = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-  const area = `${line} L${right} ${bottom} L${left} ${bottom} Z`;
-  const yTicks = Array.from({ length: 5 }, (_, index) => {
-    const ratio = index / 4;
-    const y = top + ratio * (bottom - top);
-    const value = 10 ** (max - ratio * spread);
-    return { y, value };
-  });
-  const xTicks = Array.from({ length: 4 }, (_, index) => {
-    const ratio = index / 3;
-    const x = left + ratio * (right - left);
-    const time = firstTime + ratio * timeSpread;
-    return { x, label: new Date(time).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) };
-  });
-
-  return (
-    <svg className="priceChart" viewBox="0 0 1200 410" role="img" aria-label="Dollar market cap chart">
-      <defs>
-        <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#a56cff" stopOpacity=".35" />
-          <stop offset="1" stopColor="#a56cff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <g className="chartGrid">
-        {yTicks.map((tick) => <path key={tick.y} d={`M${left} ${tick.y}H${right}`} />)}
-        {xTicks.map((tick) => <path key={tick.x} d={`M${tick.x} ${top}V${bottom}`} />)}
-      </g>
-      <g className="chartLabels">
-        {yTicks.map((tick) => <text key={tick.y} x="78" y={tick.y + 4} textAnchor="end">${compact(tick.value)}</text>)}
-        {xTicks.map((tick, index) => <text key={tick.x} x={tick.x} y="382" textAnchor={index === 0 ? "start" : index === 3 ? "end" : "middle"}>{tick.label}</text>)}
-      </g>
-      <path className="chartArea" d={area} />
-      <path className="chartLine" d={line} />
-      <circle className="chartPoint" cx={points.at(-1)?.[0]} cy={points.at(-1)?.[1]} r="4" />
-    </svg>
-  );
+function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" }) {
+  const paths = {
+    contract: "M3 2h8l4 4v10H3zM11 2v4h4M6 10h6M6 13h4",
+    curve: "M2 14h3V9h3V6h3V3h4M12 3h3v3",
+    wallet: "M2 5h13v10H2zM4 5V3h9v2M11 9h4v3h-4z",
+    clock: "M9 2a7 7 0 1 0 0 14A7 7 0 0 0 9 2zM9 5v4l3 2",
+    cap: "M2 15V9l4-4 3 3 6-6M11 2h4v4",
+    peak: "M2 14l4-8 3 4 3-7 4 11",
+    drop: "M3 4l5 6 3-4 4 6M12 12h3V9",
+    volume: "M3 15V9h3v6M8 15V4h3v11M13 15V7h3v8",
+    holders: "M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM1 16c0-4 2-6 5-6s5 2 5 6M13 4a2 2 0 1 1 0 4M12 11c3 0 4 2 4 5",
+    traders: "M2 5h12M10 2l4 3-4 3M16 13H4M8 10l-4 3 4 3",
+    buy: "M9 16V3M4 8l5-5 5 5",
+    creator: "M9 2l2 4 4 1-3 3 1 5-4-2-4 2 1-5-3-3 4-1z",
+  };
+  return <svg className="pixelIcon" viewBox="0 0 18 18" aria-hidden="true"><path d={paths[type]} /></svg>;
 }
 
 export default async function LaunchPage({ params }: { params: Promise<{ address: string }> }) {
@@ -93,10 +48,10 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
   const market = launchMarket(launch);
   const recentTrades = trades.slice(-30).reverse();
   const marketByHash = new Map(marketTrades.map((trade) => [trade.transaction_hash, trade]));
-  const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Collecting";
-  const percent = (value: number | null) => value == null ? "Collecting" : `${value.toFixed(1)}%`;
+  const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
+  const percent = (value: number | null, fallback = "Pending data") => value == null ? fallback : `${value.toFixed(1)}%`;
   const holderDelta = launch.holder_change_5m == null
-    ? "Collecting"
+    ? "First snapshot due"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
 
   return (
@@ -122,10 +77,10 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
         <aside className="launchMeta">
           {launch.description && <p>{launch.description}</p>}
           <dl>
-            <div><dt>CA</dt><dd title={launch.token_address}>{short(launch.token_address)}</dd></div>
-            <div><dt>Curve</dt><dd title={launch.curve_address}>{short(launch.curve_address)}</dd></div>
-            <div><dt>Deployer</dt><dd title={launch.deployer_address}>{short(launch.deployer_address)}</dd></div>
-            <div><dt>Launched</dt><dd>{new Date(launch.launched_at).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</dd></div>
+            <div><dt><PixelIcon type="contract" /> Contract address</dt><dd><CopyField value={launch.token_address} /></dd></div>
+            <div><dt><PixelIcon type="curve" /> Bonding curve</dt><dd><CopyField value={launch.curve_address} /></dd></div>
+            <div><dt><PixelIcon type="wallet" /> Deployer wallet</dt><dd><CopyField value={launch.deployer_address} /></dd></div>
+            <div><dt><PixelIcon type="clock" /> Launched</dt><dd className="launchDate">{new Date(launch.launched_at).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</dd></div>
           </dl>
           <nav className="launchLinks">
             {launch.website_url && <a href={launch.website_url} target="_blank" rel="noreferrer">Website</a>}
@@ -135,27 +90,31 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
         </aside>
       </section>
 
-      <section className="detailStats">
-        <article><small>Market cap</small><strong>{usd(launch.market_cap_usd)}</strong></article>
-        <article><small>ATH market cap</small><strong>{usd(launch.ath_market_cap_usd)}</strong></article>
-        <article><small>Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "Collecting"}</strong></article>
-        <article><small>Drawdown</small><strong className="negative">{percent(launch.drawdown_from_peak_pct)}</strong></article>
-        <article><small>Volume</small><strong>{usd(launch.volume_usd)}</strong></article>
-        <article><small>Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Collecting"}</strong></article>
-        <article><small>Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "positive" : "negative"}>{holderDelta}</strong></article>
-        <article><small>Top 10</small><strong>{percent(launch.top_10_holder_pct)}</strong></article>
-        <article><small>Traders</small><strong>{launch.unique_traders.toLocaleString("en-GB")}</strong></article>
-        <article><small>Buy pressure</small><strong className="positive">{percent(launch.buy_pressure_pct)}</strong></article>
-        <article><small>First minute buyers</small><strong>{launch.first_minute_buyers.toLocaleString("en-GB")}</strong></article>
-        <article><small>Creator sells</small><strong className={launch.creator_sells ? "negative" : "positive"}>{launch.creator_sells.toLocaleString("en-GB")}</strong></article>
-      </section>
-
-      <section className="chartPanel">
-        <header>
-          <div><small>Market cap</small><strong>{usd(launch.market_cap_usd)}</strong></div>
-          <span>{marketTrades.length ? `${new Date(marketTrades[0].block_time).toLocaleDateString("en-GB")} to ${new Date(marketTrades.at(-1)?.block_time ?? marketTrades[0].block_time).toLocaleDateString("en-GB")}` : "Waiting for dollar data"} <b>•</b> log scale</span>
-        </header>
-        <MarketCapChart trades={marketTrades} />
+      <section className="marketWorkspace">
+        <div className="chartPanel">
+          <header>
+            <div><small>Live market cap</small><strong>{usd(launch.market_cap_usd)}</strong></div>
+            <span>{marketTrades.length ? `${new Date(marketTrades[0].block_time).toLocaleDateString("en-GB")} to ${new Date(marketTrades.at(-1)?.block_time ?? marketTrades[0].block_time).toLocaleDateString("en-GB")}` : "Waiting for dollar priced trade"}</span>
+          </header>
+          <PonsEyeChart trades={marketTrades} />
+        </div>
+        <aside className="metricRail">
+          <header><span>Token telemetry</span><b><i /> Live</b></header>
+          <div className="metricRailGrid">
+            <article><small><PixelIcon type="cap" /> Market cap</small><strong>{usd(launch.market_cap_usd)}</strong></article>
+            <article><small><PixelIcon type="cap" /> ATH market cap</small><strong>{usd(launch.ath_market_cap_usd)}</strong></article>
+            <article><small><PixelIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></article>
+            <article><small><PixelIcon type="drop" /> Drawdown</small><strong className="negative">{percent(launch.drawdown_from_peak_pct, "No peak yet")}</strong></article>
+            <article><small><PixelIcon type="volume" /> Volume</small><strong>{usd(launch.volume_usd)}</strong></article>
+            <article><small><PixelIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Snapshot due"}</strong></article>
+            <article><small><PixelIcon type="holders" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "positive" : "negative"}>{holderDelta}</strong></article>
+            <article><small><PixelIcon type="holders" /> Top 10</small><strong>{percent(launch.top_10_holder_pct, "Snapshot due")}</strong></article>
+            <article><small><PixelIcon type="traders" /> Traders</small><strong>{launch.unique_traders.toLocaleString("en-GB")}</strong></article>
+            <article><small><PixelIcon type="buy" /> Buy pressure</small><strong className="positive">{percent(launch.buy_pressure_pct, "No trades yet")}</strong></article>
+            <article><small><PixelIcon type="traders" /> First minute</small><strong>{launch.first_minute_buyers.toLocaleString("en-GB")}</strong></article>
+            <article><small><PixelIcon type="creator" /> Creator sells</small><strong className={launch.creator_sells ? "negative" : "positive"}>{launch.creator_sells.toLocaleString("en-GB")}</strong></article>
+          </div>
+        </aside>
       </section>
 
       <section className="tradeTape detailTradeTape">
