@@ -25,6 +25,8 @@ main { width: 100%; margin: 0; padding: 0 22px 72px; }
 .brand { display: flex; align-items: center; }
 .brandLogo { display: block; width: 280px; height: auto; image-rendering: pixelated; }
 .systemMeta { display: flex; align-items: center; gap: 26px; font-size: 10px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.chainLabel { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.chainLabel img { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; }
 .recorder { display: flex; gap: 9px; align-items: center; color: #8b91a0; }
 .recorder i, .panelStatus i { width: 7px; height: 7px; background: #555a68; display: inline-block; }
 .recorder.live { color: var(--green); }
@@ -155,15 +157,14 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .lockFooter { min-height: 29px; margin-top: 13px; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #22262e; }
 .lockFooter > span { color: #777d8b; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
 .lockFooter .signalPrivate { color: #5d6370; text-align: right; }
-.lockFooter .chartLink,.positionMonitorFooter .chartLink { padding: 7px 9px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(154,255,79,.32); border-radius: 5px; color: var(--green); background: rgba(154,255,79,.055); font-size: 9px; letter-spacing: .06em; text-decoration: none; text-transform: uppercase; }
+.lockFooter .chartLink,.positionMonitorFooter .chartLink { padding: 7px 9px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(165,108,255,.4); border-radius: 5px; color: var(--purple); background: rgba(165,108,255,.07); font-size: 9px; letter-spacing: .06em; text-decoration: none; text-transform: uppercase; }
 .lockFooter .chartLink b,.positionMonitorFooter .chartLink b { font-size: 11px; transition: transform .16s ease; }
-a.chartLink:hover,a.chartLink:focus-visible { color: #090b0d; background: var(--green); outline: none; }
+a.chartLink:hover,a.chartLink:focus-visible { color: #090b0d; background: var(--purple); outline: none; }
 a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px); }
 .positionMonitor { position: relative; height: 111px; margin-top: auto; overflow: hidden; border: 1px solid #26302a; border-radius: 8px; background: #090d0b; }
 .positionMonitor > svg { width: 100%; height: 70px; display: block; }
 .positionGrid { fill: none; stroke: #18231d; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .positionLine { fill: none; stroke: var(--green); stroke-width: 2.25; filter: drop-shadow(0 0 3px rgba(154,255,79,.38)); vector-effect: non-scaling-stroke; }
-.positionEntry { fill: #090d0b; stroke: var(--green); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .positionEnd { fill: var(--green); stroke: #090d0b; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .positionMonitor.closed { border-color: #30353f; background: #0b0d11; }
 .positionMonitor.closed .positionGrid { stroke: #1c2028; }

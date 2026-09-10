@@ -165,7 +165,6 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
               <path className="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
               <path className="positionFill" style={{ fill: `url(#${positionGradientId})` }} d={launch.position_status === "closed" ? "M0 58L32 49L64 52L96 34L128 40L160 24L192 30L224 15L256 20L288 29L320 27V72H0Z" : "M0 58L32 51L64 54L96 40L128 45L160 31L192 36L224 20L256 25L288 13L320 9V72H0Z"} />
               <polyline className="positionLine" points={launch.position_status === "closed" ? "0,58 32,49 64,52 96,34 128,40 160,24 192,30 224,15 256,20 288,29 320,27" : "0,58 32,51 64,54 96,40 128,45 160,31 192,36 224,20 256,25 288,13 320,9"} />
-              <circle className="positionEntry" cx="2" cy="58" r="4" />
               <circle className="positionEnd" cx="318" cy={launch.position_status === "closed" ? "27" : "9"} r="4" />
             </svg>
             <div className="positionMonitorFooter">
@@ -253,7 +252,7 @@ export default async function Home() {
       <AutoRefresh intervalMs={3_000} />
       <header className="header">
         <div className="systemMeta">
-          <span>Robinhood Chain</span>
+          <span className="chainLabel"><Image src="/robinhood-feather.svg" alt="" width={24} height={24} />Robinhood Chain</span>
           <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {showingPreview ? "Design preview" : recorderLive ? "Recorder live" : "Recorder paused"}</div>
         </div>
       </header>
@@ -273,7 +272,7 @@ export default async function Home() {
         ) : (
           <div className="launchBoard">
             <LaunchLane title="Sighted" count={showingPreview ? sightings.length : researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" preview={showingPreview} />
-            <LaunchLane title="Surveillance" count={showingPreview ? surveillance.length : researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" preview={showingPreview} />
+            <LaunchLane title="Surveilling" count={showingPreview ? surveillance.length : researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" preview={showingPreview} />
             <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" preview={showingPreview} />
           </div>
         )}
