@@ -134,13 +134,6 @@ export default async function Home() {
           </div>
           <h1>Watch every launch.<br /><em>Find what repeats.</em></h1>
         </div>
-        <div className="eyeConsole" aria-hidden="true">
-          <div className="corner topLeft" /><div className="corner topRight" />
-          <div className="corner bottomLeft" /><div className="corner bottomRight" />
-          <span className="consoleLabel">Market observation unit</span>
-          <div className="orb"><div className="orbCore"><i /></div></div>
-          <div className="consoleReadout"><span>Feed status</span><strong>{recorderLive ? "Tracking" : "Standby"}</strong></div>
-        </div>
       </section>
 
       <section className="stats">
