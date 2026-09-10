@@ -7,15 +7,11 @@ import {
   LineStyle,
   PriceScaleMode,
   createChart,
-  createSeriesMarkers,
   createTextWatermark,
   type CandlestickData,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
-  type ISeriesMarkersPluginApi,
-  type SeriesMarker,
-  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -86,11 +82,11 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const entryMarkerRef = useRef<HTMLDivElement>(null);
+  const exitMarkerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const bondLineRef = useRef<IPriceLine | null>(null);
   const entryLineRef = useRef<IPriceLine | null>(null);
-  const positionMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
   const latestTradeAtRef = useRef<string | null>(trades.at(-1)?.block_time ?? null);
   const pollingRef = useRef(false);
@@ -103,12 +99,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
     return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
   };
   const entryCandle = useMemo(() => nearestCandle(acquiredAt), [acquiredAt, candles]);
-  const positionMarkers = useMemo(() => {
-    const markers: SeriesMarker<Time>[] = [];
-    const exit = nearestCandle(closedAt);
-    if (exit) markers.push({ id: "ponseye-exit", time: exit.time, position: "aboveBar", shape: "arrowDown", color: "#ff718c", text: "POSITION CLOSED", size: 2 });
-    return markers.sort((a, b) => Number(a.time) - Number(b.time));
-  }, [candles, closedAt]);
+  const exitCandle = useMemo(() => nearestCandle(closedAt), [candles, closedAt]);
   const bondMarketCap = useMemo(() => {
     if (!graduatedAt) return null;
     const graduationTime = new Date(graduatedAt).getTime();
@@ -230,13 +221,11 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
 
     chartRef.current = chart;
     seriesRef.current = series;
-    positionMarkersRef.current = createSeriesMarkers(series, []);
 
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      positionMarkersRef.current = null;
     };
   }, []);
 
@@ -260,22 +249,32 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
     const chart = chartRef.current;
     const series = seriesRef.current;
     const container = containerRef.current;
-    const marker = entryMarkerRef.current;
-    if (!chart || !series || !container || !marker || !entryCandle) {
-      if (marker) marker.hidden = true;
+    const entryMarker = entryMarkerRef.current;
+    const exitMarker = exitMarkerRef.current;
+    if (!chart || !series || !container) {
+      if (entryMarker) entryMarker.hidden = true;
+      if (exitMarker) exitMarker.hidden = true;
       return;
     }
 
     const updateMarker = () => {
-      const x = chart.timeScale().timeToCoordinate(entryCandle.time);
-      const y = series.priceToCoordinate(entryCandle.low);
-      if (x == null || y == null) {
-        marker.hidden = true;
-        return;
-      }
-      marker.hidden = false;
-      marker.style.left = `${x}px`;
-      marker.style.top = `${container.offsetTop + y}px`;
+      const position = (marker: HTMLDivElement | null, candle: CandlestickData<UTCTimestamp> | null, price: "low" | "high") => {
+        if (!marker || !candle) {
+          if (marker) marker.hidden = true;
+          return;
+        }
+        const x = chart.timeScale().timeToCoordinate(candle.time);
+        const y = series.priceToCoordinate(candle[price]);
+        if (x == null || y == null) {
+          marker.hidden = true;
+          return;
+        }
+        marker.hidden = false;
+        marker.style.left = `${x}px`;
+        marker.style.top = `${container.offsetTop + y}px`;
+      };
+      position(entryMarker, entryCandle, "low");
+      position(exitMarker, exitCandle, "high");
     };
 
     const frame = window.requestAnimationFrame(updateMarker);
@@ -287,11 +286,7 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
       resizeObserver.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateMarker);
     };
-  }, [entryCandle]);
-
-  useEffect(() => {
-    positionMarkersRef.current?.setMarkers(positionMarkers);
-  }, [positionMarkers]);
+  }, [entryCandle, exitCandle]);
 
   useEffect(() => {
     const series = seriesRef.current;
@@ -356,8 +351,15 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
         <span className="chartEntryChevron">⌃</span>
         <div className="chartEntryBadge">
           <img src="/ponseye-acquired-icon.svg" alt="" />
-          <span><small>PonsEye</small><strong>Buy locked</strong></span>
+          <strong>PONSEYE BUY</strong>
         </div>
+      </div>
+      <div ref={exitMarkerRef} className="chartEntryMarker chartExitMarker" hidden>
+        <div className="chartEntryBadge">
+          <span className="chartSoldIcon" aria-hidden="true">×</span>
+          <strong>PONSEYE SOLD</strong>
+        </div>
+        <span className="chartEntryChevron">⌄</span>
       </div>
       {!candles.length ? <div className="chartEmpty chartEmptyOverlay"><span>PRICE FEED</span>Waiting for the first dollar priced trade</div> : null}
     </div>
