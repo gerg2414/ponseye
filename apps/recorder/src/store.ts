@@ -109,7 +109,7 @@ export async function saveLaunchCall(row: LaunchCall) {
     initial_quote_in_raw: metadata.initialQuoteIn ?? null,
     raw_launch_call: row,
   };
-  const { error } = await db.from("launches").upsert(payload, { onConflict: "curve_address" });
+  const { error } = await db.from("launches").upsert(payload, { onConflict: "token_address" });
   assertOk(error, "save launch");
   tokenByCurve.set(addresses.curveAddress, addresses.tokenAddress);
   knownTokens.add(addresses.tokenAddress);
