@@ -7,6 +7,19 @@ export const dynamic = "force-dynamic";
 
 const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
 const currentFeeds = new Set(["launch_activity", "curve_trades"]);
+const imageHosts = new Set([
+  "ipfs.io",
+  "gateway.pinata.cloud",
+  "gmgn.ai",
+  "pbs.twimg.com",
+  "img.koyen.fun",
+  "m.rapidlaunch.io",
+  "j7m.io",
+  "unavatar.io",
+  "www.copybara.run",
+  "i.postimg.cc",
+  "axiomtrading-v2.axiom-cdn.io",
+]);
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
 
 function age(value: string) {
@@ -21,7 +34,7 @@ function safeImageUrl(value: string | null) {
   if (!value) return null;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && ["ipfs.io", "gateway.pinata.cloud"].includes(url.hostname)
+    return url.protocol === "https:" && imageHosts.has(url.hostname)
       ? value
       : null;
   } catch {
@@ -37,7 +50,7 @@ function TokenCard({ launch }: { launch: Launch }) {
     <article className="launchCard">
       <div className="cardTop">
         <div className="tokenImage">
-          {imageUrl ? <Image src={imageUrl} alt="" width={60} height={60} /> : <span>?</span>}
+          {imageUrl ? <Image src={imageUrl} alt="" width={64} height={64} unoptimized /> : <span>?</span>}
         </div>
         <div className="tokenIdentity">
           <div><strong>{launch.name ?? "Metadata pending"}</strong><time>{age(launch.launched_at)}</time></div>
@@ -47,7 +60,7 @@ function TokenCard({ launch }: { launch: Launch }) {
 
       <div className="metrics">
         <div><small>TX</small><strong>{launch.trade_count}</strong></div>
-        <div><small>Makers</small><strong>{launch.unique_traders}</strong></div>
+        <div><small>Traders</small><strong>{launch.unique_traders}</strong></div>
         <div><small>B / S</small><strong><b>{launch.buys}</b> / {launch.sells}</strong></div>
       </div>
 
@@ -87,7 +100,7 @@ function LaunchLane({ title, count, tone, launches, empty }: {
 }
 
 export default async function Home() {
-  const { launches, streams, launchCount, tradeCount, dataConnected } = await getDashboardData();
+  const { launches, streams, launchCount, tradeCount } = await getDashboardData();
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
@@ -138,11 +151,6 @@ export default async function Home() {
       </section>
 
       <section className="boardSection">
-        <div className="boardHead">
-          <div><p className="eyebrow"><span>02</span> Live launch board</p><h2>PONS launches</h2></div>
-          <div className={`panelStatus ${dataConnected ? "" : "offline"}`}><i /> {dataConnected ? "Database connected" : "Database unavailable"}</div>
-        </div>
-
         {launches.length === 0 ? (
           <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
         ) : (
