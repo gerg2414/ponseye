@@ -126,7 +126,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .cardMetaStack > time { padding: 5px 7px; border: 1px solid #2a2d36; border-radius: 5px; color: #858b98; background: rgba(7,8,10,.7); font-size: 10px; }
 .positionBadge { padding: 6px 8px; border: 1px solid #343945; border-radius: 5px; color: #a8aeba; background: #11141a; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .positionBadge.live { border-color: rgba(154,255,79,.35); color: var(--green); background: rgba(154,255,79,.055); }
-.positionBadge.closed { border-color: #414754; color: #c0c5cf; background: rgba(173,180,194,.055); }
+.positionBadge.closed { border-color: rgba(255,113,140,.4); color: #ff718c; background: rgba(255,113,140,.065); }
 .tokenIdentity { flex: 1; min-width: 0; display: grid; gap: 7px; padding-top: 2px; }
 .tokenIdentity strong { overflow: hidden; color: var(--white); font-family: Arial,sans-serif; font-size: 19px; white-space: nowrap; text-overflow: ellipsis; }
 .tokenIdentity > span { color: var(--purple); font-size: 13px; }
@@ -175,8 +175,8 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionMonitorFooter > span:first-child { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .positionMonitorFooter > span:first-child i { width: 6px; height: 6px; background: var(--green); box-shadow: 0 0 7px rgba(154,255,79,.65); }
 .positionMonitor.closed .positionMonitorFooter { border-color: #262b34; }
-.positionMonitor.closed .positionMonitorFooter > span:first-child { color: #b8bec9; }
-.positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #8f96a3; box-shadow: none; }
+.positionMonitor.closed .positionMonitorFooter > span:first-child { color: #ff718c; }
+.positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #ff718c; box-shadow: 0 0 7px rgba(255,113,140,.55); }
 .positionMonitor.loss .positionMonitorFooter > span:first-child { color: #ff718c; }
 .positionMonitor.loss .positionMonitorFooter > span:first-child i { background: #ff718c; }
 .progressTrack { height: 6px; overflow: hidden; background: #242732; }
@@ -231,6 +231,23 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .targetsResults .eyebrow { margin-bottom: 8px; }
 .verifiedKey { display: flex; align-items: center; gap: 9px; color: #747a88; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
 .verifiedKey i,.verifiedBadge i { width: 6px; height: 6px; background: var(--green); box-shadow: 0 0 8px rgba(154,255,79,.7); }
+.targetHistory { width: 100%; overflow-x: auto; }
+.targetHistoryHead,.targetHistoryRow { display: grid; grid-template-columns: minmax(260px,1.55fr) repeat(4,minmax(105px,.72fr)) minmax(105px,.62fr); align-items: center; column-gap: 20px; }
+.targetHistoryHead { min-height: 48px; padding: 0 22px; border-bottom: 1px solid var(--line); color: #686e7c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.targetHistoryRow { min-height: 82px; padding: 12px 22px; border-bottom: 1px solid #20232b; background: #0e1015; }
+.targetHistoryRow:last-child { border-bottom: 0; }
+.targetHistoryRow > strong { color: #d9dce3; font-family: Arial,sans-serif; font-size: 14px; }
+.targetHistoryToken { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.targetHistoryToken .targetRank { width: 20px; flex: 0 0 20px; }
+.historyTokenThumb { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border: 1px solid rgba(165,108,255,.5); border-radius: 8px; color: #d3b9ff; background: linear-gradient(145deg,#292032,#14121a); font-family: Arial,sans-serif; font-size: 11px; font-weight: 800; }
+.targetHistoryToken > span:last-child { min-width: 0; display: grid; gap: 5px; }
+.targetHistoryToken strong { overflow: hidden; color: var(--white); font-family: Arial,sans-serif; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.targetHistoryToken small { color: var(--purple); font-size: 10px; }
+.targetHistoryRow .historyReturn { color: var(--green); font-size: 17px; }
+.historyClosed { display: flex; align-items: center; gap: 8px; color: #8e94a1; font-size: 10px; }
+.historyClosed i { width: 6px; height: 6px; background: #ff718c; box-shadow: 0 0 7px rgba(255,113,140,.45); }
+.historyChartLink { justify-self: end; color: #b9bec9; font-size: 9px; letter-spacing: .05em; text-decoration: none; text-transform: uppercase; }
+.historyChartLink b { margin-left: 5px; color: var(--purple); font-size: 12px; }
 .targetGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; background: var(--line); }
 .targetCard { min-height: 390px; padding: 22px; position: relative; overflow: hidden; background: #101218; }
 .targetCard::before { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 3px; background: var(--purple); }
@@ -396,6 +413,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .targetScanner { width: 250px; height: 250px; }
   .targetOverview { grid-template-columns: 190px 1fr; overflow-x: auto; }
   .multipleBreakdown { min-width: 600px; }
+  .targetHistoryHead,.targetHistoryRow { min-width: 880px; }
   .targetGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .marketWorkspace { grid-template-columns: 1fr; }
   .metricRailGrid { grid-template-columns: repeat(4,minmax(0,1fr)); }
