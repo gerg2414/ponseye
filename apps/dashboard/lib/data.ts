@@ -187,7 +187,7 @@ export async function getLaunchDetail(tokenAddress: string) {
       p_token_address: tokenAddress,
       p_trade_limit: 100,
       p_market_limit: 1000,
-    }).abortSignal(AbortSignal.timeout(3_000)),
+    }).abortSignal(AbortSignal.timeout(1_200)),
     getDashboardData(),
   ]);
 
