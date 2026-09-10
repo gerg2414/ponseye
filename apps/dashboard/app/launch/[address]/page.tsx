@@ -62,7 +62,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
   const percent = (value: number | null, fallback = "Pending data") => value == null ? fallback : `${value.toFixed(1)}%`;
   const holderDelta = launch.holder_change_5m == null
-    ? "First snapshot due"
+    ? launch.holder_count == null ? "First snapshot due" : "Baseline recorded"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
   const bondingTone = launch.status === "graduated"
     ? "completed"
