@@ -96,11 +96,10 @@ export async function getDashboardData() {
   if (!url || !key) return emptyData;
 
   const db = createClient(url, key, { auth: { persistSession: false } });
-  const [launchesResult, launchCountResult, streamsResult, tradesResult] = await Promise.all([
+  const [launchesResult, totalsResult, streamsResult] = await Promise.all([
     db.from("launch_board").select("*").order("launched_at", { ascending: false }).limit(200),
-    db.from("launches").select("token_address", { count: "exact", head: true }),
+    db.from("dashboard_totals").select("launch_count,trade_count").single(),
     db.from("stream_status").select("feed,status,last_seen_at").order("feed"),
-    db.from("trades").select("event_id", { count: "exact", head: true }).not("token_address", "is", null),
   ]);
 
   const launches = (launchesResult.data ?? []).map((launch) => ({
@@ -122,9 +121,9 @@ export async function getDashboardData() {
   return {
     launches,
     streams: (streamsResult.data ?? []) as StreamStatus[],
-    launchCount: launchCountResult.count ?? 0,
-    tradeCount: tradesResult.count ?? 0,
-    dataConnected: !launchesResult.error && !launchCountResult.error && !streamsResult.error && !tradesResult.error,
+    launchCount: Number(totalsResult.data?.launch_count ?? 0),
+    tradeCount: Number(totalsResult.data?.trade_count ?? 0),
+    dataConnected: !launchesResult.error && !totalsResult.error && !streamsResult.error,
   };
 }
 
