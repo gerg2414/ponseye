@@ -251,20 +251,12 @@ export default async function Home() {
     <main>
       <AutoRefresh intervalMs={3_000} />
       <header className="header">
+        <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         <div className="systemMeta">
           <span className="chainLabel"><Image src="/robinhood-feather.svg" alt="" width={24} height={24} />Robinhood Chain</span>
           <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {showingPreview ? "Design preview" : recorderLive ? "Recorder live" : "Recorder paused"}</div>
         </div>
       </header>
-
-      <section className="hero">
-        <div className="heroCopy">
-          <div className="heroBrand">
-            <Image className="heroRobot" src="/ponseye-robot-scanning.gif" alt="" width={512} height={512} priority unoptimized />
-            <Image className="heroWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
-          </div>
-        </div>
-      </section>
 
       <div className="boardStage">
         <div className="boardWatcher" aria-hidden="true">
