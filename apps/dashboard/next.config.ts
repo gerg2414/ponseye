@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "www.copybara.run" },
       { protocol: "https", hostname: "i.postimg.cc" },
       { protocol: "https", hostname: "axiomtrading-v2.axiom-cdn.io" },
+      { protocol: "https", hostname: "d.uguu.se" },
+      { protocol: "https", hostname: "cloudflare-ipfs.com" },
+      { protocol: "https", hostname: "dweb.link" },
     ],
   },
 };

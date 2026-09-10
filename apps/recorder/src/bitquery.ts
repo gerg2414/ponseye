@@ -42,3 +42,26 @@ export function createBitqueryClient(token: string, onConnected: () => void): Cl
     on: { connected: onConnected },
   });
 }
+
+export async function queryBitquery<T>(token: string, query: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch("https://streaming.bitquery.io/graphql", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ query }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Bitquery query failed with ${response.status}`);
+  }
+
+  const payload = await response.json() as T & { errors?: Array<{ message?: string }> };
+  if (payload.errors?.length) {
+    throw new Error(`Bitquery query failed: ${payload.errors.map((error) => error.message ?? "Unknown error").join("; ")}`);
+  }
+
+  return payload;
+}

@@ -53,3 +53,28 @@ export const CURVE_TRADES = `
     }
   }
 `;
+
+export const MARKET_TRADES = `
+  subscription PonsMarketTrades {
+    Trading {
+      Trades(where: {
+        Pair: {Market: {Protocol: {is: "pons_v2"} Network: {is: "Robinhood"}}}
+      }) {
+        Block { Time }
+        Side
+        Price
+        PriceInUsd
+        Amounts { Base Quote }
+        AmountsInUsd { Base Quote }
+        Trader { Address }
+        TransactionHeader { Hash }
+        Pair {
+          Pool { Address }
+          Token { Address Symbol }
+          QuoteToken { Address Symbol }
+          Market { Protocol }
+        }
+      }
+    }
+  }
+`;

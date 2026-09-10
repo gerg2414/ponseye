@@ -20,6 +20,56 @@ type EventRow = {
   Arguments: Array<{ Name: string; Value: { address?: string; bigInteger?: string; integer?: number } }>;
 };
 
+type MarketTradeRow = {
+  Block: { Time: string };
+  Side: string;
+  Price?: string | number;
+  PriceInUsd?: string | number;
+  Amounts?: { Base?: string | number; Quote?: string | number };
+  AmountsInUsd?: { Base?: string | number; Quote?: string | number };
+  Trader?: { Address?: string };
+  TransactionHeader: { Hash: string };
+  Pair: {
+    Pool?: { Address?: string };
+    Token: { Address: string; Symbol?: string };
+    QuoteToken?: { Address?: string; Symbol?: string };
+    Market?: { Protocol?: string };
+  };
+};
+
+export type HolderCandidate = {
+  token_address: string;
+  curve_address: string;
+  deployer_address: string;
+  status: string;
+  launched_at: string;
+  last_trade_at: string | null;
+  holder_snapshot_at: string | null;
+};
+
+export type HolderPosition = {
+  holderAddress: string;
+  balance: number;
+  balancePct: number | null;
+  rank: number;
+  firstChangeAt: string | null;
+  lastChangeAt: string | null;
+  updateCount: number | null;
+};
+
+export type HolderSnapshot = {
+  tokenAddress: string;
+  observedAt: string;
+  holderCount: number;
+  totalHolderBalance: number;
+  largestHolderPct: number | null;
+  top10HolderPct: number | null;
+  top100HolderPct: number | null;
+  creatorBalancePct: number | null;
+  positions: HolderPosition[];
+  rawMetrics: unknown;
+};
+
 function assertOk(error: { message: string } | null, context: string) {
   if (error) throw new Error(`${context}: ${error.message}`);
 }
@@ -122,6 +172,51 @@ export async function saveTrade(row: EventRow) {
   assertOk(error, "save trade");
 }
 
+export async function saveMarketTrade(row: MarketTradeRow) {
+  const tokenAddress = row.Pair.Token.Address?.toLowerCase();
+  if (!tokenAddress) return;
+
+  const { data: launch } = await db
+    .from("launches")
+    .select("token_address")
+    .eq("token_address", tokenAddress)
+    .maybeSingle();
+  if (!launch?.token_address) return;
+
+  const side = row.Side.toLowerCase() === "buy" ? "buy" : "sell";
+  const transactionHash = row.TransactionHeader.Hash.toLowerCase();
+  const traderAddress = row.Trader?.Address?.toLowerCase() ?? null;
+  const marketEventId = eventId([
+    transactionHash,
+    tokenAddress,
+    side,
+    traderAddress,
+    row.Amounts?.Base,
+    row.Amounts?.Quote,
+    row.Pair.QuoteToken?.Address,
+  ]);
+
+  const { error } = await db.from("trade_market_data").upsert({
+    market_event_id: marketEventId,
+    token_address: tokenAddress,
+    transaction_hash: transactionHash,
+    block_time: row.Block.Time,
+    side,
+    trader_address: traderAddress,
+    price: row.Price ?? null,
+    price_usd: row.PriceInUsd ?? null,
+    base_amount: row.Amounts?.Base ?? null,
+    quote_amount: row.Amounts?.Quote ?? null,
+    base_amount_usd: row.AmountsInUsd?.Base ?? null,
+    quote_amount_usd: row.AmountsInUsd?.Quote ?? null,
+    quote_token_address: row.Pair.QuoteToken?.Address?.toLowerCase() ?? null,
+    quote_symbol: row.Pair.QuoteToken?.Symbol ?? null,
+    protocol: row.Pair.Market?.Protocol ?? null,
+    raw_trade: row,
+  }, { onConflict: "market_event_id", ignoreDuplicates: true });
+  assertOk(error, "save market trade");
+}
+
 export async function updateStreamStatus(feed: string, status: string, message?: string) {
   const { error } = await db.from("stream_status").upsert({
     feed,
@@ -130,4 +225,54 @@ export async function updateStreamStatus(feed: string, status: string, message?:
     last_seen_at: new Date().toISOString(),
   });
   assertOk(error, "update stream status");
+}
+
+export async function getHolderCandidates(): Promise<HolderCandidate[]> {
+  const { data, error } = await db
+    .from("launch_board")
+    .select("token_address,curve_address,deployer_address,status,launched_at,last_trade_at,holder_snapshot_at")
+    .order("launched_at", { ascending: false })
+    .limit(200);
+  assertOk(error, "load holder candidates");
+  return (data ?? []) as HolderCandidate[];
+}
+
+export async function saveHolderSnapshot(snapshot: HolderSnapshot) {
+  const { error: snapshotError } = await db.from("holder_snapshots").insert({
+    token_address: snapshot.tokenAddress,
+    observed_at: snapshot.observedAt,
+    holder_count: snapshot.holderCount,
+    total_holder_balance: snapshot.totalHolderBalance,
+    largest_holder_pct: snapshot.largestHolderPct,
+    top_10_holder_pct: snapshot.top10HolderPct,
+    top_100_holder_pct: snapshot.top100HolderPct,
+    creator_balance_pct: snapshot.creatorBalancePct,
+    raw_metrics: snapshot.rawMetrics,
+  });
+  assertOk(snapshotError, "save holder snapshot");
+
+  if (snapshot.positions.length) {
+    const rows = snapshot.positions.map((position) => ({
+      token_address: snapshot.tokenAddress,
+      holder_address: position.holderAddress,
+      balance: position.balance,
+      balance_pct: position.balancePct,
+      holder_rank: position.rank,
+      first_change_at: position.firstChangeAt,
+      last_change_at: position.lastChangeAt,
+      update_count: position.updateCount,
+      refreshed_at: snapshot.observedAt,
+    }));
+    const { error: positionsError } = await db
+      .from("token_holder_positions")
+      .upsert(rows, { onConflict: "token_address,holder_address" });
+    assertOk(positionsError, "save holder positions");
+  }
+
+  const { error: cleanupError } = await db
+    .from("token_holder_positions")
+    .delete()
+    .eq("token_address", snapshot.tokenAddress)
+    .lt("refreshed_at", snapshot.observedAt);
+  assertOk(cleanupError, "remove stale holder positions");
 }

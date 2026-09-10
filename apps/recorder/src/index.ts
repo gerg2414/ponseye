@@ -2,8 +2,9 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
-import { CURVE_TRADES, LAUNCH_ACTIVITY } from "./queries.js";
-import { saveFactoryEvent, saveLaunchCall, saveTrade, updateStreamStatus } from "./store.js";
+import { runHolderCollector } from "./holders.js";
+import { CURVE_TRADES, LAUNCH_ACTIVITY, MARKET_TRADES } from "./queries.js";
+import { saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -40,6 +41,7 @@ function subscribe(
 
 async function recordingCycle() {
   const auth = await getAccessToken();
+  const collectorAbort = new AbortController();
   const client = createBitqueryClient(auth.access_token, () => {
     healthy = true;
     connectedAt = new Date().toISOString();
@@ -49,10 +51,14 @@ async function recordingCycle() {
   subscribe(client, "launch_activity", LAUNCH_ACTIVITY, (row, collection) =>
     collection === "Events" ? saveFactoryEvent(row) : saveLaunchCall(row));
   subscribe(client, "curve_trades", CURVE_TRADES, saveTrade);
+  subscribe(client, "market_trades", MARKET_TRADES, saveMarketTrade);
+  const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
   await delay(refreshAfter);
   healthy = false;
+  collectorAbort.abort();
+  await holderCollector;
   await client.dispose();
 }
 
