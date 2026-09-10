@@ -232,29 +232,14 @@ export async function saveMarketTrade(row: MarketTradeRow) {
 
 export async function warmTokenCache() {
   const activeSince = new Date(Date.now() - 60 * 60_000).toISOString();
-  const [activeResult, recentResult] = await Promise.all([
-    db
-      .from("launch_metrics")
-      .select("token_address")
-      .gte("last_trade_at", activeSince)
-      .order("last_trade_at", { ascending: false })
-      .limit(1000),
-    db
-      .from("launches")
-      .select("token_address,curve_address")
-      .gte("launched_at", activeSince)
-      .order("launched_at", { ascending: false })
-      .limit(1000),
-  ]);
+  const activeResult = await db
+    .from("launch_metrics")
+    .select("token_address")
+    .gte("last_trade_at", activeSince)
+    .order("last_trade_at", { ascending: false })
+    .limit(1000)
+    .abortSignal(AbortSignal.timeout(10_000));
   assertOk(activeResult.error, "warm active token cache");
-  assertOk(recentResult.error, "warm recent curve cache");
-
-  for (const launch of recentResult.data ?? []) {
-    const token = String(launch.token_address).toLowerCase();
-    const curve = String(launch.curve_address).toLowerCase();
-    knownTokens.add(token);
-    tokenByCurve.set(curve, token);
-  }
 
   for (const launch of activeResult.data ?? []) knownTokens.add(String(launch.token_address).toLowerCase());
 
