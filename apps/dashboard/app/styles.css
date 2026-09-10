@@ -21,9 +21,9 @@ body {
 }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: .055; background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, #fff 4px); }
 main { width: min(1320px, calc(100% - 44px)); margin: 0 auto; padding-bottom: 72px; }
-.header { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.header { height: 104px; display: flex; align-items: center; justify-content: space-between; }
 .brand { display: flex; align-items: center; }
-.brandLogo { display: block; width: 208px; height: auto; image-rendering: pixelated; }
+.brandLogo { display: block; width: 280px; height: auto; image-rendering: pixelated; }
 .systemMeta { display: flex; align-items: center; gap: 26px; font-size: 10px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
 .recorder { display: flex; gap: 9px; align-items: center; color: #8b91a0; }
 .recorder i, .panelStatus i { width: 7px; height: 7px; background: #555a68; display: inline-block; }
@@ -103,8 +103,8 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 }
 @media (max-width: 620px) {
   main { width: min(100% - 24px,1320px); padding-bottom: 34px; }
-  .header { height: 68px; }
-  .brandLogo { width: 176px; }
+  .header { height: 82px; }
+  .brandLogo { width: 220px; }
   .systemMeta > span { display: none; }
   .hero { min-height: auto; padding: 58px 0 42px; }
   h1 { font-size: clamp(39px,12vw,58px); }

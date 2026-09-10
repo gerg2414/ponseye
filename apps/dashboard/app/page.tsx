@@ -24,7 +24,7 @@ export default async function Home() {
             width={2048}
             height={768}
             priority
-            sizes="(max-width: 620px) 176px, 208px"
+            sizes="(max-width: 620px) 220px, 280px"
           />
         </div>
         <div className="systemMeta">
