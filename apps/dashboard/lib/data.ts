@@ -145,7 +145,7 @@ async function loadDashboardData() {
 const getCachedDashboardData = unstable_cache(
   loadDashboardData,
   ["dashboard-home-v2"],
-  { revalidate: 10 },
+  { revalidate: 5 },
 );
 
 export async function getDashboardData() {
@@ -162,7 +162,10 @@ export async function getLaunchDetail(tokenAddress: string) {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return null;
 
-  const db = createClient(url, key, { auth: { persistSession: false } });
+  const db = createClient(url, key, {
+    auth: { persistSession: false },
+    db: { retry: false },
+  });
   const [boardResult, launchResult, tradesResult, marketTradesResult] = await Promise.all([
     db.from("launch_board").select("*").eq("token_address", tokenAddress).maybeSingle(),
     db.from("launches").select("description,twitter_url,telegram_url,discord_url,website_url").eq("token_address", tokenAddress).maybeSingle(),
