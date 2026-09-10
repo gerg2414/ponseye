@@ -101,7 +101,7 @@ const emptyData = {
 async function loadDashboardData() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return emptyData;
+  if (!url || !key) throw new Error("Dashboard database environment is missing");
 
   const db = createClient(url, key, {
     auth: { persistSession: false },
@@ -112,8 +112,7 @@ async function loadDashboardData() {
     .abortSignal(AbortSignal.timeout(8_000));
 
   if (dashboardResult.error || !dashboardResult.data) {
-    console.error("[dashboard] data request failed", dashboardResult.error?.message ?? "No data returned");
-    return emptyData;
+    throw new Error(dashboardResult.error?.message ?? "No dashboard data returned");
   }
 
   const payload = dashboardResult.data as DashboardPayload;
@@ -143,11 +142,20 @@ async function loadDashboardData() {
   };
 }
 
-export const getDashboardData = unstable_cache(
+const getCachedDashboardData = unstable_cache(
   loadDashboardData,
-  ["dashboard-home"],
+  ["dashboard-home-v2"],
   { revalidate: 10 },
 );
+
+export async function getDashboardData() {
+  try {
+    return await getCachedDashboardData();
+  } catch (error) {
+    console.error("[dashboard] data request failed", error instanceof Error ? error.message : String(error));
+    return emptyData;
+  }
+}
 
 export async function getLaunchDetail(tokenAddress: string) {
   const url = process.env.SUPABASE_URL;
