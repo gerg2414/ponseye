@@ -4,7 +4,7 @@ import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { runHolderCollector } from "./holders.js";
 import { CURVE_MARKET_TRADES, CURVE_TRADES, LAUNCH_ACTIVITY, poolMarketTrades } from "./queries.js";
-import { getActiveMarketTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus, warmTokenCache } from "./store.js";
+import { getActiveMarketTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -23,18 +23,6 @@ function delayOrAbort(ms: number, signal: AbortSignal) {
       resolve();
     }
   });
-}
-
-async function warmCacheUntilReady(signal: AbortSignal) {
-  while (!signal.aborted) {
-    try {
-      await warmTokenCache();
-      return;
-    } catch (error) {
-      if (!signal.aborted) console.error("Token cache warmup failed", error);
-      await delay(10_000);
-    }
-  }
 }
 
 function subscribe(
@@ -98,7 +86,7 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
   const maintenance = (async () => {
     await refresh();
     while (!signal.aborted) {
-      await delayOrAbort(5 * 60_000, signal);
+      await delayOrAbort(addressSignature ? 5 * 60_000 : 10_000, signal);
       if (!signal.aborted) await refresh();
     }
   })();
@@ -117,7 +105,6 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
 async function recordingCycle() {
   const auth = await getAccessToken();
   const collectorAbort = new AbortController();
-  const cacheWarmup = warmCacheUntilReady(collectorAbort.signal);
   const client = createBitqueryClient(auth.access_token, () => {
     healthy = true;
     connectedAt = new Date().toISOString();
@@ -140,7 +127,6 @@ async function recordingCycle() {
   healthy = false;
   collectorAbort.abort();
   await holderCollector;
-  await cacheWarmup;
   await poolFeeds.stop();
   await client.dispose();
 }
