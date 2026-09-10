@@ -150,7 +150,7 @@ const presets: Record<PresetName, LabSettings> = {
     scoreThreshold: 90,
     runnerTarget: 2,
     positionSizeUsd: 25,
-    stopLossPct: 30,
+    stopLossPct: 20,
     creatorGate: true,
     concentrationGate: true,
     rules: [
