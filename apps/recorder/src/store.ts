@@ -266,7 +266,7 @@ export async function getHolderCandidates(): Promise<HolderCandidate[]> {
     .from("launch_board")
     .select("token_address,curve_address,deployer_address,status,launched_at,last_trade_at,holder_snapshot_at")
     .order("launched_at", { ascending: false })
-    .limit(200);
+    .limit(500);
   assertOk(error, "load holder candidates");
   return (data ?? []) as HolderCandidate[];
 }
