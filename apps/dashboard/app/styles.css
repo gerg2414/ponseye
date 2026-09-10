@@ -124,20 +124,20 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .cardTitleRow { min-width: 0; display: flex; align-items: flex-start; gap: 12px; }
 .cardMetaStack { flex: 0 0 auto; display: grid; justify-items: end; gap: 7px; }
 .cardMetaStack > time { padding: 5px 7px; border: 1px solid #2a2d36; border-radius: 5px; color: #858b98; background: rgba(7,8,10,.7); font-size: 10px; }
-.positionBadge { padding: 5px 7px; border: 1px solid #343945; border-radius: 5px; color: #8d93a0; background: #11141a; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.positionBadge { padding: 6px 8px; border: 1px solid #343945; border-radius: 5px; color: #a8aeba; background: #11141a; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .positionBadge.live { border-color: rgba(154,255,79,.35); color: var(--green); background: rgba(154,255,79,.055); }
-.positionBadge.closed { border-color: rgba(255,113,140,.35); color: #ff718c; background: rgba(255,113,140,.055); }
+.positionBadge.closed { border-color: #414754; color: #c0c5cf; background: rgba(173,180,194,.055); }
 .tokenIdentity { flex: 1; min-width: 0; display: grid; gap: 7px; padding-top: 2px; }
 .tokenIdentity strong { overflow: hidden; color: var(--white); font-family: Arial,sans-serif; font-size: 19px; white-space: nowrap; text-overflow: ellipsis; }
 .tokenIdentity > span { color: var(--purple); font-size: 13px; }
 .cardMarketCap { margin-top: 22px; display: grid; gap: 8px; }
-.cardMarketCap span { color: #777e8c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.cardMarketCap span { color: #858c9a; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
 .cardMarketCap strong { overflow: hidden; color: #f1f2f6; font-family: Arial,sans-serif; font-size: 29px; line-height: 1; letter-spacing: -.045em; white-space: nowrap; text-overflow: ellipsis; }
 .acquiredMetrics { margin-top: 22px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .acquiredMetrics > div { min-width: 0; display: grid; gap: 8px; }
 .acquiredMetrics > div:nth-child(2) { justify-items: center; text-align: center; }
 .acquiredMetrics > div:last-child { justify-items: end; text-align: right; }
-.acquiredMetrics span { color: #777e8c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.acquiredMetrics span { color: #858c9a; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
 .acquiredMetrics strong { overflow: hidden; color: #eceef3; font-family: Arial,sans-serif; font-size: 23px; line-height: 1; letter-spacing: -.04em; white-space: nowrap; text-overflow: ellipsis; }
 .acquiredMetrics .gainMetric strong { color: var(--green); }
 .targetLock { margin-top: auto; padding: 14px; border: 1px solid #292d37; border-radius: 8px; background: linear-gradient(rgba(165,108,255,.025),rgba(165,108,255,.008)),#0a0c10; }
@@ -162,21 +162,23 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionMonitor { position: relative; height: 111px; margin-top: auto; overflow: hidden; border: 1px solid #26302a; border-radius: 8px; background: #090d0b; }
 .positionMonitor > svg { width: 100%; height: 70px; display: block; }
 .positionGrid { fill: none; stroke: #18231d; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.positionFill { fill: rgba(154,255,79,.065); }
-.positionLine { fill: none; stroke: var(--green); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.positionLine { fill: none; stroke: var(--green); stroke-width: 2.25; filter: drop-shadow(0 0 3px rgba(154,255,79,.38)); vector-effect: non-scaling-stroke; }
 .positionEntry { fill: #090d0b; stroke: var(--green); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .positionEnd { fill: var(--green); stroke: #090d0b; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.positionMonitor.closed { border-color: #34292d; background: #0d090b; }
-.positionMonitor.closed .positionGrid { stroke: #261a1f; }
-.positionMonitor.closed .positionFill { fill: rgba(255,113,140,.055); }
-.positionMonitor.closed .positionLine { stroke: #ff718c; }
-.positionMonitor.closed .positionEnd { fill: #ff718c; }
+.positionMonitor.closed { border-color: #30353f; background: #0b0d11; }
+.positionMonitor.closed .positionGrid { stroke: #1c2028; }
+.positionMonitor.loss { border-color: #3b292f; background: #0d090b; }
+.positionMonitor.loss .positionGrid { stroke: #261a1f; }
+.positionMonitor.loss .positionLine { stroke: #ff718c; filter: drop-shadow(0 0 3px rgba(255,113,140,.36)); }
+.positionMonitor.loss .positionEnd { fill: #ff718c; }
 .positionMonitorFooter { height: 40px; padding: 0 9px 0 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #202a24; }
-.positionMonitorFooter > span:first-child { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.positionMonitorFooter > span:first-child { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .positionMonitorFooter > span:first-child i { width: 6px; height: 6px; background: var(--green); box-shadow: 0 0 7px rgba(154,255,79,.65); }
-.positionMonitor.closed .positionMonitorFooter { border-color: #2b2024; }
-.positionMonitor.closed .positionMonitorFooter > span:first-child { color: #ff718c; }
-.positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #ff718c; box-shadow: none; }
+.positionMonitor.closed .positionMonitorFooter { border-color: #262b34; }
+.positionMonitor.closed .positionMonitorFooter > span:first-child { color: #b8bec9; }
+.positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #8f96a3; box-shadow: none; }
+.positionMonitor.loss .positionMonitorFooter > span:first-child { color: #ff718c; }
+.positionMonitor.loss .positionMonitorFooter > span:first-child i { background: #ff718c; }
 .progressTrack { height: 6px; overflow: hidden; background: #242732; }
 .progressTrack i { display: block; height: 100%; max-width: 100%; background: linear-gradient(90deg,var(--purple),#d56fff); box-shadow: 0 0 9px rgba(165,108,255,.55); }
 .completing .progressTrack i { background: linear-gradient(90deg,#ff7f50,#ffbf69); box-shadow: 0 0 9px rgba(255,159,67,.5); }
