@@ -54,45 +54,51 @@ export const CURVE_TRADES = `
   }
 `;
 
-export const MARKET_TRADES = `
-  subscription PonsMarketTrades {
+const MARKET_TRADE_FIELDS = `
+  Block { Time }
+  Side
+  Price
+  PriceInUsd
+  Amounts { Base Quote }
+  AmountsInUsd { Base Quote }
+  Trader { Address }
+  TransactionHeader { Hash }
+  Pair {
+    Pool { Address }
+    Token { Address Symbol }
+    QuoteToken { Address Symbol }
+    Market { Protocol }
+  }
+`;
+
+export const CURVE_MARKET_TRADES = `
+  subscription PonsCurveMarketTrades {
     Trading {
       CurveTrades: Trades(where: {
         Pair: {Market: {Protocol: {is: "pons_v2"} Network: {is: "Robinhood"}}}
       }) {
-        Block { Time }
-        Side
-        Price
-        PriceInUsd
-        Amounts { Base Quote }
-        AmountsInUsd { Base Quote }
-        Trader { Address }
-        TransactionHeader { Hash }
-        Pair {
-          Pool { Address }
-          Token { Address Symbol }
-          QuoteToken { Address Symbol }
-          Market { Protocol }
-        }
-      }
-      PoolTrades: Trades(where: {
-        Pair: {Market: {Protocol: {is: "uniswap_v4"} Network: {is: "Robinhood"}}}
-      }) {
-        Block { Time }
-        Side
-        Price
-        PriceInUsd
-        Amounts { Base Quote }
-        AmountsInUsd { Base Quote }
-        Trader { Address }
-        TransactionHeader { Hash }
-        Pair {
-          Pool { Address }
-          Token { Address Symbol }
-          QuoteToken { Address Symbol }
-          Market { Protocol }
-        }
+        ${MARKET_TRADE_FIELDS}
       }
     }
   }
 `;
+
+export function poolMarketTrades(tokenAddresses: string[]) {
+  if (!tokenAddresses.length) throw new Error("Pool market feed requires at least one token address");
+  const addresses = tokenAddresses.map((address) => JSON.stringify(address.toLowerCase())).join(",");
+
+  return `
+    subscription PonsPoolMarketTrades {
+      Trading {
+        PoolTrades: Trades(where: {
+          Pair: {
+            Market: {Protocol: {is: "uniswap_v4"} Network: {is: "Robinhood"}}
+            Token: {Address: {in: [${addresses}]}}
+          }
+        }) {
+          ${MARKET_TRADE_FIELDS}
+        }
+      }
+    }
+  `;
+}
