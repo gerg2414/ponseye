@@ -1,11 +1,12 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { Launch } from "../lib/data";
 import { getDashboardData } from "../lib/data";
 import { quoteValue } from "../lib/market";
 import { AutoRefresh } from "./auto-refresh";
 import { TokenImage } from "./token-image";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 5;
 
 const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
 function age(value: string) {
@@ -37,7 +38,7 @@ function TokenCard({ launch }: { launch: Launch }) {
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
 
   return (
-    <a className="launchCardLink" href={`/launch/${launch.token_address}`}>
+    <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
       <article className="launchCard">
         <div className="cardTop">
           <div className="tokenImage">
@@ -71,7 +72,7 @@ function TokenCard({ launch }: { launch: Launch }) {
         </div>
 
       </article>
-    </a>
+    </Link>
   );
 }
 

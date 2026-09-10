@@ -7,8 +7,7 @@ import { TokenImage } from "../../token-image";
 import { CopyField } from "./copy-field";
 import { PonsEyeChart } from "./ponseye-chart";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 5;
 
 export const metadata: Metadata = {
   title: "Launch Research | PonsEye",

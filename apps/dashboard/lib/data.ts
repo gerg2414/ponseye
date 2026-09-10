@@ -120,7 +120,7 @@ async function loadDashboardData() {
   });
   const dashboardResult = await db
     .rpc("get_dashboard_home", { p_limit: 12 })
-    .abortSignal(AbortSignal.timeout(8_000));
+    .abortSignal(AbortSignal.timeout(20_000));
 
   if (dashboardResult.error || !dashboardResult.data) {
     throw new Error(dashboardResult.error?.message ?? "No dashboard data returned");
@@ -187,7 +187,7 @@ export async function getLaunchDetail(tokenAddress: string) {
       p_token_address: tokenAddress,
       p_trade_limit: 100,
       p_market_limit: 1000,
-    }).abortSignal(AbortSignal.timeout(1_200)),
+    }).abortSignal(AbortSignal.timeout(20_000)),
     getDashboardData(),
   ]);
 
