@@ -29,7 +29,7 @@ type LabSettings = {
   rules: Rule[];
 };
 
-type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality";
+type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x";
 type ControlTab = "models" | "rules" | "gates";
 type SavedModel = { name: string; settings: LabSettings };
 
@@ -144,6 +144,59 @@ const presets: Record<PresetName, LabSettings> = {
       { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 60, min: 30, max: 95, step: 5, weight: 25, direction: "max", suffix: "%" },
     ],
   },
+  // Best repeatable candidates from the 10 Sep recorded dataset. Each remained
+  // positive across all four chronological test periods and under a 5% cost stress.
+  steady2x: {
+    scoreThreshold: 90,
+    runnerTarget: 2,
+    positionSizeUsd: 25,
+    stopLossPct: 30,
+    creatorGate: true,
+    concentrationGate: true,
+    rules: [
+      { key: "trade_count", label: "Trade depth", short: "trades", threshold: 8, min: 5, max: 60, step: 1, weight: 10, direction: "min", suffix: "" },
+      { key: "unique_traders", label: "Trader spread", short: "traders", threshold: 12, min: 2, max: 30, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "buy_pressure_pct", label: "Buy pressure", short: "buy pressure", threshold: 58, min: 40, max: 75, step: 1, weight: 10, direction: "min", suffix: "%" },
+      { key: "first_minute_buyers", label: "Early buyers", short: "early buyers", threshold: 4, min: 1, max: 15, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "momentum_multiple", label: "Launch momentum", short: "momentum", threshold: 0.9, min: 0.4, max: 2, step: 0.05, weight: 20, direction: "min", suffix: "x" },
+      { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 70, min: 20, max: 100, step: 5, weight: 15, direction: "min", suffix: "%" },
+      { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 90, min: 30, max: 95, step: 5, weight: 15, direction: "max", suffix: "%" },
+    ],
+  },
+  runner3x: {
+    scoreThreshold: 70,
+    runnerTarget: 3,
+    positionSizeUsd: 25,
+    stopLossPct: 40,
+    creatorGate: true,
+    concentrationGate: true,
+    rules: [
+      { key: "trade_count", label: "Trade depth", short: "trades", threshold: 15, min: 5, max: 60, step: 1, weight: 20, direction: "min", suffix: "" },
+      { key: "unique_traders", label: "Trader spread", short: "traders", threshold: 12, min: 2, max: 30, step: 1, weight: 25, direction: "min", suffix: "" },
+      { key: "buy_pressure_pct", label: "Buy pressure", short: "buy pressure", threshold: 60, min: 40, max: 75, step: 1, weight: 10, direction: "min", suffix: "%" },
+      { key: "first_minute_buyers", label: "Early buyers", short: "early buyers", threshold: 7, min: 1, max: 15, step: 1, weight: 10, direction: "min", suffix: "" },
+      { key: "momentum_multiple", label: "Launch momentum", short: "momentum", threshold: 1.05, min: 0.4, max: 2, step: 0.05, weight: 10, direction: "min", suffix: "x" },
+      { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 70, min: 20, max: 100, step: 5, weight: 5, direction: "min", suffix: "%" },
+      { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 55, min: 30, max: 95, step: 5, weight: 20, direction: "max", suffix: "%" },
+    ],
+  },
+  wide3x: {
+    scoreThreshold: 70,
+    runnerTarget: 3,
+    positionSizeUsd: 25,
+    stopLossPct: 30,
+    creatorGate: true,
+    concentrationGate: true,
+    rules: [
+      { key: "trade_count", label: "Trade depth", short: "trades", threshold: 30, min: 5, max: 60, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "unique_traders", label: "Trader spread", short: "traders", threshold: 12, min: 2, max: 30, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "buy_pressure_pct", label: "Buy pressure", short: "buy pressure", threshold: 60, min: 40, max: 75, step: 1, weight: 10, direction: "min", suffix: "%" },
+      { key: "first_minute_buyers", label: "Early buyers", short: "early buyers", threshold: 6, min: 1, max: 15, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "momentum_multiple", label: "Launch momentum", short: "momentum", threshold: 1.2, min: 0.4, max: 2, step: 0.05, weight: 20, direction: "min", suffix: "x" },
+      { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 50, min: 20, max: 100, step: 5, weight: 15, direction: "min", suffix: "%" },
+      { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 85, min: 30, max: 95, step: 5, weight: 10, direction: "max", suffix: "%" },
+    ],
+  },
 };
 
 const presetDetails: Array<{ name: PresetName; label: string; description: string }> = [
@@ -153,6 +206,9 @@ const presetDetails: Array<{ name: PresetName; label: string; description: strin
   { name: "early", label: "Early velocity", description: "Weights first-minute pace and momentum" },
   { name: "crowd", label: "Crowd strength", description: "Weights trader depth and distribution" },
   { name: "quality", label: "Quality hold", description: "Weights retention and holder spread" },
+  { name: "steady2x", label: "Tested 2x", description: "30 signals · all four periods positive" },
+  { name: "runner3x", label: "Tested 3x", description: "35 signals · selective runner search" },
+  { name: "wide3x", label: "Wider 3x", description: "56 signals · broader tested search" },
 ];
 
 const savedModelsKey = "ponseye-lab-saved-models-v1";
