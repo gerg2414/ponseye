@@ -116,6 +116,8 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
   const gainMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
     ? launch.market_cap_usd / launch.entry_market_cap_usd
     : null;
+  const positionLoss = gainMultiple != null && gainMultiple < 1;
+  const positionGradientId = `position-fill-${launch.token_address.replace(/[^a-z0-9-]/gi, "")}`;
   const filledSegments = Math.ceil(lockScore / 6.25);
 
   return (
@@ -152,10 +154,16 @@ function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "s
         )}
 
         {acquired ? (
-          <div className={`positionMonitor ${launch.position_status === "closed" ? "closed" : "live"}`}>
+          <div className={`positionMonitor ${launch.position_status === "closed" ? "closed" : "live"} ${positionLoss ? "loss" : "profit"}`}>
             <svg viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id={positionGradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={positionLoss ? "#ff718c" : "#9aff4f"} stopOpacity=".34" />
+                  <stop offset="100%" stopColor={positionLoss ? "#ff718c" : "#9aff4f"} stopOpacity="0" />
+                </linearGradient>
+              </defs>
               <path className="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
-              <path className="positionFill" d={launch.position_status === "closed" ? "M0 58L32 49L64 52L96 34L128 40L160 24L192 30L224 15L256 20L288 29L320 27V72H0Z" : "M0 58L32 51L64 54L96 40L128 45L160 31L192 36L224 20L256 25L288 13L320 9V72H0Z"} />
+              <path className="positionFill" style={{ fill: `url(#${positionGradientId})` }} d={launch.position_status === "closed" ? "M0 58L32 49L64 52L96 34L128 40L160 24L192 30L224 15L256 20L288 29L320 27V72H0Z" : "M0 58L32 51L64 54L96 40L128 45L160 31L192 36L224 20L256 25L288 13L320 9V72H0Z"} />
               <polyline className="positionLine" points={launch.position_status === "closed" ? "0,58 32,49 64,52 96,34 128,40 160,24 192,30 224,15 256,20 288,29 320,27" : "0,58 32,51 64,54 96,40 128,45 160,31 192,36 224,20 256,25 288,13 320,9"} />
               <circle className="positionEntry" cx="2" cy="58" r="4" />
               <circle className="positionEnd" cx="318" cy={launch.position_status === "closed" ? "27" : "9"} r="4" />
