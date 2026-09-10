@@ -1,164 +1,166 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import {
+  CandlestickSeries,
+  ColorType,
+  CrosshairMode,
+  PriceScaleMode,
+  createChart,
+  createTextWatermark,
+  type CandlestickData,
+  type IChartApi,
+  type ISeriesApi,
+  type UTCTimestamp,
+} from "lightweight-charts";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarketTrade } from "../../../lib/data";
 import { compact } from "../../../lib/market";
 
-type Candle = {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-};
+const INTERVALS = [
+  { label: "1m", value: 60_000 },
+  { label: "5m", value: 5 * 60_000 },
+  { label: "15m", value: 15 * 60_000 },
+  { label: "1h", value: 60 * 60_000 },
+] as const;
 
-function intervalFor(spanMs: number) {
-  if (spanMs <= 2 * 60 * 60_000) return 60_000;
-  if (spanMs <= 12 * 60 * 60_000) return 5 * 60_000;
-  if (spanMs <= 2 * 24 * 60 * 60_000) return 15 * 60_000;
-  return 60 * 60_000;
-}
+function buildCandles(trades: MarketTrade[], interval: number) {
+  const buckets = new Map<number, CandlestickData<UTCTimestamp>>();
 
-function buildCandles(trades: MarketTrade[]) {
-  const points = trades
-    .flatMap((trade) => trade.price_usd && trade.price_usd > 0
-      ? [{ time: new Date(trade.block_time).getTime(), value: trade.price_usd * 1_000_000_000, volume: trade.quote_amount_usd ?? trade.base_amount_usd ?? 0 }]
-      : [])
-    .sort((a, b) => a.time - b.time);
-  if (!points.length) return { candles: [] as Candle[], interval: 60_000 };
+  for (const trade of trades) {
+    if (!trade.price_usd || trade.price_usd <= 0) continue;
+    const price = trade.price_usd * 1_000_000_000;
+    const timestamp = new Date(trade.block_time).getTime();
+    const bucket = Math.floor(timestamp / interval) * interval;
+    const time = Math.floor(bucket / 1_000) as UTCTimestamp;
+    const candle = buckets.get(bucket);
 
-  const interval = intervalFor(points.at(-1)!.time - points[0].time);
-  const buckets = new Map<number, Candle>();
-  for (const point of points) {
-    const time = Math.floor(point.time / interval) * interval;
-    const candle = buckets.get(time);
     if (candle) {
-      candle.high = Math.max(candle.high, point.value);
-      candle.low = Math.min(candle.low, point.value);
-      candle.close = point.value;
-      candle.volume += point.volume;
+      candle.high = Math.max(candle.high, price);
+      candle.low = Math.min(candle.low, price);
+      candle.close = price;
     } else {
-      buckets.set(time, { time, open: point.value, high: point.value, low: point.value, close: point.value, volume: point.volume });
+      buckets.set(bucket, { time, open: price, high: price, low: price, close: price });
     }
   }
-  return { candles: [...buckets.values()].slice(-120), interval };
-}
 
-function intervalLabel(interval: number) {
-  return interval < 60 * 60_000 ? `${interval / 60_000}m` : `${interval / 60 / 60_000}h`;
+  return [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time)).slice(-500);
 }
 
 export function PonsEyeChart({ trades }: { trades: MarketTrade[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const { candles, interval } = useMemo(() => buildCandles(trades), [trades]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const fittedIntervalRef = useRef<number | null>(null);
+  const [interval, setInterval] = useState(60_000);
+  const candles = useMemo(() => buildCandles(trades, interval), [interval, trades]);
 
-  if (candles.length < 2) {
-    return (
-      <div className="tvChartShell">
-        <div className="tvToolbar"><strong>PONS / MCAP</strong><span>USD</span><span>LOG</span><b>LIVE</b></div>
-        <div className="chartEmpty"><span>PRICE FEED</span>Waiting for the first dollar priced trades</div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-  const width = 1000;
-  const height = 470;
-  const left = 18;
-  const right = 902;
-  const top = 34;
-  const bottom = 405;
-  const logLow = Math.log10(Math.min(...candles.map((candle) => candle.low)));
-  const logHigh = Math.log10(Math.max(...candles.map((candle) => candle.high)));
-  const padding = Math.max((logHigh - logLow) * 0.12, 0.025);
-  const min = logLow - padding;
-  const max = logHigh + padding;
-  const spread = max - min;
-  const step = (right - left) / candles.length;
-  const bodyWidth = Math.max(2, Math.min(10, step * 0.62));
-  const y = (value: number) => bottom - ((Math.log10(value) - min) / spread) * (bottom - top);
-  const x = (index: number) => left + step * index + step / 2;
-  const yTicks = Array.from({ length: 6 }, (_, index) => {
-    const ratio = index / 5;
-    return { y: top + ratio * (bottom - top), value: 10 ** (max - ratio * spread) };
-  });
-  const xTicks = Array.from({ length: 5 }, (_, index) => {
-    const candleIndex = Math.min(candles.length - 1, Math.round((index / 4) * (candles.length - 1)));
-    return { x: x(candleIndex), time: candles[candleIndex].time };
-  });
-  const selectedIndex = hovered ?? candles.length - 1;
-  const selected = candles[selectedIndex];
-  const selectedX = x(selectedIndex);
-  const selectedY = y(selected.close);
-  const rising = selected.close >= selected.open;
+    const chart = createChart(containerRef.current, {
+      autoSize: true,
+      height: 470,
+      layout: {
+        background: { type: ColorType.Solid, color: "#090b0f" },
+        textColor: "#747b89",
+        fontFamily: '"SFMono-Regular", Consolas, monospace',
+        fontSize: 11,
+        attributionLogo: true,
+      },
+      grid: {
+        vertLines: { color: "#181c23", style: 1 },
+        horzLines: { color: "#181c23", style: 1 },
+      },
+      rightPriceScale: {
+        mode: PriceScaleMode.Logarithmic,
+        borderColor: "#252a34",
+        scaleMargins: { top: 0.12, bottom: 0.1 },
+      },
+      timeScale: {
+        borderColor: "#252a34",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 4,
+        barSpacing: 9,
+        minBarSpacing: 3,
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "#626978", labelBackgroundColor: "#a56cff" },
+        horzLine: { color: "#626978", labelBackgroundColor: "#a56cff" },
+      },
+      localization: {
+        priceFormatter: (price: number) => `$${compact(price)}`,
+      },
+    });
 
-  function handlePointer(event: React.PointerEvent<SVGSVGElement>) {
-    const bounds = svgRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-    const chartX = ((event.clientX - bounds.left) / bounds.width) * width;
-    const index = Math.max(0, Math.min(candles.length - 1, Math.floor((chartX - left) / step)));
-    setHovered(index);
-  }
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: "#9aff4f",
+      downColor: "#ff5f7f",
+      wickUpColor: "#9aff4f",
+      wickDownColor: "#ff5f7f",
+      borderVisible: false,
+      priceLineColor: "#a56cff",
+      priceLineWidth: 1,
+      priceLineVisible: true,
+      lastValueVisible: true,
+      priceFormat: {
+        type: "custom",
+        minMove: 0.01,
+        formatter: (price: number) => `$${compact(price)}`,
+      },
+    });
+
+    createTextWatermark(chart.panes()[0], {
+      horzAlign: "center",
+      vertAlign: "center",
+      lines: [
+        { text: "PONSEYE", color: "rgba(255,255,255,.045)", fontSize: 58, fontFamily: "Arial, sans-serif", fontStyle: "bold" },
+        { text: "LAUNCH INTELLIGENCE", color: "rgba(165,108,255,.16)", fontSize: 10, fontFamily: "Consolas, monospace", fontStyle: "normal" },
+      ],
+    });
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!seriesRef.current || !chartRef.current) return;
+    seriesRef.current.setData(candles);
+    if (candles.length && fittedIntervalRef.current !== interval) {
+      chartRef.current.timeScale().fitContent();
+      fittedIntervalRef.current = interval;
+    }
+  }, [candles, interval]);
 
   return (
     <div className="tvChartShell">
       <div className="tvToolbar">
         <strong>PONS / MCAP</strong>
-        <span>{intervalLabel(interval)}</span>
+        <div className="tvIntervals" aria-label="Chart interval">
+          {INTERVALS.map((option) => (
+            <button
+              className={interval === option.value ? "active" : ""}
+              key={option.value}
+              type="button"
+              onClick={() => setInterval(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <span>USD</span>
         <span>LOG</span>
         <b><i /> LIVE</b>
       </div>
-      <div className="tvOhlc">
-        <span>O <b>${compact(selected.open)}</b></span>
-        <span>H <b>${compact(selected.high)}</b></span>
-        <span>L <b>${compact(selected.low)}</b></span>
-        <span>C <b className={rising ? "up" : "down"}>${compact(selected.close)}</b></span>
-      </div>
-      <svg
-        ref={svgRef}
-        className="priceChart tvChart"
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="Interactive PonsEye dollar market cap candlestick chart"
-        onPointerMove={handlePointer}
-        onPointerLeave={() => setHovered(null)}
-      >
-        <g className="chartGrid">
-          {yTicks.map((tick) => <path key={tick.y} d={`M${left} ${tick.y}H${right}`} />)}
-          {xTicks.map((tick) => <path key={tick.x} d={`M${tick.x} ${top}V${bottom}`} />)}
-        </g>
-        <g className="chartWatermark">
-          <text x={(left + right) / 2} y="220" textAnchor="middle">PONSEYE</text>
-          <text x={(left + right) / 2} y="247" textAnchor="middle">LAUNCH INTELLIGENCE</text>
-        </g>
-        <g className="chartCandles">
-          {candles.map((candle, index) => {
-            const candleX = x(index);
-            const openY = y(candle.open);
-            const closeY = y(candle.close);
-            const up = candle.close >= candle.open;
-            return (
-              <g key={candle.time} className={up ? "up" : "down"}>
-                <path d={`M${candleX} ${y(candle.high)}V${y(candle.low)}`} />
-                <rect x={candleX - bodyWidth / 2} y={Math.min(openY, closeY)} width={bodyWidth} height={Math.max(2, Math.abs(closeY - openY))} />
-              </g>
-            );
-          })}
-        </g>
-        <g className="chartLabels">
-          {yTicks.map((tick) => <text key={tick.y} x="916" y={tick.y + 4}>${compact(tick.value)}</text>)}
-          {xTicks.map((tick) => <text key={tick.x} x={tick.x} y="440" textAnchor="middle">{new Date(tick.time).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })}</text>)}
-        </g>
-        <g className="chartCrosshair">
-          <path d={`M${selectedX} ${top}V${bottom}`} />
-          <path d={`M${left} ${selectedY}H${right}`} />
-          <circle cx={selectedX} cy={selectedY} r="4" />
-          <rect x="905" y={selectedY - 12} width="88" height="24" />
-          <text x="949" y={selectedY + 4} textAnchor="middle">${compact(selected.close)}</text>
-        </g>
-      </svg>
+      <div ref={containerRef} className="priceChart tradingViewCanvas" aria-label="TradingView Lightweight Chart showing PonsEye dollar market cap" />
+      {!candles.length ? <div className="chartEmpty chartEmptyOverlay"><span>PRICE FEED</span>Waiting for the first dollar priced trade</div> : null}
     </div>
   );
 }
