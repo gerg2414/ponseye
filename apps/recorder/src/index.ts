@@ -3,13 +3,27 @@ import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { runHolderCollector } from "./holders.js";
-import { CURVE_TRADES, LAUNCH_ACTIVITY, MARKET_TRADES } from "./queries.js";
-import { saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus, warmTokenCache } from "./store.js";
+import { CURVE_MARKET_TRADES, CURVE_TRADES, LAUNCH_ACTIVITY, poolMarketTrades } from "./queries.js";
+import { getActiveMarketTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus, warmTokenCache } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function delayOrAbort(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) return resolve();
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done, { once: true });
+
+    function done() {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    }
+  });
+}
 
 async function warmCacheUntilReady(signal: AbortSignal) {
   while (!signal.aborted) {
@@ -29,7 +43,7 @@ function subscribe(
   query: string,
   handler: (row: never, collection: string) => Promise<void>,
 ) {
-  client.subscribe({ query }, {
+  return client.subscribe({ query }, {
     next: async (result) => {
       try {
         const data = result.data as { EVM?: Record<string, never[]>; Trading?: Record<string, never[]> } | undefined;
@@ -52,6 +66,54 @@ function subscribe(
   });
 }
 
+function chunks<T>(items: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
+    items.slice(index * size, (index + 1) * size));
+}
+
+function createPoolFeedController(client: Client, signal: AbortSignal) {
+  let disposers: Array<() => void> = [];
+  let addressSignature = "";
+  let refreshQueue = Promise.resolve();
+
+  const refresh = () => {
+    refreshQueue = refreshQueue.then(async () => {
+      if (signal.aborted) return;
+      const addresses = await getActiveMarketTokens();
+      const nextSignature = addresses.join(",");
+      if (nextSignature === addressSignature) return;
+
+      for (const dispose of disposers) dispose();
+      disposers = chunks(addresses, 100).map((batch) =>
+        subscribe(client, "market_trades", poolMarketTrades(batch), saveMarketTrade));
+      addressSignature = nextSignature;
+      console.log(`Pool market feed tracking ${addresses.length} Pons tokens across ${disposers.length} filtered streams`);
+    }).catch(async (error) => {
+      console.error("Pool market feed refresh failed", error);
+      await updateStreamStatus("market_trades", "error", error instanceof Error ? error.message : String(error));
+    });
+    return refreshQueue;
+  };
+
+  const maintenance = (async () => {
+    await refresh();
+    while (!signal.aborted) {
+      await delayOrAbort(5 * 60_000, signal);
+      if (!signal.aborted) await refresh();
+    }
+  })();
+
+  return {
+    refresh,
+    async stop() {
+      await refreshQueue;
+      for (const dispose of disposers) dispose();
+      disposers = [];
+      await maintenance;
+    },
+  };
+}
+
 async function recordingCycle() {
   const auth = await getAccessToken();
   const collectorAbort = new AbortController();
@@ -61,11 +123,16 @@ async function recordingCycle() {
     connectedAt = new Date().toISOString();
     console.log("Bitquery WebSocket connected");
   });
+  const poolFeeds = createPoolFeedController(client, collectorAbort.signal);
 
-  subscribe(client, "launch_activity", LAUNCH_ACTIVITY, (row, collection) =>
-    collection === "Events" ? saveFactoryEvent(row) : saveLaunchCall(row));
+  subscribe(client, "launch_activity", LAUNCH_ACTIVITY, async (row, collection) => {
+    if (collection !== "Events") return saveLaunchCall(row);
+    await saveFactoryEvent(row);
+    const event = row as { Log?: { Signature?: { Name?: string } } };
+    if (event.Log?.Signature?.Name === "PoolGraduated") await poolFeeds.refresh();
+  });
   subscribe(client, "curve_trades", CURVE_TRADES, saveTrade);
-  subscribe(client, "market_trades", MARKET_TRADES, saveMarketTrade);
+  subscribe(client, "market_trades", CURVE_MARKET_TRADES, saveMarketTrade);
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
@@ -74,6 +141,7 @@ async function recordingCycle() {
   collectorAbort.abort();
   await holderCollector;
   await cacheWarmup;
+  await poolFeeds.stop();
   await client.dispose();
 }
 
