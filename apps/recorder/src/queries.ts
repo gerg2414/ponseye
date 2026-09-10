@@ -1,5 +1,5 @@
-export const LAUNCH_ACTIVITY = `
-  subscription PonsLaunchActivity {
+export const PONS_ACTIVITY = `
+  subscription PonsActivity {
     EVM(network: robinhood) {
       Calls(where: {Call: {
         To: {in: [
@@ -13,7 +13,7 @@ export const LAUNCH_ACTIVITY = `
         Transaction { Hash From }
         Call { To Value Input Output }
       }
-      Events(where: {
+      FactoryEvents: Events(where: {
         LogHeader: {Address: {is: "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e"}}
         Log: {Signature: {Name: {in: ["TokenLaunched", "LaunchSwept", "PoolGraduated"]}}}
       }) {
@@ -30,14 +30,7 @@ export const LAUNCH_ACTIVITY = `
           }
         }
       }
-    }
-  }
-`;
-
-export const CURVE_TRADES = `
-  subscription PonsCurveTrades {
-    EVM(network: robinhood) {
-      Events(where: {Log: {Signature: {Name: {in: ["CurveBuy", "CurveSell"]}}}}) {
+      CurveEvents: Events(where: {Log: {Signature: {Name: {in: ["CurveBuy", "CurveSell"]}}}}) {
         Block { Time Number }
         Transaction { Hash From }
         LogHeader { Address }
@@ -71,33 +64,28 @@ const MARKET_TRADE_FIELDS = `
   }
 `;
 
-export const CURVE_MARKET_TRADES = `
-  subscription PonsCurveMarketTrades {
-    Trading {
-      CurveTrades: Trades(where: {
-        Pair: {Market: {Protocol: {is: "pons_v2"} Network: {is: "Robinhood"}}}
+export function marketTrades(tokenAddresses: string[]) {
+  const addresses = tokenAddresses.map((address) => JSON.stringify(address.toLowerCase())).join(",");
+  const poolTrades = addresses ? `
+      PoolTrades: Trades(where: {
+        Pair: {
+          Market: {Protocol: {is: "uniswap_v4"} Network: {is: "Robinhood"}}
+          Token: {Address: {in: [${addresses}]}}
+        }
       }) {
         ${MARKET_TRADE_FIELDS}
       }
-    }
-  }
-`;
-
-export function poolMarketTrades(tokenAddresses: string[]) {
-  if (!tokenAddresses.length) throw new Error("Pool market feed requires at least one token address");
-  const addresses = tokenAddresses.map((address) => JSON.stringify(address.toLowerCase())).join(",");
+  ` : "";
 
   return `
-    subscription PonsPoolMarketTrades {
+    subscription PonsMarketTrades {
       Trading {
-        PoolTrades: Trades(where: {
-          Pair: {
-            Market: {Protocol: {is: "uniswap_v4"} Network: {is: "Robinhood"}}
-            Token: {Address: {in: [${addresses}]}}
-          }
+        CurveTrades: Trades(where: {
+          Pair: {Market: {Protocol: {is: "pons_v2"} Network: {is: "Robinhood"}}}
         }) {
           ${MARKET_TRADE_FIELDS}
         }
+        ${poolTrades}
       }
     }
   `;
