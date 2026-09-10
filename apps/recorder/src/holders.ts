@@ -117,10 +117,10 @@ function due(candidate: HolderCandidate, now: number) {
 
   if (launchAge > 60 * 60_000 && tradeAge > 60 * 60_000) return false;
   const interval = launchAge <= 15 * 60_000
-    ? 2 * 60_000
+    ? 5 * 60_000
     : tradeAge <= 15 * 60_000
-      ? 5 * 60_000
-      : 15 * 60_000;
+      ? 10 * 60_000
+      : 30 * 60_000;
   return now - lastSnapshotAt >= interval;
 }
 
@@ -135,7 +135,7 @@ async function collectOne(accessToken: string, candidate: HolderCandidate, signa
   const creatorBalance = numberValue(evm?.creatorHolder?.[0]?.Balance?.Amount);
   const observedAt = new Date().toISOString();
 
-  const positions = topRows.flatMap<HolderPosition>((row, index) => {
+  const positions = topRows.slice(0, 20).flatMap<HolderPosition>((row, index) => {
     const address = row.Holder?.Address?.toLowerCase();
     const balance = balances[index] ?? 0;
     if (!address || !/^0x[0-9a-f]{40}$/.test(address) || balance <= 0) return [];
@@ -170,7 +170,9 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
   while (!signal.aborted) {
     try {
       const now = Date.now();
-      const candidates = (await getHolderCandidates()).filter((candidate) => due(candidate, now));
+      const candidates = (await getHolderCandidates())
+        .filter((candidate) => due(candidate, now))
+        .slice(0, 12);
 
       let rateLimited = false;
       for (const candidate of candidates) {
@@ -184,7 +186,7 @@ export async function runHolderCollector(accessToken: string, signal: AbortSigna
             break;
           }
         }
-        await delay(1_250, signal);
+        await delay(3_000, signal);
       }
 
       if (!signal.aborted) await updateStreamStatus("holder_snapshots", "connected");
