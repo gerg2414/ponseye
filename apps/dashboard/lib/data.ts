@@ -47,6 +47,9 @@ export type Launch = {
   research_state_at: string;
   research_rule_version: string;
   research_reasons: string[];
+  acquired_at?: string | null;
+  entry_market_cap_usd?: number | null;
+  position_status?: "open" | "closed" | null;
 };
 
 export type Trade = {
