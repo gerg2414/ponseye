@@ -76,17 +76,19 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, closedAt }: {
+export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, closedAt, entryMarketCap }: {
   trades: MarketTrade[];
   tokenAddress: string;
   graduatedAt: string | null;
   acquiredAt: string | null;
   closedAt: string | null;
+  entryMarketCap: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const bondLineRef = useRef<IPriceLine | null>(null);
+  const entryLineRef = useRef<IPriceLine | null>(null);
   const positionMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
   const latestTradeAtRef = useRef<string | null>(trades.at(-1)?.block_time ?? null);
@@ -276,6 +278,25 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, cl
       });
     }
   }, [bondMarketCap]);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    if (entryLineRef.current) {
+      series.removePriceLine(entryLineRef.current);
+      entryLineRef.current = null;
+    }
+    if (entryMarketCap) {
+      entryLineRef.current = series.createPriceLine({
+        price: entryMarketCap,
+        color: "#a56cff",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "ENTRY 1.00X",
+      });
+    }
+  }, [entryMarketCap]);
 
   return (
     <div className="tvChartShell">
