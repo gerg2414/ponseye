@@ -32,7 +32,7 @@ main { width: 100%; margin: 0; padding: 0 22px 72px; }
 .recorder i, .panelStatus i { width: 7px; height: 7px; background: #555a68; display: inline-block; }
 .recorder.live { color: var(--green); }
 .recorder.live i, .panelStatus i { background: var(--green); box-shadow: 0 0 10px rgba(154,255,79,.75); }
-.consolePrelude { position: relative; z-index: 3; height: 228px; padding-bottom: 20px; display: flex; align-items: flex-end; pointer-events: none; transform: translateY(70px); }
+.consolePrelude { position: relative; z-index: 3; height: 228px; padding-bottom: 20px; display: flex; align-items: flex-end; pointer-events: none; }
 .consoleSignal { position: relative; width: min(560px,48vw); padding-left: 20px; display: grid; gap: 12px; }
 .consoleSignal::before { content: ""; position: absolute; left: 0; top: 1px; bottom: 0; width: 2px; background: linear-gradient(var(--purple),rgba(165,108,255,.08)); box-shadow: 0 0 12px rgba(165,108,255,.3); }
 .consoleNode { width: fit-content; max-width: 100%; overflow: hidden; color: var(--purple); font-size: 12px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; text-transform: uppercase; animation: consoleType .65s steps(30,end) .15s both; }
@@ -120,12 +120,6 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .status.graduated i { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .panelFoot { padding: 14px 18px; display: flex; justify-content: space-between; color: #555b68; background: #0a0c0f; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
 .boardStage { position: relative; padding-top: 115px; }
-.capitalCircuitLink { position: absolute; z-index: 5; right: 14px; top: 61px; min-height: 40px; padding: 0 12px 0 9px; display: flex; align-items: center; gap: 9px; border: 1px solid rgba(165,108,255,.58); border-radius: 7px; color: #d7c5f6; background: rgba(18,12,27,.86); box-shadow: inset 0 0 18px rgba(165,108,255,.08),0 8px 24px rgba(0,0,0,.28); font-size: 11px; font-weight: 700; letter-spacing: .075em; text-decoration: none; text-transform: uppercase; }
-.capitalCircuitLink svg { width: 23px; height: 23px; fill: none; stroke: #777e8c; stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; }
-.capitalCircuitLink .circuitTrace,.capitalCircuitLink .circuitArrow { stroke: var(--green); }
-.capitalCircuitLink b { color: var(--purple); font-size: 14px; transition: transform .18s ease; }
-.capitalCircuitLink:hover b,.capitalCircuitLink:focus-visible b { transform: translate(2px,-2px); }
-.capitalCircuitLink:focus-visible { outline: 1px solid var(--purple); outline-offset: 3px; }
 .boardSection { position: relative; z-index: 2; overflow: hidden; background: rgba(12,14,18,.97); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0,0,0,.28); }
 .boardWatcher { position: absolute; z-index: 1; inset: 0 0 auto; height: 350px; overflow: visible; pointer-events: none; }
 .boardWatcher::after { content: ""; position: absolute; z-index: 2; inset: 0; background: linear-gradient(90deg,var(--bg) 0%,rgba(7,8,10,.84) 30%,transparent 64%); }
@@ -523,7 +517,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .panelHead h2 { font-size: 19px; }
   .panelStatus { display: none; }
   .panelFoot span:last-child { display: none; }
-  .consolePrelude { height: 155px; padding: 0 0 13px; align-items: flex-end; transform: translateY(35px); }
+  .consolePrelude { height: 155px; padding: 0 0 13px; align-items: flex-end; }
   .consoleSignal { width: min(330px,84vw); padding-left: 14px; gap: 8px; }
   .consoleNode { font-size: 9px; }
   .consoleLog { grid-template-columns: 1fr; gap: 4px; }
@@ -531,7 +525,6 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .consoleLog span:nth-child(n+5) { display: none; }
   .consoleAwait { gap: 7px; font-size: 8px; }
   .boardStage { padding-top: 72px; }
-  .capitalCircuitLink { right: 8px; top: 22px; min-height: 36px; font-size: 9px; }
   .boardWatcher { height: 215px; }
   .boardWatcher::after { background: linear-gradient(90deg,var(--bg) 0%,rgba(7,8,10,.66) 16%,transparent 58%); }
   .boardWatcher img { right: -40px; top: -210px; width: 650px; max-width: none; opacity: .82; }
