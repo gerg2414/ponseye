@@ -267,6 +267,9 @@ export default async function Home() {
       </section>
 
       <section className="boardSection">
+        <div className="boardWatcher" aria-hidden="true">
+          <Image src="/ponseye-giant-watcher.png" alt="" width={1920} height={819} priority />
+        </div>
         {visibleLaunches.length === 0 ? (
           <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
         ) : (
