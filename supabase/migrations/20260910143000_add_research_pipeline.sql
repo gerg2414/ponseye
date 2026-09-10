@@ -25,7 +25,7 @@ create index research_events_token_time_idx
 
 alter table public.research_events enable row level security;
 revoke all on table public.research_events from public, anon, authenticated;
-grant select, insert, update, delete on table public.research_events to service_role;
+grant select, insert on table public.research_events to service_role;
 
 create function public.classify_launch_research_state()
 returns trigger
