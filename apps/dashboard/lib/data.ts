@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 
 export type Launch = {
   token_address: string;
@@ -97,7 +98,7 @@ const emptyData = {
   dataConnected: false,
 };
 
-export async function getDashboardData() {
+async function loadDashboardData() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return emptyData;
@@ -107,7 +108,7 @@ export async function getDashboardData() {
     db: { retry: false },
   });
   const dashboardResult = await db
-    .rpc("get_dashboard_home", { p_limit: 200 })
+    .rpc("get_dashboard_home", { p_limit: 50 })
     .abortSignal(AbortSignal.timeout(8_000));
 
   if (dashboardResult.error || !dashboardResult.data) {
@@ -141,6 +142,12 @@ export async function getDashboardData() {
     dataConnected: true,
   };
 }
+
+export const getDashboardData = unstable_cache(
+  loadDashboardData,
+  ["dashboard-home"],
+  { revalidate: 10 },
+);
 
 export async function getLaunchDetail(tokenAddress: string) {
   const url = process.env.SUPABASE_URL;
