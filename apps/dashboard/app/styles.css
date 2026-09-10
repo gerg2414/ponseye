@@ -29,9 +29,9 @@ main { width: 100%; margin: 0; padding: 0 22px 72px; }
 .recorder i, .panelStatus i { width: 7px; height: 7px; background: #555a68; display: inline-block; }
 .recorder.live { color: var(--green); }
 .recorder.live i, .panelStatus i { background: var(--green); box-shadow: 0 0 10px rgba(154,255,79,.75); }
-.hero { min-height: 450px; padding: 36px 24px 48px 0; display: grid; grid-template-columns: 1.35fr .65fr; gap: 70px; align-items: center; }
+.hero { min-height: 450px; padding: 36px 0 48px; display: grid; grid-template-columns: 1fr; align-items: center; }
 .heroBrand { display: flex; align-items: center; gap: 0; margin: 0 0 28px; }
-.heroRobot { display: block; width: 190px; height: 190px; object-fit: contain; image-rendering: pixelated; }
+.heroRobot { display: block; width: 210px; height: 210px; object-fit: contain; image-rendering: pixelated; transform: translateY(-8px); }
 .heroWordmark { display: block; width: min(520px,calc(100% - 156px)); height: auto; margin-left: -34px; image-rendering: pixelated; }
 .eyebrow { color: #8c92a2; letter-spacing: .13em; font-size: 10px; font-weight: 700; text-transform: uppercase; margin: 0 0 18px; }
 .eyebrow span { color: var(--purple); margin-right: 12px; }
