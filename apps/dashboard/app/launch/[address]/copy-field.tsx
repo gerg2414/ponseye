@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 export function CopyField({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<number | null>(null);
-  const displayValue = `${value.slice(2, 7)}.....${value.slice(-4)}`;
 
   useEffect(() => () => {
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
@@ -24,7 +23,7 @@ export function CopyField({ value }: { value: string }) {
 
   return (
     <button className="copyField" type="button" onClick={copy} aria-label={`Copy ${value}`} title="Copy full address">
-      <span>{displayValue}</span>
+      <span>{value}</span>
       <i aria-hidden="true">
         {copied ? (
           <svg viewBox="0 0 18 18"><path d="M3 9l4 4 8-9" /></svg>
