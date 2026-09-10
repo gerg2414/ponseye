@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
 
-export async function GET() {
+export async function GET(request: Request) {
   const startedAt = Date.now();
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
@@ -29,6 +29,16 @@ export async function GET() {
       keyPresent: true,
       hostname,
       error: "invalid_url",
+    });
+  }
+
+  if (new URL(request.url).searchParams.has("env")) {
+    return Response.json({
+      ok: true,
+      elapsedMs: Date.now() - startedAt,
+      urlPresent: true,
+      keyPresent: true,
+      hostname,
     });
   }
 
