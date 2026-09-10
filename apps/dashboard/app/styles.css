@@ -136,7 +136,13 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .laneHead > div { display: flex; align-items: center; gap: 10px; }
 .laneHead img { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
 .laneHead strong { color: var(--white); font-family: Arial,sans-serif; font-size: 16px; letter-spacing: -.01em; }
-.laneHead > span { min-width: 34px; padding: 7px 8px; border: 1px solid #282c36; border-radius: 6px; color: #a5aab6; background: #11141a; font-size: 11px; text-align: center; }
+.laneHead .laneHeadActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.laneCount { min-width: 34px; padding: 7px 8px; border: 1px solid #282c36; border-radius: 6px; color: #a5aab6; background: #11141a; font-size: 11px; text-align: center; }
+.capitalCircuitLink { min-height: 34px; padding: 0 9px; display: flex; align-items: center; gap: 7px; border: 1px solid rgba(165,108,255,.48); border-radius: 6px; color: #cdb7f1; background: rgba(165,108,255,.075); font-size: 9px; font-weight: 700; letter-spacing: .065em; text-decoration: none; text-transform: uppercase; }
+.capitalCircuitLink svg { width: 18px; height: 18px; fill: none; stroke: #737a88; stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; }
+.capitalCircuitLink .circuitTrace,.capitalCircuitLink .circuitArrow { stroke: var(--green); }
+.capitalCircuitLink:hover,.capitalCircuitLink:focus-visible { border-color: var(--purple); color: var(--white); background: rgba(165,108,255,.13); }
+.capitalCircuitLink:focus-visible { outline: 1px solid var(--purple); outline-offset: 2px; }
 .launchLane.completing .laneHead { background: linear-gradient(90deg,rgba(165,108,255,.07),transparent 58%),#0a0c0f; }
 .launchLane.completed .laneHead { background: linear-gradient(90deg,rgba(154,255,79,.07),transparent 58%),#0a0c0f; }
 .launchLaneBody { height: 760px; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
