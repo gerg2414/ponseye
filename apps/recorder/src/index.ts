@@ -4,7 +4,7 @@ import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { runHolderCollector } from "./holders.js";
 import { CURVE_TRADES, LAUNCH_ACTIVITY, MARKET_TRADES } from "./queries.js";
-import { saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus, warmTokenCache } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -42,6 +42,7 @@ function subscribe(
 
 async function recordingCycle() {
   const auth = await getAccessToken();
+  await warmTokenCache();
   const collectorAbort = new AbortController();
   const client = createBitqueryClient(auth.access_token, () => {
     healthy = true;
