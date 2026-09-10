@@ -35,13 +35,26 @@ main { width: 100%; margin: 0; padding: 0 22px 72px; }
 .consolePrelude { position: relative; z-index: 3; height: 228px; padding-bottom: 20px; display: flex; align-items: flex-end; pointer-events: none; }
 .consoleSignal { position: relative; width: min(560px,48vw); padding-left: 20px; display: grid; gap: 12px; }
 .consoleSignal::before { content: ""; position: absolute; left: 0; top: 1px; bottom: 0; width: 2px; background: linear-gradient(var(--purple),rgba(165,108,255,.08)); box-shadow: 0 0 12px rgba(165,108,255,.3); }
-.consoleNode { color: var(--purple); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.consoleNode { width: fit-content; max-width: 100%; overflow: hidden; color: var(--purple); font-size: 12px; font-weight: 700; letter-spacing: .12em; white-space: nowrap; text-transform: uppercase; animation: consoleType .65s steps(30,end) .15s both; }
 .consoleLog { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px 24px; }
-.consoleLog span { display: grid; grid-template-columns: 66px 1fr; align-items: center; gap: 10px; color: #747b89; font-size: 11px; letter-spacing: .045em; text-transform: uppercase; }
+.consoleLog span { width: fit-content; max-width: 100%; overflow: hidden; display: grid; grid-template-columns: 66px 1fr; align-items: center; gap: 10px; color: #747b89; font-size: 11px; letter-spacing: .045em; white-space: nowrap; text-transform: uppercase; animation: consoleType .62s steps(28,end) both; }
+.consoleLog span:nth-child(1) { animation-delay: .9s; }
+.consoleLog span:nth-child(2) { animation-delay: 1.55s; }
+.consoleLog span:nth-child(3) { animation-delay: 2.2s; }
+.consoleLog span:nth-child(4) { animation-delay: 2.85s; }
+.consoleLog span:nth-child(5) { animation-delay: 3.5s; }
+.consoleLog span:nth-child(6) { animation-delay: 4.15s; }
 .consoleLog time { color: #464c58; }
 .consoleLog b { overflow: hidden; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
-.consoleAwait { display: flex; align-items: center; gap: 9px; color: #9ba1ae; font-size: 11px; font-weight: 700; letter-spacing: .075em; text-transform: uppercase; }
+.consoleAwait { width: fit-content; max-width: 100%; overflow: hidden; display: flex; align-items: center; gap: 9px; color: #9ba1ae; font-size: 11px; font-weight: 700; letter-spacing: .075em; white-space: nowrap; text-transform: uppercase; animation: consoleType .9s steps(42,end) 4.9s both; }
+.consoleAwait::after { content: ""; width: 7px; height: 13px; flex: 0 0 7px; background: var(--purple); animation: consoleCursor .75s steps(1,end) 5.8s infinite; }
 .consoleAwait i { width: 6px; height: 6px; display: block; background: var(--green); box-shadow: 0 0 9px rgba(154,255,79,.75); }
+@keyframes consoleType { from { clip-path: inset(0 100% 0 0); opacity: 0; } to { clip-path: inset(0); opacity: 1; } }
+@keyframes consoleCursor { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .consoleNode,.consoleLog span,.consoleAwait { animation: none; }
+  .consoleAwait::after { animation: none; }
+}
 .eyebrow { color: #8c92a2; letter-spacing: .13em; font-size: 10px; font-weight: 700; text-transform: uppercase; margin: 0 0 18px; }
 .eyebrow span { color: var(--purple); margin-right: 12px; }
 h1 { color: var(--white); font-family: Arial, sans-serif; font-size: clamp(42px, 6vw, 78px); line-height: .96; letter-spacing: -.065em; margin: 0; max-width: 850px; }
