@@ -19,7 +19,7 @@ function short(value: string) {
   return `${value.slice(0, 7)}…${value.slice(-5)}`;
 }
 
-function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" }) {
+function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" | "web" | "x" | "telegram" }) {
   const paths = {
     contract: "M3 2h8l4 4v10H3zM11 2v4h4M6 10h6M6 13h4",
     curve: "M2 14h3V9h3V6h3V3h4M12 3h3v3",
@@ -33,6 +33,9 @@ function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" |
     traders: "M2 5h12M10 2l4 3-4 3M16 13H4M8 10l-4 3 4 3",
     buy: "M9 16V3M4 8l5-5 5 5",
     creator: "M9 2l2 4 4 1-3 3 1 5-4-2-4 2 1-5-3-3 4-1z",
+    web: "M9 2a7 7 0 1 0 0 14A7 7 0 0 0 9 2zM2 9h14M9 2c2 2 3 4 3 7s-1 5-3 7M9 2C7 4 6 6 6 9s1 5 3 7",
+    x: "M3 3l12 12M15 3L3 15",
+    telegram: "M2 8l14-5-4 13-3-5-3 2 1-3zM7 10l5-4",
   };
   return <svg className="pixelIcon" viewBox="0 0 18 18" aria-hidden="true"><path d={paths[type]} /></svg>;
 }
@@ -67,15 +70,15 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
           <div className="detailTokenImage">
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={92} priority />
           </div>
-          <div>
+          <div className="launchIdentityCopy">
             <span className="detailStatus">{launch.status}</span>
             <h1>{launch.name ?? "Metadata pending"}</h1>
             <p>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"} <b>•</b> {market.asset.symbol} pair</p>
+            {launch.description ? <p className="tokenDescription">{launch.description}</p> : null}
             <div className="titleBonding"><i style={{ width: `${launch.progress_pct ?? 0}%` }} /><span>{launch.progress_pct?.toFixed(1) ?? "0.0"}% bonded</span></div>
           </div>
         </div>
         <aside className="launchMeta">
-          {launch.description && <p>{launch.description}</p>}
           <dl>
             <div><dt><PixelIcon type="contract" /> Contract address</dt><dd><CopyField value={launch.token_address} /></dd></div>
             <div><dt><PixelIcon type="curve" /> Bonding curve</dt><dd><CopyField value={launch.curve_address} /></dd></div>
@@ -83,9 +86,9 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
             <div><dt><PixelIcon type="clock" /> Launched</dt><dd className="launchDate">{new Date(launch.launched_at).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</dd></div>
           </dl>
           <nav className="launchLinks">
-            {launch.website_url && <a href={launch.website_url} target="_blank" rel="noreferrer">Website</a>}
-            {launch.twitter_url && <a href={launch.twitter_url} target="_blank" rel="noreferrer">X</a>}
-            {launch.telegram_url && <a href={launch.telegram_url} target="_blank" rel="noreferrer">Telegram</a>}
+            {launch.website_url && <a href={launch.website_url} target="_blank" rel="noreferrer"><PixelIcon type="web" /> Website <span>↗</span></a>}
+            {launch.twitter_url && <a href={launch.twitter_url} target="_blank" rel="noreferrer"><PixelIcon type="x" /> X <span>↗</span></a>}
+            {launch.telegram_url && <a href={launch.telegram_url} target="_blank" rel="noreferrer"><PixelIcon type="telegram" /> Telegram <span>↗</span></a>}
           </nav>
         </aside>
       </section>
