@@ -124,6 +124,7 @@ export default async function Home() {
       <AutoRefresh intervalMs={3_000} />
       <header className="header">
         <div className="systemMeta">
+          <Link className="labHeaderLink" href="/lab">PonsEye Lab <span>↗</span></Link>
           <span>Robinhood Chain</span>
           <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {recorderLive ? "Recorder live" : "Recorder paused"}</div>
         </div>
