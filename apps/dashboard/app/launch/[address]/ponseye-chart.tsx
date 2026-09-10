@@ -7,11 +7,15 @@ import {
   LineStyle,
   PriceScaleMode,
   createChart,
+  createSeriesMarkers,
   createTextWatermark,
   type CandlestickData,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -72,21 +76,37 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
+export function PonsEyeChart({ trades, tokenAddress, graduatedAt, acquiredAt, closedAt }: {
   trades: MarketTrade[];
   tokenAddress: string;
   graduatedAt: string | null;
+  acquiredAt: string | null;
+  closedAt: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const bondLineRef = useRef<IPriceLine | null>(null);
+  const positionMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
   const latestTradeAtRef = useRef<string | null>(trades.at(-1)?.block_time ?? null);
   const pollingRef = useRef(false);
   const [liveTrades, setLiveTrades] = useState(trades);
   const [interval, setInterval] = useState(60_000);
   const candles = useMemo(() => buildCandles(liveTrades, interval), [interval, liveTrades]);
+  const positionMarkers = useMemo(() => {
+    const markers: SeriesMarker<Time>[] = [];
+    const nearestCandle = (value: string | null) => {
+      if (!value || !candles.length) return null;
+      const target = new Date(value).getTime() / 1_000;
+      return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
+    };
+    const entry = nearestCandle(acquiredAt);
+    const exit = nearestCandle(closedAt);
+    if (entry) markers.push({ id: "ponseye-entry", time: entry.time, position: "belowBar", shape: "arrowUp", color: "#9aff4f", text: "PONSEYE BUY", size: 2 });
+    if (exit) markers.push({ id: "ponseye-exit", time: exit.time, position: "aboveBar", shape: "arrowDown", color: "#ff718c", text: "POSITION CLOSED", size: 2 });
+    return markers.sort((a, b) => Number(a.time) - Number(b.time));
+  }, [acquiredAt, candles, closedAt]);
   const bondMarketCap = useMemo(() => {
     if (!graduatedAt) return null;
     const graduationTime = new Date(graduatedAt).getTime();
@@ -207,11 +227,13 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
 
     chartRef.current = chart;
     seriesRef.current = series;
+    positionMarkersRef.current = createSeriesMarkers(series, []);
 
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      positionMarkersRef.current = null;
     };
   }, []);
 
@@ -230,6 +252,10 @@ export function PonsEyeChart({ trades, tokenAddress, graduatedAt }: {
       fittedIntervalRef.current = interval;
     }
   }, [candles, interval]);
+
+  useEffect(() => {
+    positionMarkersRef.current?.setMarkers(positionMarkers);
+  }, [positionMarkers]);
 
   useEffect(() => {
     const series = seriesRef.current;
