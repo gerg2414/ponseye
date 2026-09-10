@@ -264,11 +264,13 @@ export async function updateStreamStatus(feed: string, status: string, message?:
 }
 
 export async function getHolderCandidates(): Promise<HolderCandidate[]> {
+  const activeSince = new Date(Date.now() - 60 * 60_000).toISOString();
   const { data, error } = await db
     .from("launch_board")
     .select("token_address,curve_address,deployer_address,status,launched_at,last_trade_at,holder_snapshot_at")
-    .order("launched_at", { ascending: false })
-    .limit(500);
+    .gte("last_trade_at", activeSince)
+    .order("last_trade_at", { ascending: false })
+    .limit(1000);
   assertOk(error, "load holder candidates");
   return (data ?? []) as HolderCandidate[];
 }
