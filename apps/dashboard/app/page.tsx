@@ -9,6 +9,66 @@ import { TokenImage } from "./token-image";
 export const dynamic = "force-dynamic";
 
 const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
+
+function previewLaunch(overrides: Partial<Launch> & Pick<Launch, "token_address" | "name" | "symbol" | "research_state">): Launch {
+  const now = new Date();
+  return {
+    curve_address: "0x0000000000000000000000000000000000000000",
+    image_url: null,
+    deployer_address: "0x0000000000000000000000000000000000000000",
+    pair_token_address: null,
+    status: "active",
+    launched_at: new Date(now.getTime() - 4 * 60_000).toISOString(),
+    swept_at: null,
+    graduated_at: null,
+    trade_count: 5,
+    buys: 4,
+    sells: 1,
+    unique_traders: 3,
+    net_quote_raw: "0",
+    last_trade_at: now.toISOString(),
+    graduation_threshold_raw: null,
+    progress_pct: null,
+    volume_quote_raw: "0",
+    last_quote_amount_raw: null,
+    last_token_amount_raw: null,
+    peak_multiple: 0.45,
+    drawdown_from_peak_pct: 12,
+    buy_pressure_pct: 58,
+    creator_trades: 0,
+    creator_sells: 0,
+    first_minute_buyers: 2,
+    largest_buy_quote_raw: null,
+    holder_snapshot_at: null,
+    holder_count: null,
+    holder_change_5m: null,
+    largest_holder_pct: null,
+    top_10_holder_pct: 64,
+    top_100_holder_pct: null,
+    creator_balance_pct: 3,
+    price_usd: null,
+    volume_usd: null,
+    market_cap_usd: 18_400,
+    ath_market_cap_usd: null,
+    usd_price_at: now.toISOString(),
+    research_state_at: now.toISOString(),
+    research_rule_version: "design-preview",
+    research_reasons: [],
+    ...overrides,
+  };
+}
+
+function designPreviewLaunches() {
+  return [
+    previewLaunch({ token_address: "preview-sighted-one", name: "Neural Frog", symbol: "NFRG", research_state: "sighted", market_cap_usd: 18_400 }),
+    previewLaunch({ token_address: "preview-sighted-two", name: "Blind Spot", symbol: "BLIND", research_state: "sighted", market_cap_usd: 11_900, trade_count: 2, unique_traders: 2, first_minute_buyers: 1 }),
+    previewLaunch({ token_address: "preview-watch-one", name: "Signal Ghost", symbol: "EYE", research_state: "under_watch", market_cap_usd: 31_700, trade_count: 22, unique_traders: 11, first_minute_buyers: 5, peak_multiple: 1.05, buy_pressure_pct: 64 }),
+    previewLaunch({ token_address: "preview-watch-two", name: "Night Circuit", symbol: "NITE", research_state: "under_watch", market_cap_usd: 26_300, trade_count: 16, unique_traders: 8, first_minute_buyers: 3, peak_multiple: 0.82, buy_pressure_pct: 59, drawdown_from_peak_pct: 24 }),
+    previewLaunch({ token_address: "preview-acquired-one", name: "Open Signal", symbol: "OPEN", research_state: "target_locked", market_cap_usd: 48_600, entry_market_cap_usd: 33_200, position_status: "open" }),
+    previewLaunch({ token_address: "preview-acquired-two", name: "Watchtower", symbol: "WATCH", research_state: "target_locked", market_cap_usd: 72_100, entry_market_cap_usd: 41_800, position_status: "closed" }),
+  ];
+}
+
 function age(value: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return `${seconds}s`;
@@ -42,7 +102,7 @@ function lockLabel(launch: Launch, score: number) {
   return "Scanning";
 }
 
-function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired" }) {
+function TokenCard({ launch, mode, preview = false }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired"; preview?: boolean }) {
   const lockScore = targetLockScore(launch);
   const acquired = mode === "acquired";
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
@@ -53,7 +113,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
       <article className={`launchCard ${acquired ? "isAcquired" : ""}`}>
         <div className="cardTop">
           <div className="tokenImage">
-            <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
+            {preview ? <span className="tokenFallback">{launch.symbol?.slice(0, 1) ?? "?"}</span> : <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />}
           </div>
           <div className="cardContent">
             <div className="cardTitleRow">
@@ -81,14 +141,14 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
           </div>
           <div className="lockFooter">
             <span>{launch.research_state === "target_locked" && !acquired ? "Awaiting execution" : acquired ? (launch.position_status === "closed" ? "Position closed" : "Position live") : "Ponseye monitoring"}</span>
-            {acquired ? <Link href={`/launch/${launch.token_address}`}>View chart <b>↗</b></Link> : <span className="signalPrivate">Signal engine active</span>}
+            {acquired ? (preview ? <span className="chartLink">View chart <b>↗</b></span> : <Link href={`/launch/${launch.token_address}`} className="chartLink">View chart <b>↗</b></Link>) : <span className="signalPrivate">Signal engine active</span>}
           </div>
         </div>
       </article>
   );
 }
 
-function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
+function LaunchLane({ title, count, tone, icon, mode, launches, empty, preview = false }: {
   title: string;
   count: number;
   tone: "new" | "completing" | "completed";
@@ -96,6 +156,7 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
   mode: "sighted" | "surveillance" | "acquired";
   launches: Launch[];
   empty: string;
+  preview?: boolean;
 }) {
   return (
     <section className={`launchLane ${tone}`}>
@@ -104,7 +165,7 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
         <span>{count}</span>
       </header>
       <div className="launchLaneBody">
-        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} />) : (
+        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} preview={preview} />) : (
           <div className="laneEmpty">{empty}</div>
         )}
       </div>
@@ -114,16 +175,18 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
 
 export default async function Home() {
   const { launches, streams, launchCount, researchCounts } = await getDashboardData();
+  const showingPreview = launches.length === 0 && process.env.VERCEL_ENV === "preview";
+  const visibleLaunches = showingPreview ? designPreviewLaunches() : launches;
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
-  const acquired = launches
+  const acquired = visibleLaunches
     .filter((launch) => launch.research_state === "target_locked")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
-  const surveillance = launches
+  const surveillance = visibleLaunches
     .filter((launch) => launch.research_state === "under_watch")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
-  const sightings = launches
+  const sightings = visibleLaunches
     .filter((launch) => launch.research_state === "sighted")
     .sort((a, b) => new Date(b.launched_at).getTime() - new Date(a.launched_at).getTime());
 
@@ -133,7 +196,7 @@ export default async function Home() {
       <header className="header">
         <div className="systemMeta">
           <span>Robinhood Chain</span>
-          <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {recorderLive ? "Recorder live" : "Recorder paused"}</div>
+          <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {showingPreview ? "Design preview" : recorderLive ? "Recorder live" : "Recorder paused"}</div>
         </div>
       </header>
 
@@ -147,16 +210,16 @@ export default async function Home() {
       </section>
 
       <section className="boardSection">
-        {launches.length === 0 ? (
+        {visibleLaunches.length === 0 ? (
           <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
         ) : (
           <div className="launchBoard">
-            <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
-            <LaunchLane title="Surveillance" count={researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
-            <LaunchLane title="Acquired" count={researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" />
+            <LaunchLane title="Sighted" count={showingPreview ? sightings.length : researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" preview={showingPreview} />
+            <LaunchLane title="Surveillance" count={showingPreview ? surveillance.length : researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" preview={showingPreview} />
+            <LaunchLane title="Acquired" count={showingPreview ? acquired.length : researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a position yet" preview={showingPreview} />
           </div>
         )}
-        <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Buys appear after confirmation</span></footer>
+        <footer className="panelFoot"><span>{showingPreview ? "Sample tokens shown for design" : `Ponseye is watching ${launchCount.toLocaleString("en-GB")} launches`}</span><span>{showingPreview ? "Interface preview only" : "Buys appear after confirmation"}</span></footer>
       </section>
     </main>
   );
