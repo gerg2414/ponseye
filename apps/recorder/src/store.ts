@@ -243,7 +243,7 @@ export async function getActiveMarketTokens(): Promise<string[]> {
     .gte("last_trade_at", activeSince)
     .order("last_trade_at", { ascending: false })
     .limit(1000)
-    .abortSignal(AbortSignal.timeout(10_000));
+    .abortSignal(AbortSignal.timeout(30_000));
   assertOk(activeResult.error, "warm active token cache");
 
   const tokens = [...new Set((activeResult.data ?? []).map((launch) => String(launch.token_address).toLowerCase()))]
