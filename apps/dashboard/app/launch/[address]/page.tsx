@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLaunchDetail } from "../../../lib/data";
-import { launchMarket, quoteAsset, quoteValue } from "../../../lib/market";
+import { launchMarket, quoteValue } from "../../../lib/market";
 import { TokenImage } from "../../token-image";
 import { CopyField } from "./copy-field";
 import { PonsEyeChart } from "./ponseye-chart";
@@ -13,10 +13,6 @@ export const metadata: Metadata = {
   title: "Launch Research | PonsEye",
   description: "Recorded PONS launch data and trade evidence.",
 };
-
-function short(value: string) {
-  return `${value.slice(0, 7)}…${value.slice(-5)}`;
-}
 
 function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" }) {
   const paths = {
@@ -53,10 +49,8 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
   const detail = await getLaunchDetail(address.toLowerCase());
   if (!detail) notFound();
 
-  const { launch, trades, marketTrades } = detail;
+  const { launch, marketTrades } = detail;
   const market = launchMarket(launch);
-  const recentTrades = trades.slice(-30).reverse();
-  const marketByHash = new Map(marketTrades.map((trade) => [trade.transaction_hash, trade]));
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
   const percent = (value: number | null, fallback = "Pending data") => value == null ? fallback : `${value.toFixed(1)}%`;
   const holderDelta = launch.holder_change_5m == null
@@ -117,7 +111,13 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
               <div className="progressTrack"><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
             </div>
           </header>
-          <PonsEyeChart trades={marketTrades} tokenAddress={launch.token_address} graduatedAt={launch.graduated_at} />
+          <PonsEyeChart
+            trades={marketTrades}
+            tokenAddress={launch.token_address}
+            graduatedAt={launch.graduated_at}
+            acquiredAt={launch.acquired_at ?? (launch.research_state === "target_locked" ? launch.research_state_at : null)}
+            closedAt={launch.closed_at ?? null}
+          />
         </div>
         <aside className="metricRail">
           <header><span>Token telemetry</span><b><i /> Live</b></header>
@@ -138,25 +138,6 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
         </aside>
       </section>
 
-      <section className="tradeTape detailTradeTape">
-          <header><h2>Latest trades</h2><span>{recentTrades.length} shown</span></header>
-          <div className="tradeRows">
-            {recentTrades.length ? recentTrades.map((trade) => {
-              const asset = quoteAsset(launch.pair_token_address);
-              const quoteAmount = Number(trade.quote_amount_raw) / 10 ** asset.decimals;
-              const dollarTrade = marketByHash.get(trade.transaction_hash);
-              const dollarAmount = dollarTrade?.quote_amount_usd ?? dollarTrade?.base_amount_usd;
-              return (
-                <div className="tradeRow" key={trade.event_id}>
-                  <b className={trade.side}>{trade.side}</b>
-                  <span>{dollarAmount ? quoteValue(dollarAmount, "USDG") : quoteValue(quoteAmount, asset.symbol)}</span>
-                  <span>{trade.trader_address ? short(trade.trader_address) : "Unknown wallet"}</span>
-                  <time>{new Date(trade.block_time).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" })}</time>
-                </div>
-              );
-            }) : <div className="chartEmpty">No trades recorded yet</div>}
-          </div>
-      </section>
     </main>
   );
 }
