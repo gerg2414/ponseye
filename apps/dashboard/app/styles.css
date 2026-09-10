@@ -30,9 +30,9 @@ main { width: 100%; margin: 0; padding: 0 22px 72px; }
 .recorder.live { color: var(--green); }
 .recorder.live i, .panelStatus i { background: var(--green); box-shadow: 0 0 10px rgba(154,255,79,.75); }
 .hero { min-height: 450px; padding: 36px 24px 48px 0; display: grid; grid-template-columns: 1.35fr .65fr; gap: 70px; align-items: center; }
-.heroBrand { display: flex; align-items: center; gap: 20px; margin: 0 0 28px; }
-.heroRobot { display: block; width: 148px; height: 148px; object-fit: contain; image-rendering: pixelated; }
-.heroWordmark { display: block; width: min(440px,calc(100% - 168px)); height: auto; image-rendering: pixelated; }
+.heroBrand { display: flex; align-items: center; gap: 0; margin: 0 0 28px; }
+.heroRobot { display: block; width: 190px; height: 190px; object-fit: contain; image-rendering: pixelated; }
+.heroWordmark { display: block; width: min(520px,calc(100% - 156px)); height: auto; margin-left: -34px; image-rendering: pixelated; }
 .eyebrow { color: #8c92a2; letter-spacing: .13em; font-size: 10px; font-weight: 700; text-transform: uppercase; margin: 0 0 18px; }
 .eyebrow span { color: var(--purple); margin-right: 12px; }
 h1 { color: var(--white); font-family: Arial, sans-serif; font-size: clamp(42px, 6vw, 78px); line-height: .96; letter-spacing: -.065em; margin: 0; max-width: 850px; }
@@ -153,9 +153,9 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   .brandLogo { width: 220px; }
   .systemMeta > span { display: none; }
   .hero { min-height: auto; padding: 30px 0 42px; }
-  .heroBrand { gap: 10px; margin-bottom: 22px; }
-  .heroRobot { width: 92px; height: 92px; }
-  .heroWordmark { width: min(240px,calc(100% - 102px)); }
+  .heroBrand { gap: 0; margin-bottom: 22px; }
+  .heroRobot { width: 115px; height: 115px; }
+  .heroWordmark { width: min(255px,calc(100% - 95px)); margin-left: -20px; }
   h1 { font-size: clamp(39px,12vw,58px); }
   .lede { font-size: 14px; }
   .stats article { min-height: 96px; padding: 14px; gap: 9px; }
