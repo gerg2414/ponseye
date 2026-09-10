@@ -64,6 +64,11 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
   const holderDelta = launch.holder_change_5m == null
     ? "First snapshot due"
     : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
+  const bondingTone = launch.status === "graduated"
+    ? "completed"
+    : launch.status === "swept" || (launch.progress_pct ?? 0) >= 10
+      ? "completing"
+      : "new";
 
   return (
     <main className="launchPage">
@@ -94,7 +99,6 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
               ) : null}
             </div>
             {launch.description ? <p className="tokenDescription">{launch.description}</p> : null}
-            <div className="titleBonding"><i style={{ width: `${launch.progress_pct ?? 0}%` }} /><span>{launch.progress_pct?.toFixed(1) ?? "0.0"}% bonded</span></div>
           </div>
         </div>
         <aside className="launchMeta">
@@ -111,7 +115,10 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
         <div className="chartPanel">
           <header>
             <div><small>Live market cap</small><strong>{usd(launch.market_cap_usd)}</strong></div>
-            <span>{marketTrades.length ? `${new Date(marketTrades[0].block_time).toLocaleDateString("en-GB")} to ${new Date(marketTrades.at(-1)?.block_time ?? marketTrades[0].block_time).toLocaleDateString("en-GB")}` : "Waiting for dollar priced trade"}</span>
+            <div className={`marketBonding ${bondingTone}`}>
+              <div><small>Bonding progress</small><strong>{launch.progress_pct == null ? "Awaiting threshold" : `${launch.progress_pct.toFixed(1)}%`}</strong></div>
+              <div className="progressTrack"><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
+            </div>
           </header>
           <PonsEyeChart trades={marketTrades} />
         </div>
