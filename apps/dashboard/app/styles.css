@@ -119,7 +119,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .status.graduated i { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .panelFoot { padding: 14px 18px; display: flex; justify-content: space-between; color: #555b68; background: #0a0c0f; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
 .pixelMenu { position: relative; z-index: 110; align-self: flex-start; margin-top: 9px; }
-.pixelMenu > summary { position: relative; width: 50px; height: 46px; padding: 11px 10px; display: grid; align-content: space-between; justify-items: end; border: 1px solid #4a3b61; color: #c39aff; background: linear-gradient(135deg,rgba(165,108,255,.12),transparent 58%),#0b0e13; cursor: pointer; list-style: none; clip-path: polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px); box-shadow: inset 0 0 0 1px rgba(165,108,255,.05),0 8px 22px rgba(0,0,0,.28); }
+.pixelMenu > summary { position: relative; width: 50px; height: 46px; padding: 11px 10px; display: grid; align-content: space-between; justify-items: end; border: 1px solid #4a3b61; border-radius: 10px; color: #c39aff; background: linear-gradient(135deg,rgba(165,108,255,.12),transparent 58%),#0b0e13; cursor: pointer; list-style: none; box-shadow: inset 0 0 0 1px rgba(165,108,255,.05),0 8px 22px rgba(0,0,0,.28); }
 .pixelMenu > summary::-webkit-details-marker { display: none; }
 .pixelMenu > summary::before,.pixelMenu > summary::after { content: ""; position: absolute; width: 4px; height: 4px; background: var(--purple); }
 .pixelMenu > summary::before { top: 5px; left: 5px; }
