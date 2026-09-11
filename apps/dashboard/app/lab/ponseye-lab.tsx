@@ -806,9 +806,9 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       <section className="labOutput">
         <div className="labSummaryGrid">
           <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
-          <article><small>{exitSettings.runnerTarget}x peak reached</small><strong>{analysis.hits.length}</strong><span>before applying the stop</span></article>
-          <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>including stalled tokens</span></article>
-          <article><small>Missed runners</small><strong>{analysis.misses.length}</strong><span>rejected by this model</span></article>
+          <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>{analysis.hits.length} reached {exitSettings.runnerTarget}x</span></article>
+          <article className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}><small>Simulated result</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{analysis.replayable.length} replayed positions</span></article>
+          <article className={analysis.simulatedRoi >= 0 ? "positive" : "negative"}><small>ROI</small><strong>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}%</strong><span>on {formatUsd(analysis.capitalTested)} tested</span></article>
           <article><small>Under 1.2x</small><strong>{analysis.falsePositives.length}</strong><span>selected but stalled</span></article>
           <article><small>Graduated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
         </div>
