@@ -1349,3 +1349,78 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
     max-height: 68vh;
   }
 }
+
+
+/* Position identity and external token links */
+.positionResources {
+  margin-top: 13px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.positionContract {
+  height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #303640;
+  background: #0d1015;
+}
+.positionContract > span {
+  color: var(--green);
+  font-family: "SFMono-Regular",Consolas,monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+.positionContract .copyField {
+  width: auto;
+  max-width: min(34vw,390px);
+  gap: 7px;
+}
+.positionContract .copyField > span {
+  overflow: hidden;
+  color: #b7bdc6;
+  font-family: "SFMono-Regular",Consolas,monospace;
+  font-size: 9px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.positionContract .copyField > i { width: 15px; height: 15px; color: #7e8794; }
+.positionContract .copyField > b { display: none; }
+.positionContract .copyField:focus-visible { outline-color: #626b78; }
+.positionLinks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.positionLinks a {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #8f98a5;
+  background: #11151a;
+  clip-path: polygon(4px 0,calc(100% - 4px) 0,calc(100% - 4px) 2px,100% 2px,100% calc(100% - 4px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) 100%,4px 100%,4px calc(100% - 2px),0 calc(100% - 2px),0 4px,2px 4px,2px 2px,4px 2px);
+  box-shadow: inset 0 0 0 1px #303640;
+}
+.positionLinks a:hover,.positionLinks a:focus-visible {
+  color: #0a0d10;
+  background: var(--green);
+  box-shadow: none;
+  outline: none;
+}
+.positionLinks svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.labDrawer.exit > summary { grid-template-columns: minmax(0,1fr) auto; }
+
+@media (max-width: 760px) {
+  .positionResources { align-items: flex-start; flex-direction: column; }
+  .positionContract { width: min(100%,460px); }
+  .positionContract .copyField { max-width: calc(100% - 28px); }
+}
