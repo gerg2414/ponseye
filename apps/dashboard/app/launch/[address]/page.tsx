@@ -137,7 +137,7 @@ export default async function LaunchPage({ params, searchParams }: {
   if (!detail) notFound();
 
   const { launch, marketTrades, chartCandles, bondPriceUsd } = detail;
-  const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
+  const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "No price yet";
   const requestedEntryAt = query.entry && Number.isFinite(Date.parse(query.entry)) ? query.entry : null;
   const requestedEntryMarketCap = query.entryMc && Number(query.entryMc) > 0 ? Number(query.entryMc) : null;
   const entryMarketCap = requestedEntryMarketCap ?? launch.entry_market_cap_usd ?? null;
@@ -146,6 +146,7 @@ export default async function LaunchPage({ params, searchParams }: {
   const gainMultiple = entryMarketCap && currentMarketCap ? currentMarketCap / entryMarketCap : null;
   const peakMultiple = entryMarketCap && launch.ath_market_cap_usd ? launch.ath_market_cap_usd / entryMarketCap : null;
   const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
+  const acquired = Boolean(entryAt && entryMarketCap && entryMarketCap > 0);
   const gainTone = gainMultiple != null && gainMultiple < 1 ? "negative" : "positive";
   const websiteUrl = safeExternalUrl(launch.website_url);
   const xUrl = safeExternalUrl(launch.twitter_url);
@@ -163,7 +164,7 @@ export default async function LaunchPage({ params, searchParams }: {
     <main className="launchPage positionPage">
       <header className="launchNav">
         <Link href="/" className="backLink"><span>←</span> Back to signals</Link>
-        <div className={`positionNavStatus ${closed ? "closed" : "live"}`}><i /> {closed ? "Position closed" : "Position live"}</div>
+        <div className={`positionNavStatus ${closed ? "closed" : acquired ? "live" : "watching"}`}><i /> {closed ? "Position closed" : acquired ? "Position live" : "Tracked token"}</div>
       </header>
 
       <section className="positionHero">
@@ -172,8 +173,8 @@ export default async function LaunchPage({ params, searchParams }: {
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={92} priority />
           </div>
           <div className="launchIdentityCopy">
-            <span className="positionEyebrow">PonsEye acquired</span>
-            <h1>{launch.name ?? "Metadata pending"}</h1>
+            <span className="positionEyebrow">{acquired ? "PonsEye acquired" : "PonsEye tracked"}</span>
+            <h1>{launch.name ?? "Unnamed token"}</h1>
             <div className="tokenSubline">
               <span>{launch.symbol ? `${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
               <b>◈</b>
@@ -194,28 +195,43 @@ export default async function LaunchPage({ params, searchParams }: {
             </div>
           </div>
         </div>
-        <aside className={`positionMultiple ${gainTone}`}>
-          <span>{closed ? "Final return" : "Current return"}</span>
-          <strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong>
-          <small>{closed ? "Position banked" : "Ponseye is still holding"}</small>
-        </aside>
+        {acquired ? (
+          <aside className={`positionMultiple ${gainTone}`}>
+            <span>{closed ? "Final return" : "Current return"}</span>
+            <strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "No return yet"}</strong>
+            <small>{closed ? "Position banked" : "Ponseye is still holding"}</small>
+          </aside>
+        ) : (
+          <aside className="positionMultiple">
+            <span>Peak market cap</span>
+            <strong>{usd(launch.ath_market_cap_usd)}</strong>
+            <small>Observed by PonsEye</small>
+          </aside>
+        )}
       </section>
 
       <section className="positionStats">
-        <article><span>Entry MC</span><strong>{usd(entryMarketCap)}</strong></article>
-        <article><span>{closed ? "Exit MC" : "Current MC"}</span><strong>{usd(currentMarketCap)}</strong></article>
-        <article className={gainTone}><span>{closed ? "Banked" : "Gains"}</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></article>
-        <article><span>Peak MC</span><strong>{usd(launch.ath_market_cap_usd)}</strong><small>{peakMultiple ? `${peakMultiple.toFixed(2)}x from entry` : "Peak multiple pending"}</small></article>
+        {acquired ? <>
+          <article><span>Entry MC</span><strong>{usd(entryMarketCap)}</strong></article>
+          <article><span>{closed ? "Exit MC" : "Current MC"}</span><strong>{usd(currentMarketCap)}</strong></article>
+          <article className={gainTone}><span>{closed ? "Banked" : "Gains"}</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "No return yet"}</strong></article>
+          <article><span>Peak MC</span><strong>{usd(launch.ath_market_cap_usd)}</strong><small>{peakMultiple ? `${peakMultiple.toFixed(2)}x from entry` : "Peak tracking"}</small></article>
+        </> : <>
+          <article><span>Current MC</span><strong>{usd(currentMarketCap)}</strong></article>
+          <article><span>Peak MC</span><strong>{usd(launch.ath_market_cap_usd)}</strong></article>
+          <article><span>Trades</span><strong>{launch.trade_count.toLocaleString("en-GB")}</strong></article>
+          <article><span>Holders</span><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Not recorded"}</strong></article>
+        </>}
       </section>
 
       <section className="positionChartPanel">
         <header>
           <div>
-            <span className="positionChartKicker">PonsEye position tracker</span>
+            <span className="positionChartKicker">{acquired ? "PonsEye position tracker" : "PonsEye market tracker"}</span>
             <strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"} / Market cap</strong>
           </div>
           <div className="positionLegend" aria-label="Position chart markers">
-            <span className="buy"><i>↑</i> Ponseye buy</span>
+            {acquired ? <span className="buy"><i>↑</i> Ponseye buy</span> : null}
             {closed ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> Tracking live</span>}
           </div>
         </header>
