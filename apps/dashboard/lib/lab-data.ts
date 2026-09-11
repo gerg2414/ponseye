@@ -33,6 +33,7 @@ export type LabToken = {
   future_low_multiple: number | null;
   final_multiple: number | null;
   pre_target_low_multiples: Record<string, number | null>;
+  post_2x_pre_target_low_multiples: Record<string, number | null>;
 };
 
 function numberOrNull(value: unknown) {
@@ -86,12 +87,13 @@ async function loadPonsEyeLabData(): Promise<LabToken[]> {
     future_low_multiple: numberOrNull(token.future_low_multiple),
     final_multiple: numberOrNull(token.final_multiple),
     pre_target_low_multiples: numericRecord(token.pre_target_low_multiples),
+    post_2x_pre_target_low_multiples: numericRecord(token.post_2x_pre_target_low_multiples),
   })) as LabToken[];
 }
 
 const getCachedPonsEyeLabData = unstable_cache(
   loadPonsEyeLabData,
-  ["ponseye-lab-dataset-v3"],
+  ["ponseye-lab-dataset-v4"],
   { revalidate: 600 },
 );
 

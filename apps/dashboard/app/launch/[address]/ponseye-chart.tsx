@@ -91,23 +91,36 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, bondPriceUsd }: {
+export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, bondPriceUsd, acquiredAt, closedAt, entryMarketCap }: {
   trades: MarketTrade[];
   candles: ChartCandle[];
   tokenAddress: string;
   graduatedAt: string | null;
   bondPriceUsd: number | null;
+  acquiredAt: string | null;
+  closedAt: string | null;
+  entryMarketCap: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const entryMarkerRef = useRef<HTMLDivElement>(null);
+  const exitMarkerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const bondLineRef = useRef<IPriceLine | null>(null);
+  const entryLineRef = useRef<IPriceLine | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
   const latestTradeAtRef = useRef<string | null>(trades.at(-1)?.block_time ?? null);
   const pollingRef = useRef(false);
   const [liveTrades, setLiveTrades] = useState(trades);
   const [interval, setInterval] = useState(60_000);
   const candles = useMemo(() => buildCandles(seedCandles, liveTrades, interval), [interval, liveTrades, seedCandles]);
+  const nearestCandle = (value: string | null) => {
+    if (!value || !candles.length) return null;
+    const target = new Date(value).getTime() / 1_000;
+    return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
+  };
+  const entryCandle = useMemo(() => nearestCandle(acquiredAt), [acquiredAt, candles]);
+  const exitCandle = useMemo(() => nearestCandle(closedAt), [candles, closedAt]);
   const bondMarketCap = useMemo(() => {
     if (bondPriceUsd && bondPriceUsd > 0) return bondPriceUsd * 1_000_000_000;
     if (!graduatedAt) return null;
@@ -130,6 +143,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
   }, [liveTrades]);
 
   useEffect(() => {
+    if (tokenAddress.startsWith("preview-")) return;
     const controller = new AbortController();
 
     async function poll() {
@@ -254,6 +268,49 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
   }, [candles, interval]);
 
   useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+    const container = containerRef.current;
+    const entryMarker = entryMarkerRef.current;
+    const exitMarker = exitMarkerRef.current;
+    if (!chart || !series || !container) {
+      if (entryMarker) entryMarker.hidden = true;
+      if (exitMarker) exitMarker.hidden = true;
+      return;
+    }
+
+    const updateMarker = () => {
+      const position = (marker: HTMLDivElement | null, candle: CandlestickData<UTCTimestamp> | null, price: "low" | "high") => {
+        if (!marker || !candle) {
+          if (marker) marker.hidden = true;
+          return;
+        }
+        const x = chart.timeScale().timeToCoordinate(candle.time);
+        const y = series.priceToCoordinate(candle[price]);
+        if (x == null || y == null) {
+          marker.hidden = true;
+          return;
+        }
+        marker.hidden = false;
+        marker.style.left = `${x}px`;
+        marker.style.top = `${container.offsetTop + y}px`;
+      };
+      position(entryMarker, entryCandle, "low");
+      position(exitMarker, exitCandle, "high");
+    };
+
+    const frame = window.requestAnimationFrame(updateMarker);
+    const resizeObserver = new ResizeObserver(updateMarker);
+    resizeObserver.observe(container);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(updateMarker);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateMarker);
+    };
+  }, [entryCandle, exitCandle]);
+
+  useEffect(() => {
     const series = seriesRef.current;
     if (!series) return;
     if (bondLineRef.current) {
@@ -271,6 +328,25 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
       });
     }
   }, [bondMarketCap]);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    if (entryLineRef.current) {
+      series.removePriceLine(entryLineRef.current);
+      entryLineRef.current = null;
+    }
+    if (entryMarketCap) {
+      entryLineRef.current = series.createPriceLine({
+        price: entryMarketCap,
+        color: "#a56cff",
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "ENTRY 1.00X",
+      });
+    }
+  }, [entryMarketCap]);
 
   return (
     <div className="tvChartShell">
@@ -293,6 +369,20 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
         <b><i /> LIVE</b>
       </div>
       <div ref={containerRef} className="priceChart tradingViewCanvas" aria-label="TradingView Lightweight Chart showing PonsEye dollar market cap" />
+      <div ref={entryMarkerRef} className="chartEntryMarker" hidden>
+        <span className="chartEntryChevron">⌃</span>
+        <div className="chartEntryBadge">
+          <img src="/ponseye-acquired-icon.svg" alt="" />
+          <strong>PONSEYE BUY</strong>
+        </div>
+      </div>
+      <div ref={exitMarkerRef} className="chartEntryMarker chartExitMarker" hidden>
+        <div className="chartEntryBadge">
+          <span className="chartSoldIcon" aria-hidden="true">×</span>
+          <strong>PONSEYE SELL</strong>
+        </div>
+        <span className="chartEntryChevron">⌄</span>
+      </div>
       {!candles.length ? <div className="chartEmpty chartEmptyOverlay"><span>PRICE FEED</span>Waiting for the first dollar priced trade</div> : null}
     </div>
   );

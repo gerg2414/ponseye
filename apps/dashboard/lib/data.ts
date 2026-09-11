@@ -68,6 +68,10 @@ export type LaunchRecord = Launch & {
   telegram_url: string | null;
   discord_url: string | null;
   website_url: string | null;
+  acquired_at?: string | null;
+  closed_at?: string | null;
+  entry_market_cap_usd?: number | null;
+  position_status?: "open" | "closed" | null;
 };
 
 export type MarketTrade = {

@@ -31,6 +31,8 @@ type LabSettings = {
 
 type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x";
 type ControlTab = "models" | "rules" | "gates";
+type WorkspaceTab = "entry" | "exit";
+type ExitModel = "fixed" | "nostop" | "breakeven" | "initials";
 type SavedModel = { name: string; settings: LabSettings };
 
 type ScoredToken = LabToken & {
@@ -404,6 +406,8 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.balanced));
   const [activePreset, setActivePreset] = useState<PresetName | "custom">("balanced");
   const [controlTab, setControlTab] = useState<ControlTab>("models");
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("entry");
+  const [exitModel, setExitModel] = useState<ExitModel>("fixed");
   const [savedModels, setSavedModels] = useState<SavedModel[]>([]);
   const [modelName, setModelName] = useState("");
   const [storageReady, setStorageReady] = useState(false);
@@ -447,11 +451,39 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     const replayable = selected.filter((token) => token.future_peak_multiple != null && token.final_multiple != null);
     const stopMultiple = 1 - settings.stopLossPct / 100;
     const strategyOutcomes = replayable.map((token) => {
-      const lowBeforeTarget = token.pre_target_low_multiples[String(settings.runnerTarget)];
-      const stopped = lowBeforeTarget != null && lowBeforeTarget <= stopMultiple;
-      const targetReached = (token.future_peak_multiple ?? 0) >= settings.runnerTarget;
-      const exitMultiple = stopped ? stopMultiple : targetReached ? settings.runnerTarget : Math.max(0, token.final_multiple ?? 0);
-      return { token, stopped, targetReached: targetReached && !stopped, openAtEnd: !stopped && !targetReached, exitMultiple };
+      const target = settings.runnerTarget;
+      const lowBeforeTarget = token.pre_target_low_multiples[String(target)];
+      const lowBeforeTwo = token.pre_target_low_multiples["2"];
+      const targetReachedRaw = (token.future_peak_multiple ?? 0) >= target;
+      const twoReachedBeforeStop = (token.future_peak_multiple ?? 0) >= 2
+        && (exitModel === "nostop" || lowBeforeTwo == null || lowBeforeTwo > stopMultiple);
+      const stoppedBeforeTarget = exitModel !== "nostop"
+        && lowBeforeTarget != null
+        && lowBeforeTarget <= stopMultiple;
+
+      if (exitModel === "initials" && twoReachedBeforeStop) {
+        const runnerValue = Math.max(0, token.final_multiple ?? 0);
+        return {
+          token,
+          stopped: false,
+          targetReached: true,
+          openAtEnd: true,
+          exitMultiple: 1 + runnerValue / 2,
+        };
+      }
+
+      if (exitModel === "breakeven" && twoReachedBeforeStop && target > 2) {
+        const lowAfterTwoBeforeTarget = token.post_2x_pre_target_low_multiples[String(target)];
+        const breakevenHit = lowAfterTwoBeforeTarget != null && lowAfterTwoBeforeTarget <= 1;
+        if (breakevenHit) {
+          return { token, stopped: true, targetReached: false, openAtEnd: false, exitMultiple: 1 };
+        }
+      }
+
+      const stopped = stoppedBeforeTarget;
+      const targetReached = targetReachedRaw && !stopped;
+      const exitMultiple = stopped ? stopMultiple : targetReached ? target : Math.max(0, token.final_multiple ?? 0);
+      return { token, stopped, targetReached, openAtEnd: !stopped && !targetReached, exitMultiple };
     });
     const stopHits = strategyOutcomes.filter((outcome) => outcome.stopped).length;
     const targetExits = strategyOutcomes.filter((outcome) => outcome.targetReached).length;
@@ -478,7 +510,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       total: scored.filter((token) => (token.future_peak_multiple ?? 0) >= target).length,
     }));
     return { selected, hits, misses, falsePositives, graduated, replayable, stopHits, targetExits, openAtEnd, capitalTested, simulatedEndValue, simulatedPnl, simulatedRoi, orderedSignals, orderedMisses, bands, runnerLadder };
-  }, [tokens, settings]);
+  }, [tokens, settings, exitModel]);
 
   function choosePreset(name: PresetName) {
     setSettings(cloneSettings(presets[name]));
@@ -520,7 +552,19 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const visibleResults = resultView === "signals" ? analysis.orderedSignals : analysis.orderedMisses;
 
   return (
-    <div className="labWorkspace">
+    <>
+      <nav className="labModeTabs" aria-label="PonsEye Lab model type">
+        <button type="button" className={workspaceTab === "entry" ? "active" : ""} onClick={() => setWorkspaceTab("entry")}>
+          <small>Signal selection</small>
+          <strong>Entry Models</strong>
+        </button>
+        <button type="button" className={workspaceTab === "exit" ? "active" : ""} onClick={() => setWorkspaceTab("exit")}>
+          <small>Position management</small>
+          <strong>Exit Models</strong>
+        </button>
+      </nav>
+      <div className={`labWorkspace ${workspaceTab === "exit" ? "exitMode" : ""}`}>
+      {workspaceTab === "entry" && (
       <aside className="labControls">
         <header>
           <div><small>Signal model</small><h2>{activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label}</h2></div>
@@ -599,10 +643,18 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </section>
         )}
       </aside>
+      )}
 
       <section className="labOutput">
+        {workspaceTab === "exit" && (
         <section className="labStrategyPanel">
-          <header><div><small>Trade replay</small><h2>Test the entry and exit</h2></div><span>From the Surveillance price</span></header>
+          <header><div><small>Trade replay</small><h2>Test the exit</h2></div><span>Using the selected Entry Model</span></header>
+          <nav className="labExitModels" aria-label="Exit model">
+            <button type="button" className={exitModel === "fixed" ? "active" : ""} onClick={() => setExitModel("fixed")}><strong>Fixed target</strong><small>Stop first, then sell everything at target</small></button>
+            <button type="button" className={exitModel === "nostop" ? "active" : ""} onClick={() => setExitModel("nostop")}><strong>No initial stop</strong><small>Hold until target or the recorded end price</small></button>
+            <button type="button" className={exitModel === "breakeven" ? "active" : ""} onClick={() => setExitModel("breakeven")}><strong>Break even at 2x</strong><small>Move the stop to entry after price reaches 2x</small></button>
+            <button type="button" className={exitModel === "initials" ? "active" : ""} onClick={() => setExitModel("initials")}><strong>Initials at 2x</strong><small>Sell half at 2x and leave the rest running</small></button>
+          </nav>
           <div className="labStrategyControls">
             <div className="target">
               <label>Take profit</label>
@@ -610,9 +662,9 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               <div>{runnerOptions.map((target) => <button type="button" className={settings.runnerTarget === target ? "active" : ""} key={target} onClick={() => { setSettings({ ...settings, runnerTarget: target }); setActivePreset("custom"); }}>{target}x</button>)}</div>
             </div>
             <div className="stop">
-              <label htmlFor="stopLoss">Stop loss</label>
-              <strong>−{settings.stopLossPct}%</strong>
-              <input id="stopLoss" aria-label="Stop loss percentage" type="range" min="10" max="90" step="5" value={settings.stopLossPct} onChange={(event) => { setSettings({ ...settings, stopLossPct: Number(event.target.value) }); setActivePreset("custom"); }} />
+              <label htmlFor="stopLoss">Initial stop loss</label>
+              <strong>{exitModel === "nostop" ? "OFF" : `−${settings.stopLossPct}%`}</strong>
+              <input id="stopLoss" aria-label="Stop loss percentage" type="range" min="10" max="90" step="5" value={settings.stopLossPct} disabled={exitModel === "nostop"} onChange={(event) => { setSettings({ ...settings, stopLossPct: Number(event.target.value) }); setActivePreset("custom"); }} />
             </div>
             <label className="stake">
               <span>Position size</span>
@@ -627,6 +679,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
             <article className="unknown"><small>No replay data</small><strong>{analysis.selected.length - analysis.replayable.length}</strong><span>excluded from money result</span></article>
           </div>
         </section>
+        )}
 
         <div className="labSummaryGrid">
           <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
@@ -655,13 +708,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         </section>
 
         <section className="labMoneyPanel">
-          <header><div><small>Strategy result</small><h2>{formatUsd(settings.positionSizeUsd)} per acquired token</h2></div><span>{settings.runnerTarget}x target · {settings.stopLossPct}% stop</span></header>
+          <header><div><small>Strategy result</small><h2>{formatUsd(settings.positionSizeUsd)} per acquired token</h2></div><span>{exitModel === "initials" ? "Initials at 2x · runner held" : exitModel === "breakeven" ? `${settings.runnerTarget}x target · break even after 2x` : exitModel === "nostop" ? `${settings.runnerTarget}x target · no stop` : `${settings.runnerTarget}x target · ${settings.stopLossPct}% stop`}</span></header>
           <div className="labMoneyGrid">
             <article><small>Capital tested</small><strong>{formatUsd(analysis.capitalTested)}</strong><span>{analysis.replayable.length} replayed positions</span></article>
             <article><small>End value</small><strong>{formatUsd(analysis.simulatedEndValue)}</strong><span>Targets, stops and open positions</span></article>
             <article className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}><small>Strategy P&amp;L</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% return</span></article>
           </div>
-          <p>Each position exits when the stop or take profit is reached first. Positions hitting neither are valued at their final recorded price. Figures exclude fees and slippage.</p>
+          <p>{exitModel === "initials" ? "Half the tokens are sold at 2x to recover the initial stake. The remaining half is valued at the final recorded price." : exitModel === "breakeven" ? "The initial stop applies until 2x. After 2x, the stop moves to the entry price while the selected target remains active." : exitModel === "nostop" ? "Positions are held until the selected target or valued at the final recorded price when the target is not reached." : "Each position exits when the stop or take profit is reached first. Positions hitting neither are valued at their final recorded price."} Figures exclude fees and slippage.</p>
         </section>
 
         <section className="labBreakdown">
@@ -693,6 +746,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <span>Rules use only metrics recorded when each token first reached Surveillance. Curve and migrated pool prices are joined in USD. Tokens without a safe USD match fall back to curve performance. Holder rules are ignored when no holder snapshot existed at signal time.</span>
         </footer>
       </section>
-    </div>
+      </div>
+    </>
   );
 }

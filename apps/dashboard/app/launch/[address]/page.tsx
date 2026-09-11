@@ -1,167 +1,185 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLaunchDetail } from "../../../lib/data";
-import { launchMarket, quoteAsset, quoteValue } from "../../../lib/market";
+import { getLaunchDetail, type LaunchRecord, type MarketTrade } from "../../../lib/data";
+import { quoteValue } from "../../../lib/market";
 import { TokenImage } from "../../token-image";
-import { CopyField } from "./copy-field";
 import { PonsEyeChart } from "./ponseye-chart";
 
 export const revalidate = 5;
 
 export const metadata: Metadata = {
-  title: "Launch Research | PonsEye",
-  description: "Recorded PONS launch data and trade evidence.",
+  title: "Position Tracker | PonsEye",
+  description: "Follow PonsEye's autonomous position from entry to exit.",
 };
 
-function short(value: string) {
-  return `${value.slice(0, 7)}…${value.slice(-5)}`;
-}
+const previewPositions = {
+  "preview-acquired-one": { name: "Open Signal", symbol: "OPEN", entry: 33_200, current: 48_600, closed: false },
+  "preview-acquired-two": { name: "Watchtower", symbol: "WATCH", entry: 41_800, current: 72_100, closed: true },
+} as const;
 
-function progressTone(value: number | null) {
-  if ((value ?? 0) >= 75) return "progressHigh";
-  if ((value ?? 0) >= 30) return "progressMid";
-  return "progressLow";
-}
+function previewLaunchDetail(address: keyof typeof previewPositions) {
+  const position = previewPositions[address];
+  const end = Date.now();
+  const start = end - 74 * 60_000;
+  const acquiredAt = new Date(start + 22 * 60_000).toISOString();
+  const closedAt = position.closed ? new Date(start + 62 * 60_000).toISOString() : null;
+  const marketTrades: MarketTrade[] = Array.from({ length: 75 }, (_, index) => {
+    const progress = index / 74;
+    const base = 17_800 + (position.current - 17_800) * progress;
+    const pulse = Math.sin(index * 0.72) * 2_600 + Math.sin(index * 0.19) * 1_400;
+    const lateMove = position.closed && index > 62 ? -(index - 62) * 320 : 0;
+    const marketCap = Math.max(12_000, base + pulse + lateMove);
+    return {
+      market_event_id: `preview-${index}`,
+      transaction_hash: `0x${index.toString(16).padStart(64, "0")}`,
+      block_time: new Date(start + index * 60_000).toISOString(),
+      side: index % 4 === 0 ? "sell" : "buy",
+      trader_address: null,
+      price_usd: marketCap / 1_000_000_000,
+      base_amount_usd: 250 + index * 11,
+      quote_amount_usd: 250 + index * 11,
+      protocol: "pons_v2",
+    };
+  });
 
-function PixelIcon({ type }: { type: "contract" | "curve" | "wallet" | "clock" | "cap" | "peak" | "drop" | "volume" | "holders" | "traders" | "buy" | "creator" }) {
-  const paths = {
-    contract: "M3 2h8l4 4v10H3zM11 2v4h4M6 10h6M6 13h4",
-    curve: "M2 14h3V9h3V6h3V3h4M12 3h3v3",
-    wallet: "M2 5h13v10H2zM4 5V3h9v2M11 9h4v3h-4z",
-    clock: "M9 2a7 7 0 1 0 0 14A7 7 0 0 0 9 2zM9 5v4l3 2",
-    cap: "M2 15V9l4-4 3 3 6-6M11 2h4v4",
-    peak: "M2 14l4-8 3 4 3-7 4 11",
-    drop: "M3 4l5 6 3-4 4 6M12 12h3V9",
-    volume: "M3 15V9h3v6M8 15V4h3v11M13 15V7h3v8",
-    holders: "M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM1 16c0-4 2-6 5-6s5 2 5 6M13 4a2 2 0 1 1 0 4M12 11c3 0 4 2 4 5",
-    traders: "M2 5h12M10 2l4 3-4 3M16 13H4M8 10l-4 3 4 3",
-    buy: "M9 16V3M4 8l5-5 5 5",
-    creator: "M9 2l2 4 4 1-3 3 1 5-4-2-4 2 1-5-3-3 4-1z",
+  const launch: LaunchRecord = {
+    token_address: address,
+    curve_address: "0x8e5d2dff0e240f331933c8a839e2df2d65d01ec4",
+    name: position.name,
+    symbol: position.symbol,
+    image_url: null,
+    deployer_address: "0x45d416dce3b69353fdbbdc9ebfc6e03194083c11",
+    pair_token_address: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    status: position.closed ? "closed" : "active",
+    launched_at: new Date(start).toISOString(),
+    swept_at: null,
+    graduated_at: null,
+    trade_count: 184,
+    buys: 132,
+    sells: 52,
+    unique_traders: 68,
+    net_quote_raw: "0",
+    last_trade_at: new Date(end).toISOString(),
+    graduation_threshold_raw: null,
+    progress_pct: 100,
+    volume_quote_raw: "0",
+    last_quote_amount_raw: null,
+    last_token_amount_raw: null,
+    peak_multiple: position.current / position.entry,
+    drawdown_from_peak_pct: position.closed ? 8.4 : 3.1,
+    buy_pressure_pct: 71.7,
+    creator_trades: 0,
+    creator_sells: 0,
+    first_minute_buyers: 14,
+    largest_buy_quote_raw: null,
+    holder_snapshot_at: new Date(end).toISOString(),
+    holder_count: 347,
+    holder_change_5m: 18,
+    largest_holder_pct: 8.1,
+    top_10_holder_pct: 42.6,
+    top_100_holder_pct: 78.4,
+    creator_balance_pct: 0,
+    price_usd: position.current / 1_000_000_000,
+    volume_usd: 186_400,
+    market_cap_usd: position.current,
+    ath_market_cap_usd: position.current * 1.08,
+    usd_price_at: new Date(end).toISOString(),
+    research_state: "target_locked",
+    research_state_at: acquiredAt,
+    research_rule_version: "design-preview",
+    research_reasons: [],
+    acquired_at: acquiredAt,
+    closed_at: closedAt,
+    entry_market_cap_usd: position.entry,
+    position_status: position.closed ? "closed" : "open",
+    description: "A sample PonsEye position showing the autonomous entry and position lifecycle on the market cap chart.",
+    twitter_url: null,
+    telegram_url: null,
+    discord_url: null,
+    website_url: null,
   };
-  return <svg className="pixelIcon" viewBox="0 0 18 18" aria-hidden="true"><path d={paths[type]} /></svg>;
-}
 
-function SocialIcon({ type }: { type: "website" | "x" | "telegram" }) {
-  if (type === "x") {
-    return <svg className="socialIcon socialIconX" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.24 2.25h3.31l-7.23 8.26 8.51 11.24h-6.66l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23Zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64Z" /></svg>;
-  }
-  if (type === "telegram") {
-    return <svg className="socialIcon socialIconTelegram" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 21 3l-4 18-6-5-4 3 1-5 9-7-11 6-3-2Z" /></svg>;
-  }
-  return <svg className="socialIcon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3 4 6 4 9s-1 6-4 9M12 3c-3 3-4 6-4 9s1 6 4 9" /></svg>;
+  return { launch, trades: [], marketTrades, chartCandles: [], bondPriceUsd: null };
 }
 
 export default async function LaunchPage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = await params;
-  if (!/^0x[0-9a-f]{40}$/i.test(address)) notFound();
+  const previewAddress = address as keyof typeof previewPositions;
+  const isPreview = previewAddress in previewPositions;
+  if (!isPreview && !/^0x[0-9a-f]{40}$/i.test(address)) notFound();
 
-  const detail = await getLaunchDetail(address.toLowerCase());
+  const detail = isPreview ? previewLaunchDetail(previewAddress) : await getLaunchDetail(address.toLowerCase());
   if (!detail) notFound();
 
-  const { launch, trades, marketTrades, chartCandles, bondPriceUsd } = detail;
-  const market = launchMarket(launch);
-  const recentTrades = trades.slice(-30).reverse();
-  const marketByHash = new Map(marketTrades.map((trade) => [trade.transaction_hash, trade]));
+  const { launch, marketTrades, chartCandles, bondPriceUsd } = detail;
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
-  const percent = (value: number | null, fallback = "Pending data") => value == null ? fallback : `${value.toFixed(1)}%`;
-  const holderDelta = launch.holder_change_5m == null
-    ? "Pending"
-    : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
-  const bondingTone = launch.status === "graduated"
-    ? "completed"
-    : launch.status === "swept" || (launch.progress_pct ?? 0) >= 10
-      ? "completing"
-      : "new";
+  const entryMarketCap = launch.entry_market_cap_usd ?? null;
+  const currentMarketCap = launch.market_cap_usd ?? null;
+  const gainMultiple = entryMarketCap && currentMarketCap ? currentMarketCap / entryMarketCap : null;
+  const peakMultiple = entryMarketCap && launch.ath_market_cap_usd ? launch.ath_market_cap_usd / entryMarketCap : null;
+  const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
+  const gainTone = gainMultiple != null && gainMultiple < 1 ? "negative" : "positive";
 
   return (
-    <main className="launchPage">
+    <main className="launchPage positionPage">
       <header className="launchNav">
-        <Link href="/" className="backLink"><span>←</span> All launches</Link>
-        <div className="detailLive"><i /> Live record</div>
+        <Link href="/" className="backLink"><span>←</span> Back to signals</Link>
+        <div className={`positionNavStatus ${closed ? "closed" : "live"}`}><i /> {closed ? "Position closed" : "Position live"}</div>
       </header>
 
-      <section className="launchTitle">
+      <section className="positionHero">
         <div className="launchIdentity">
           <div className="detailTokenImage">
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={92} priority />
           </div>
           <div className="launchIdentityCopy">
-            <span className="detailStatus">{launch.status}</span>
+            <span className="positionEyebrow">PonsEye acquired</span>
             <h1>{launch.name ?? "Metadata pending"}</h1>
             <div className="tokenSubline">
               <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
-              <b>•</b>
-              <span>{market.asset.symbol} pair</span>
-              {(launch.website_url || launch.twitter_url || launch.telegram_url) ? (
-                <nav className="identityLinks" aria-label="Token links">
-                  {launch.website_url ? <a href={launch.website_url} target="_blank" rel="noreferrer" aria-label="Website" title="Website"><SocialIcon type="website" /></a> : null}
-                  {launch.twitter_url ? <a href={launch.twitter_url} target="_blank" rel="noreferrer" aria-label="X" title="X"><SocialIcon type="x" /></a> : null}
-                  {launch.telegram_url ? <a href={launch.telegram_url} target="_blank" rel="noreferrer" aria-label="Telegram" title="Telegram"><SocialIcon type="telegram" /></a> : null}
-                </nav>
-              ) : null}
+              <b>◈</b>
+              <span>Robinhood Chain</span>
             </div>
-            {launch.description ? <p className="tokenDescription">{launch.description}</p> : null}
           </div>
         </div>
-        <aside className="launchMeta">
-          <dl>
-            <div><dt><PixelIcon type="contract" /> Contract address</dt><dd><CopyField value={launch.token_address} /></dd></div>
-            <div><dt><PixelIcon type="curve" /> Bonding curve</dt><dd><CopyField value={launch.curve_address} /></dd></div>
-            <div><dt><PixelIcon type="wallet" /> Deployer wallet</dt><dd><CopyField value={launch.deployer_address} /></dd></div>
-            <div><dt><PixelIcon type="clock" /> Launched</dt><dd className="launchDate">{new Date(launch.launched_at).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</dd></div>
-          </dl>
+        <aside className={`positionMultiple ${gainTone}`}>
+          <span>{closed ? "Final return" : "Current return"}</span>
+          <strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong>
+          <small>{closed ? "Position banked" : "Ponseye is still holding"}</small>
         </aside>
       </section>
 
-      <section className="marketWorkspace">
-        <div className="chartPanel">
-          <header>
-            <div><small>Live market cap</small><strong>{usd(launch.market_cap_usd)}</strong></div>
-            <div className={`marketBonding ${bondingTone}`}>
-              <div><small>Bonding progress</small><strong>{launch.progress_pct == null ? "Awaiting threshold" : `${launch.progress_pct.toFixed(1)}%`}</strong></div>
-              <div className={`progressTrack ${progressTone(launch.progress_pct)}`}><i style={{ width: `${launch.progress_pct ?? 0}%` }} /></div>
-            </div>
-          </header>
-          <PonsEyeChart trades={marketTrades} candles={chartCandles} tokenAddress={launch.token_address} graduatedAt={launch.graduated_at} bondPriceUsd={bondPriceUsd} />
-        </div>
-        <aside className="metricRail">
-          <header><span>Token telemetry</span><b><i /> Live</b></header>
-          <div className="metricRailGrid">
-            <article><small><PixelIcon type="cap" /> Market cap</small><strong>{usd(launch.market_cap_usd)}</strong></article>
-            <article><small><PixelIcon type="cap" /> ATH market cap</small><strong>{usd(launch.ath_market_cap_usd)}</strong></article>
-            <article><small><PixelIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></article>
-            <article><small><PixelIcon type="drop" /> Drawdown</small><strong className="negative">{percent(launch.drawdown_from_peak_pct, "No peak yet")}</strong></article>
-            <article><small><PixelIcon type="volume" /> Volume</small><strong>{usd(launch.volume_usd)}</strong></article>
-            <article><small><PixelIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Pending"}</strong></article>
-            <article><small><PixelIcon type="holders" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "positive" : "negative"}>{holderDelta}</strong></article>
-            <article><small><PixelIcon type="holders" /> Top 10</small><strong>{percent(launch.top_10_holder_pct, "Pending")}</strong></article>
-            <article><small><PixelIcon type="traders" /> Traders</small><strong>{launch.unique_traders.toLocaleString("en-GB")}</strong></article>
-            <article><small><PixelIcon type="buy" /> Buy pressure</small><strong className="positive">{percent(launch.buy_pressure_pct, "No trades yet")}</strong></article>
-            <article><small><PixelIcon type="traders" /> First minute</small><strong>{launch.first_minute_buyers.toLocaleString("en-GB")}</strong></article>
-            <article><small><PixelIcon type="creator" /> Creator sells</small><strong className={launch.creator_sells ? "negative" : "positive"}>{launch.creator_sells.toLocaleString("en-GB")}</strong></article>
-          </div>
-        </aside>
+      <section className="positionStats">
+        <article><span>Entry MC</span><strong>{usd(entryMarketCap)}</strong></article>
+        <article><span>{closed ? "Exit MC" : "Current MC"}</span><strong>{usd(currentMarketCap)}</strong></article>
+        <article className={gainTone}><span>{closed ? "Banked" : "Gains"}</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></article>
+        <article><span>Position high</span><strong>{peakMultiple ? `${peakMultiple.toFixed(2)}x` : "Pending"}</strong></article>
       </section>
 
-      <section className="tradeTape detailTradeTape">
-          <header><h2>Latest trades</h2><span>{recentTrades.length} shown</span></header>
-          <div className="tradeRows">
-            {recentTrades.length ? recentTrades.map((trade) => {
-              const asset = quoteAsset(launch.pair_token_address);
-              const quoteAmount = Number(trade.quote_amount_raw) / 10 ** asset.decimals;
-              const dollarTrade = marketByHash.get(trade.transaction_hash);
-              const dollarAmount = dollarTrade?.quote_amount_usd ?? dollarTrade?.base_amount_usd;
-              return (
-                <div className="tradeRow" key={trade.event_id}>
-                  <b className={trade.side}>{trade.side}</b>
-                  <span>{dollarAmount ? quoteValue(dollarAmount, "USDG") : quoteValue(quoteAmount, asset.symbol)}</span>
-                  <span>{trade.trader_address ? short(trade.trader_address) : "Unknown wallet"}</span>
-                  <time>{new Date(trade.block_time).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" })}</time>
-                </div>
-              );
-            }) : <div className="chartEmpty">No trades recorded yet</div>}
+      <section className="positionChartPanel">
+        <header>
+          <div>
+            <span className="positionChartKicker">PonsEye position tracker</span>
+            <strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"} / Market cap</strong>
           </div>
+          <div className="positionLegend" aria-label="Position chart markers">
+            <span className="buy"><i>↑</i> Ponseye buy</span>
+            {closed ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> Tracking live</span>}
+          </div>
+        </header>
+        <div className="positionChartFrame">
+          <PonsEyeChart
+            trades={marketTrades}
+            candles={chartCandles}
+            tokenAddress={launch.token_address}
+            graduatedAt={launch.graduated_at}
+            bondPriceUsd={bondPriceUsd}
+            acquiredAt={launch.acquired_at ?? (launch.research_state === "target_locked" ? launch.research_state_at : null)}
+            closedAt={launch.closed_at ?? null}
+            entryMarketCap={entryMarketCap}
+          />
+        </div>
       </section>
     </main>
   );
