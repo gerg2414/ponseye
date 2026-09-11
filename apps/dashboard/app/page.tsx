@@ -195,7 +195,10 @@ export default async function Home() {
         ))}
       </div>
       <header className="header">
-        <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
+        <div className="headerBrand">
+          <Image className="headerMark" src="/ponseye-screen-icon-mark.png" alt="" width={256} height={256} priority />
+          <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
+        </div>
         <div className="systemMeta">
           <span className="chainLabel"><Image src="/robinhood-feather.svg" alt="" width={24} height={24} />Robinhood Chain</span>
           <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {recorderLive ? "Recorder live" : "Recorder paused"}</div>
@@ -226,11 +229,6 @@ export default async function Home() {
           </svg>
           <span>Capital circuit</span>
         </Link>
-        <div className="boardWatcher" aria-hidden="true">
-          <video className="watcherCore" autoPlay muted loop playsInline preload="auto" poster="/ponseye-giant-watcher.webp">
-            <source src="/ponseye-hero-1.webm" type="video/webm" />
-          </video>
-        </div>
         <section className="boardSection">
           {launches.length === 0 ? (
             <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
