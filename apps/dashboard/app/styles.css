@@ -121,7 +121,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .pixelMenu { position: relative; z-index: 110; align-self: flex-start; margin-top: 15px; }
 .pixelMenu > summary { position: relative; width: 50px; height: 46px; padding: 10px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid #3b404c; border-radius: 10px; color: #b986ff; background: #0d1015; cursor: pointer; list-style: none; box-shadow: inset 0 0 16px rgba(165,108,255,.055),0 8px 22px rgba(0,0,0,.28); transition: border-color .18s ease,background .18s ease,box-shadow .18s ease; }
 .pixelMenu > summary::-webkit-details-marker { display: none; }
-.pixelMenu > summary i { width: 25px; height: 3px; flex: 0 0 3px; display: block; background: currentColor; box-shadow: 0 0 7px rgba(165,108,255,.34); transform-origin: center; transition: transform .22s ease,opacity .14s ease,width .18s ease; }
+.pixelMenu > summary i { width: 26px; height: 4px; flex: 0 0 4px; display: block; background: repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 6px); filter: drop-shadow(0 0 4px rgba(165,108,255,.38)); transform-origin: center; image-rendering: pixelated; transition: transform .22s ease,opacity .14s ease,width .18s ease; }
 .pixelMenu > summary:hover,.pixelMenu > summary:focus-visible { border-color: var(--purple); background: #12151b; outline: none; box-shadow: inset 0 0 20px rgba(165,108,255,.09),0 0 18px rgba(165,108,255,.1); }
 .pixelMenu > summary:hover i:nth-child(2) { width: 19px; }
 .pixelMenu[open] > summary { color: var(--green); border-color: rgba(154,255,79,.5); background: #0d1210; box-shadow: inset 0 0 18px rgba(154,255,79,.07),0 0 18px rgba(154,255,79,.12); }
