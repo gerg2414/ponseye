@@ -742,9 +742,6 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .positionMonitor.loss .positionMonitorFooter > span:first-child i { background: #ff718c; }
 .chartEntryMarker { position: absolute; z-index: 5; display: grid; justify-items: center; transform: translate(-50%,12px); pointer-events: none; filter: drop-shadow(0 8px 14px rgba(0,0,0,.7)); }
 .chartEntryMarker[hidden] { display: none; }
-.chartBondMarker { position: absolute; z-index: 4; width: 1px; border-left: 1px dashed #ff9f43; transform: translateX(-.5px); pointer-events: none; }
-.chartBondMarker[hidden] { display: none; }
-.chartBondMarker span { position: absolute; top: 9px; left: 6px; padding: 4px 6px; color: #ffb267; background: rgba(20,14,9,.9); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
 .chartEntryChevron { height: 14px; color: var(--green); font-family: Arial,sans-serif; font-size: 25px; font-weight: 900; line-height: 19px; text-shadow: 0 0 10px rgba(154,255,79,.75); }
 .chartEntryBadge { min-width: 150px; padding: 7px 12px 7px 8px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(165,108,255,.82); border-radius: 6px; background: linear-gradient(90deg,rgba(36,19,59,.97),rgba(13,15,19,.97)); box-shadow: inset 0 0 18px rgba(165,108,255,.12),0 0 18px rgba(165,108,255,.14); }
 .chartEntryBadge img { width: 30px; height: 30px; image-rendering: pixelated; }
