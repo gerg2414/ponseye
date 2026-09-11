@@ -130,7 +130,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
             </div>
             <div className="lockFooter">
               <span>{launch.research_state === "target_locked" ? "Awaiting execution" : "Ponseye monitoring"}</span>
-              <span className="signalPrivate">Signal engine active</span>
+              <span className="signalPrivate">Surveillance active</span>
             </div>
           </div>
         )}
@@ -181,6 +181,20 @@ export default async function Home() {
   return (
     <main>
       <AutoRefresh intervalMs={3_000} />
+      <div className="heroPixelField" aria-hidden="true">
+        {Array.from({ length: 72 }, (_, index) => (
+          <i
+            key={index}
+            style={{
+              left: `${(index * 37 + 9) % 98}%`,
+              top: index < 42 ? `${24 + ((index * 73) % 390)}px` : `${470 + (((index - 42) * 113) % 1030)}px`,
+              width: `${4 + ((index * 7) % 18)}px`,
+              height: `${3 + ((index * 5) % 10)}px`,
+              animationDelay: `-${(index % 9) * 0.7}s`,
+            }}
+          />
+        ))}
+      </div>
       <header className="header">
         <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         <div className="systemMeta">
@@ -197,7 +211,7 @@ export default async function Home() {
             <span><time>00:00:03</time><b>{recorderLive ? "Robinhood feed linked" : "Robinhood feed closed"}</b></span>
             <span><time>00:00:07</time><b>Launch field mapped</b></span>
             <span><time>00:00:09</time><b>Contract trace active</b></span>
-            <span><time>00:00:12</time><b>Signal memory loaded</b></span>
+            <span><time>00:00:12</time><b>Target memory loaded</b></span>
             <span><time>00:00:15</time><b>{recorderLive ? "Acquisition gate active" : "Recorder safely paused"}</b></span>
           </div>
           <span className="consoleAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
@@ -227,7 +241,7 @@ export default async function Home() {
               <LaunchLane title="Acquired" count={researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a target yet" />
             </div>
           )}
-          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Signals appear after confirmation</span></footer>
+          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Targets appear after confirmation</span></footer>
         </section>
       </div>
     </main>
