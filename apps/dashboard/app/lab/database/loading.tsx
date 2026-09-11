@@ -5,14 +5,6 @@ export default function DatabaseLoading() {
     <main className="databasePage" aria-busy="true">
       <LabHeader current="database" />
 
-      <section className="databaseIntro">
-        <div>
-          <small>All recorded launches</small>
-          <h1>Token database</h1>
-          <p>Reading collected launch records...</p>
-        </div>
-      </section>
-
       <section className="databaseStats databaseSkeletonStats" aria-hidden="true">
         {Array.from({ length: 4 }, (_, index) => <article key={index}><i /><b /></article>)}
       </section>
