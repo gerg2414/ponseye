@@ -283,7 +283,9 @@ export default async function Home() {
           <span>Capital circuit</span>
         </Link>
         <div className="boardWatcher" aria-hidden="true">
-          <Image src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
+          <Image className="watcherCore" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
+          <Image className="watcherGlitch glitchPurple" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
+          <Image className="watcherGlitch glitchGreen" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
         </div>
         <section className="boardSection">
           {visibleLaunches.length === 0 ? (
