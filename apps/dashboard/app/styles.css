@@ -118,7 +118,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .status.graduated { border-color: rgba(154,255,79,.28); color: var(--green); background: rgba(154,255,79,.04); }
 .status.graduated i { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .panelFoot { padding: 14px 18px; display: flex; justify-content: space-between; color: #555b68; background: #0a0c0f; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
-.pixelMenu { position: relative; z-index: 110; align-self: flex-start; margin-top: 9px; }
+.pixelMenu { position: relative; z-index: 110; align-self: flex-start; margin-top: 15px; }
 .pixelMenu > summary { position: relative; width: 50px; height: 46px; padding: 11px 10px; display: grid; align-content: space-between; justify-items: end; border: 1px solid #4a3b61; border-radius: 10px; color: #c39aff; background: linear-gradient(135deg,rgba(165,108,255,.12),transparent 58%),#0b0e13; cursor: pointer; list-style: none; box-shadow: inset 0 0 0 1px rgba(165,108,255,.05),0 8px 22px rgba(0,0,0,.28); }
 .pixelMenu > summary::-webkit-details-marker { display: none; }
 .pixelMenu > summary::before,.pixelMenu > summary::after { content: ""; position: absolute; width: 4px; height: 4px; background: var(--purple); }
@@ -1671,6 +1671,8 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   margin: 0 auto;
   padding: 0 0 70px;
 }
+.databasePage .labBrand > a { width: 250px; }
+.databasePage .labNavLinks .backLink { font-size: 12px; }
 .recorderConsole {
   min-height: 116px;
   margin-top: 9px;
@@ -1686,26 +1688,26 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 }
 .recorderConsole.isLive { border-color: rgba(154,255,79,.34); background: linear-gradient(90deg,rgba(154,255,79,.065),transparent 35%),#0d1014; }
 .recorderConsoleState { padding: 7px 10px; display: grid; align-content: center; gap: 7px; }
-.recorderConsoleState > small { color: #707884; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.recorderConsoleState > strong { display: flex; align-items: center; gap: 10px; color: #eef0f3; font-family: Arial,sans-serif; font-size: 26px; }
+.recorderConsoleState > small { color: #707884; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.recorderConsoleState > strong { display: flex; align-items: center; gap: 10px; color: #eef0f3; font-family: Arial,sans-serif; font-size: 30px; }
 .recorderConsoleState > strong i { width: 8px; height: 8px; background: #777f8b; box-shadow: 0 0 0 3px rgba(119,127,139,.1); }
 .recorderConsole.isLive .recorderConsoleState > strong { color: var(--green); }
 .recorderConsole.isLive .recorderConsoleState > strong i { background: var(--green); box-shadow: 0 0 10px rgba(154,255,79,.7); }
-.recorderConsoleState > span { color: #828a96; font-family: Arial,sans-serif; font-size: 12px; }
+.recorderConsoleState > span { color: #828a96; font-family: Arial,sans-serif; font-size: 14px; }
 .recorderFeedGrid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid #292f37; border-radius: var(--radius-panel); background: #090c10; }
 .recorderFeedGrid article { min-width: 0; padding: 12px; display: grid; align-content: center; gap: 6px; border-right: 1px solid #292f37; }
 .recorderFeedGrid article:last-child { border-right: 0; }
-.recorderFeedGrid small { overflow: hidden; color: #737c88; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
-.recorderFeedGrid strong { color: #949ca8; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.recorderFeedGrid small { overflow: hidden; color: #737c88; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
+.recorderFeedGrid strong { color: #949ca8; font-size: 13px; font-weight: 600; text-transform: capitalize; }
 .recorderFeedGrid strong.connected { color: var(--green); }
 .recorderFeedGrid strong.error { color: #ff718c; }
-.recorderFeedGrid span { color: #59616d; font-size: 9px; }
-.recorderConsoleAction { display: grid; align-content: center; gap: 7px; }
-.recorderConsoleAction button { min-height: 46px; padding: 0 16px; border: 1px solid rgba(154,255,79,.42); border-radius: var(--radius-control); color: #0a0d10; background: var(--green); font: inherit; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.recorderFeedGrid span { color: #59616d; font-size: 11px; }
+.recorderConsoleAction { min-height: 0; display: grid; grid-template-rows: minmax(0,1fr) auto; gap: 7px; }
+.recorderConsoleAction button { width: 100%; height: 100%; min-height: 72px; padding: 0 18px; border: 1px solid rgba(154,255,79,.42); border-radius: var(--radius-control); color: #0a0d10; background: var(--green); font: inherit; font-size: 13px; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; cursor: pointer; }
 .recorderConsole.isLive .recorderConsoleAction button { border-color: rgba(255,113,140,.48); color: #ff9aad; background: rgba(255,113,140,.08); }
 .recorderConsoleAction button:hover:not(:disabled),.recorderConsoleAction button:focus-visible { filter: brightness(1.08); outline: 1px solid currentColor; outline-offset: 2px; }
 .recorderConsoleAction button:disabled { opacity: .55; cursor: wait; }
-.recorderConsoleAction > span { color: #ff8ca1; font-size: 9px; line-height: 1.4; }
+.recorderConsoleAction > span { color: #ff8ca1; font-size: 11px; line-height: 1.4; }
 .databaseStats {
   margin-top: 9px;
   display: grid;
@@ -1724,8 +1726,8 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   border-right: 1px solid #282d35;
 }
 .databaseStats article:last-child { border-right: 0; }
-.databaseStats small { color: #707884; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
-.databaseStats strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 29px; letter-spacing: -.035em; }
+.databaseStats small { color: #707884; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+.databaseStats strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 32px; letter-spacing: -.035em; }
 .databaseStats article:last-child strong { color: var(--green); }
 .databaseFilters {
   margin: 10px 0;
@@ -1739,7 +1741,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   background: #0d1014;
 }
 .databaseFilters label { min-width: 0; display: grid; gap: 5px; }
-.databaseFilters label > span { color: #707884; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.databaseFilters label > span { color: #707884; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .databaseFilters input,.databaseFilters select {
   width: 100%;
   height: 38px;
@@ -1749,7 +1751,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   color: #e6e9ed;
   background: #090c10;
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
 }
 .databaseFilters button,.databaseFilters > a {
   height: 38px;
@@ -1760,7 +1762,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   color: #e5e8ec;
   background: #191e25;
   font: inherit;
-  font-size: 9px;
+  font-size: 11px;
   text-decoration: none;
   text-transform: uppercase;
   cursor: pointer;
@@ -1783,9 +1785,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   background: #10141a;
 }
 .databaseLedger > header > div { display: grid; gap: 3px; }
-.databaseLedger > header small { color: #707884; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.databaseLedger > header strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 18px; }
-.databaseLedger > header > span { color: #7b838f; font-size: 11px; }
+.databaseLedger > header small { color: #707884; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.databaseLedger > header strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 21px; }
+.databaseLedger > header > span { color: #7b838f; font-size: 13px; }
 .databaseTableWrap { overflow-x: auto; }
 .databaseLedger table {
   width: 100%;
@@ -1799,7 +1801,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   border-bottom: 1px solid #282d35;
   color: #69717d;
   background: #090c10;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: .08em;
   text-align: left;
@@ -1814,17 +1816,17 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .databaseLedger th:nth-child(8) { width: 100px; }
 .databaseLedger th:last-child { width: 130px; }
 .databaseLedger td {
-  height: 70px;
+  height: 82px;
   padding: 9px 13px;
   border-bottom: 1px solid #20252d;
   color: #aeb4be;
-  font-size: 11px;
+  font-size: 13px;
   vertical-align: middle;
 }
 .databaseLedger tbody tr:last-child td { border-bottom: 0; }
 .databaseLedger tbody tr:hover td { background: #11161c; }
-.databaseLedger td > strong { color: #e1e4e8; font-family: Arial,sans-serif; font-size: 14px; }
-.databaseLedger td > small { margin-top: 4px; display: block; color: #737b87; font-size: 9px; }
+.databaseLedger td > strong { color: #e1e4e8; font-family: Arial,sans-serif; font-size: 16px; }
+.databaseLedger td > small { margin-top: 4px; display: block; color: #737b87; font-size: 11px; }
 .databaseLedger .peakValue { color: var(--green); }
 .databaseToken {
   min-width: 0;
@@ -1834,24 +1836,24 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   color: inherit;
   text-decoration: none;
 }
-.databaseToken img { width: 46px; height: 46px; border-radius: 4px; object-fit: cover; image-rendering: pixelated; }
+.databaseToken img { width: 56px; height: 56px; border-radius: 5px; object-fit: cover; image-rendering: pixelated; }
 .databaseToken > span { min-width: 0; display: grid; gap: 4px; }
-.databaseToken strong { overflow: hidden; color: #eef0f3; font-family: Arial,sans-serif; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
-.databaseToken small { color: #737b87; font-size: 10px; }
+.databaseToken strong { overflow: hidden; color: #eef0f3; font-family: Arial,sans-serif; font-size: 17px; white-space: nowrap; text-overflow: ellipsis; }
+.databaseToken small { color: #737b87; font-size: 12px; }
 .databaseToken:hover strong { color: var(--green); }
 .databaseStatus {
   padding: 6px 8px;
   display: inline-block;
   color: #929aa6;
   background: #171c22;
-  font-size: 9px;
+  font-size: 11px;
   text-transform: capitalize;
 }
 .databaseStatus.graduated { color: var(--green); background: rgba(154,255,79,.08); }
 .databaseActions { display: flex; gap: 7px; }
 .databaseActions a,.databaseActions button {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -1863,7 +1865,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   text-decoration: none;
   cursor: pointer;
 }
-.databaseActions svg { width: 17px; height: 17px; fill: currentColor; }
+.databaseActions svg { width: 19px; height: 19px; fill: currentColor; }
 .databaseActions a:hover,.databaseActions button:hover,.databaseActions a:focus-visible,.databaseActions button:focus-visible { color: #0a0d10; background: var(--green); box-shadow: none; outline: none; }
 .databaseEmpty { height: 150px !important; color: #747c88 !important; text-align: center; }
 .databasePagination {
@@ -1875,13 +1877,13 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   border-top: 1px solid #282d35;
   background: #0e1217;
 }
-.databasePagination small { color: #737b87; font-size: 9px; text-align: center; }
+.databasePagination small { color: #737b87; font-size: 11px; text-align: center; }
 .databasePagination a {
   padding: 8px 10px;
   border: 1px solid #303640;
   border-radius: var(--radius-control);
   color: #d9dde2;
-  font-size: 9px;
+  font-size: 11px;
   text-align: center;
   text-decoration: none;
   text-transform: uppercase;
