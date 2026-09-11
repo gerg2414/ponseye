@@ -241,8 +241,8 @@ export async function getActiveMarketTokens(): Promise<string[]> {
     .from("launch_metrics")
     .select("token_address")
     .in("research_state", ["under_watch", "target_locked"])
-    .gte("last_trade_at", activeSince)
-    .order("last_trade_at", { ascending: false })
+    .or(`last_trade_at.gte.${activeSince},usd_price_at.gte.${activeSince}`)
+    .order("updated_at", { ascending: false })
     .limit(1000)
     .abortSignal(AbortSignal.timeout(30_000));
   assertOk(activeResult.error, "warm active token cache");
@@ -278,8 +278,8 @@ export async function getHolderCandidates(): Promise<HolderCandidate[]> {
     .from("launch_metrics")
     .select("token_address,last_trade_at,holder_snapshot_at,launches!inner(curve_address,deployer_address,status,launched_at)")
     .in("research_state", ["under_watch", "target_locked"])
-    .gte("last_trade_at", activeSince)
-    .order("last_trade_at", { ascending: false })
+    .or(`last_trade_at.gte.${activeSince},usd_price_at.gte.${activeSince}`)
+    .order("updated_at", { ascending: false })
     .limit(1000)
     .abortSignal(AbortSignal.timeout(30_000));
   assertOk(error, "load holder candidates");
