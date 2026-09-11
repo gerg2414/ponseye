@@ -47,6 +47,8 @@ export type Launch = {
   research_state_at: string;
   research_rule_version: string;
   research_reasons: string[];
+  acquired_at?: string | null;
+  entry_market_cap_usd?: number | null;
 };
 
 export type Trade = {
@@ -154,6 +156,7 @@ async function loadDashboardData() {
     volume_usd: launch.volume_usd == null ? null : Number(launch.volume_usd),
     market_cap_usd: launch.market_cap_usd == null ? null : Number(launch.market_cap_usd),
     ath_market_cap_usd: launch.ath_market_cap_usd == null ? null : Number(launch.ath_market_cap_usd),
+    entry_market_cap_usd: launch.entry_market_cap_usd == null ? null : Number(launch.entry_market_cap_usd),
   })) as Launch[];
 
   return {

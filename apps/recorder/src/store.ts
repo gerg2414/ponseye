@@ -10,6 +10,7 @@ const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
 const tokenByCurve = new Map<string, string>();
 const knownTokens = new Set<string>();
 const lastStatusWrite = new Map<string, { status: string; at: number }>();
+const recorderFeeds = ["launch_activity", "curve_trades", "market_trades", "holder_snapshots"];
 
 type LaunchCall = {
   Block: { Time: string; Number?: string };
@@ -282,6 +283,21 @@ export async function updateStreamStatus(feed: string, status: string, message?:
     lastStatusWrite.delete(feed);
     console.error(`[${feed}] status update failed`, error.message);
   }
+}
+
+export async function getRecorderEnabled() {
+  const { data, error } = await db
+    .from("recorder_control")
+    .select("enabled")
+    .eq("id", 1)
+    .abortSignal(AbortSignal.timeout(10_000))
+    .single();
+  if (error || !data) throw new Error(`load recorder control: ${error?.message ?? "control row missing"}`);
+  return data.enabled === true;
+}
+
+export async function markRecorderPaused(message = "Recorder paused from Lab") {
+  await Promise.all(recorderFeeds.map((feed) => updateStreamStatus(feed, "stopped", message)));
 }
 
 export async function getHolderCandidates(): Promise<HolderCandidate[]> {

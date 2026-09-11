@@ -33,6 +33,20 @@ export type DatabaseResult = {
   };
 };
 
+export type RecorderFeed = {
+  feed: string;
+  status: string;
+  message: string | null;
+  last_seen_at: string;
+};
+
+export type RecorderControlState = {
+  enabled: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  feeds: RecorderFeed[];
+};
+
 // Keep this as a literal so Supabase can infer the selected row shape at build time.
 const columns = "token_address,name,symbol,image_url,status,launched_at,graduated_at,market_cap_usd,ath_market_cap_usd,peak_multiple,trade_count,buys,sells,unique_traders,buy_pressure_pct,volume_usd,holder_count";
 
@@ -51,6 +65,33 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function databaseClient() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) throw new Error("Database environment is missing");
+  return createClient(url, key, {
+    auth: { persistSession: false },
+    db: { retry: false },
+  });
+}
+
+export async function getRecorderControlState(): Promise<RecorderControlState> {
+  const db = databaseClient();
+  const [controlResult, feedsResult] = await Promise.all([
+    db.from("recorder_control").select("enabled,updated_at,updated_by").eq("id", 1).single(),
+    db.from("stream_status").select("feed,status,message,last_seen_at").order("feed"),
+  ]);
+
+  if (controlResult.error) throw new Error(controlResult.error.message);
+  if (feedsResult.error) throw new Error(feedsResult.error.message);
+  return {
+    enabled: controlResult.data.enabled === true,
+    updatedAt: controlResult.data.updated_at,
+    updatedBy: controlResult.data.updated_by,
+    feeds: (feedsResult.data ?? []) as RecorderFeed[],
+  };
+}
+
 export async function getTokenDatabase({
   page,
   pageSize,
@@ -62,14 +103,7 @@ export async function getTokenDatabase({
   search: string;
   sort: DatabaseSort;
 }): Promise<DatabaseResult> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) throw new Error("Database environment is missing");
-
-  const db = createClient(url, key, {
-    auth: { persistSession: false },
-    db: { retry: false },
-  });
+  const db = databaseClient();
 
   const safeSearch = search.trim().replace(/[^a-zA-Z0-9 _.$-]/g, "").slice(0, 80);
   const from = (page - 1) * pageSize;

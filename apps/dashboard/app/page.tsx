@@ -9,6 +9,13 @@ import { TokenImage } from "./token-image";
 export const dynamic = "force-dynamic";
 
 const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
+const targetMeterColours = [
+  "#552a94", "#6230a8", "#7036bc", "#7e3ccf",
+  "#8c43e1", "#9a49ef", "#aa4ff1", "#ba54e8",
+  "#ca58da", "#d95dc7", "#e663b1", "#f06b99",
+  "#f6767e", "#fb8265", "#fe914f", "#ff9f43",
+];
+
 function age(value: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return `${seconds}s`;
@@ -17,35 +24,45 @@ function age(value: string) {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function progressTone(value: number | null) {
-  if ((value ?? 0) >= 75) return "progressHigh";
-  if ((value ?? 0) >= 30) return "progressMid";
-  return "progressLow";
+function targetLockScore(launch: Launch) {
+  if (launch.research_state === "target_locked") return 100;
+
+  const tradeDepth = Math.min(1, launch.trade_count / 30) * 15;
+  const traderDepth = Math.min(1, launch.unique_traders / 15) * 15;
+  const pressure = Math.min(1, Math.max(0, (launch.buy_pressure_pct ?? 0) / 60)) * 15;
+  const creatorClear = launch.creator_sells === 0 ? 10 : 0;
+  const earlyBuyers = Math.min(1, launch.first_minute_buyers / 6) * 15;
+  const momentum = Math.min(1, (launch.peak_multiple ?? 0) / 1.2) * 10;
+  const peakHeld = launch.drawdown_from_peak_pct == null || launch.drawdown_from_peak_pct <= 40 ? 10 : 0;
+  const holderSpread = launch.top_10_holder_pct == null || launch.top_10_holder_pct <= 70 ? 5 : 0;
+  const creatorBalance = launch.creator_balance_pct == null || launch.creator_balance_pct <= 5 ? 5 : 0;
+  const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
+
+  return Math.round(launch.research_state === "under_watch" ? Math.max(48, score) : Math.min(47, score));
 }
 
-function MetricIcon({ type }: { type: "cap" | "volume" | "peak" | "holders" | "change" | "traders" | "buy" | "sell" | "pressure" }) {
-  if (type === "cap") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13V9l3-3 3 2 5-5" /><path d="M10 3h3v3" /></svg>;
-  if (type === "volume") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V9M8 13V4M13 13V7" /></svg>;
-  if (type === "peak") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13l4-7 2 3 3-6 3 10" /></svg>;
-  if (type === "holders") return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2" /><circle cx="11.5" cy="6" r="1.5" /><path d="M2.5 13c.3-2.5 1.5-4 3.5-4s3.2 1.5 3.5 4M10 9.5c2.1 0 3.2 1.2 3.5 3.5" /></svg>;
-  if (type === "change") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg>;
-  if (type === "traders") return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2" /><path d="M2.5 13c.3-2.5 1.5-4 3.5-4s3.2 1.5 3.5 4M11 5.5c1.5.2 2.3 1.3 2.5 3" /></svg>;
-  if (type === "buy") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" /></svg>;
-  if (type === "sell") return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M4 9l4 4 4-4" /></svg>;
-  return <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" /><path d="M8 8l3-3M8 3v2M13 8h-2" /></svg>;
+function lockLabel(launch: Launch, score: number) {
+  if (launch.research_state === "target_locked") return "Target locked";
+  if (score >= 80) return "Final checks";
+  if (score >= 48) return "Tracking";
+  return "Scanning";
 }
 
-function TokenCard({ launch }: { launch: Launch }) {
-  const progress = launch.progress_pct;
+function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired" }) {
+  const lockScore = targetLockScore(launch);
+  const acquired = mode === "acquired";
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
-  const usdVolume = launch.volume_usd ? quoteValue(launch.volume_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
-  const holderChange = launch.holder_change_5m == null
-    ? "Pending"
-    : `${launch.holder_change_5m >= 0 ? "+" : ""}${launch.holder_change_5m}`;
+  const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
+  const gainMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
+    ? launch.market_cap_usd / launch.entry_market_cap_usd
+    : null;
+  const positionLoss = gainMultiple != null && gainMultiple < 1;
+  const positionGradientId = `position-fill-${launch.token_address.replace(/[^a-z0-9-]/gi, "")}`;
+  const filledSegments = Math.ceil(lockScore / 6.25);
 
   return (
     <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
-      <article className="launchCard">
+      <article className={`launchCard ${acquired ? "isAcquired" : ""}`}>
         <div className="cardTop">
           <div className="tokenImage">
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
@@ -56,47 +73,88 @@ function TokenCard({ launch }: { launch: Launch }) {
                 <strong>{launch.name ?? "Metadata pending"}</strong>
                 <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
               </div>
-              <time>{age(launch.launched_at)}</time>
-            </div>
-            <div className="cardBonding">
-              <div><span>Bonding</span><strong>{progress == null ? "—" : `${progress.toFixed(1)}%`}</strong></div>
-              <div className={`progressTrack ${progressTone(progress)}`}><i style={{ width: `${progress ?? 0}%` }} /></div>
+              <div className="cardMetaStack">
+                <time>{age(launch.launched_at)}</time>
+                {acquired ? <span className="positionBadge live">Signal</span> : null}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="metrics">
-          <div><small><MetricIcon type="cap" /> MC</small><strong>{usdMarketCap}</strong></div>
-          <div><small><MetricIcon type="volume" /> Volume</small><strong>{usdVolume}</strong></div>
-          <div><small><MetricIcon type="peak" /> Peak</small><strong>{launch.peak_multiple ? `${launch.peak_multiple.toFixed(2)}x` : "No trades yet"}</strong></div>
-          <div><small><MetricIcon type="holders" /> Holders</small><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Pending"}</strong></div>
-          <div><small><MetricIcon type="change" /> Holders 5m</small><strong className={(launch.holder_change_5m ?? 0) >= 0 ? "buyMetric" : "sellMetric"}>{holderChange}</strong></div>
-          <div><small><MetricIcon type="traders" /> Traders</small><strong>{launch.unique_traders}</strong></div>
-          <div><small><MetricIcon type="buy" /> Buys</small><strong className="buyMetric">{launch.buys}</strong></div>
-          <div><small><MetricIcon type="sell" /> Sells</small><strong className="sellMetric">{launch.sells}</strong></div>
-          <div><small><MetricIcon type="pressure" /> Buy pressure</small><strong>{launch.buy_pressure_pct == null ? "No trades yet" : `${launch.buy_pressure_pct.toFixed(0)}%`}</strong></div>
-        </div>
+        {acquired ? (
+          <div className="acquiredMetrics">
+            <div><span>Entry MC</span><strong>{entryMarketCap ?? "Pending"}</strong></div>
+            <div><span>Current MC</span><strong>{usdMarketCap}</strong></div>
+            <div className="gainMetric"><span>Gains</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></div>
+          </div>
+        ) : (
+          <div className="cardMarketCap">
+            <span>Market cap</span>
+            <strong>{usdMarketCap}</strong>
+          </div>
+        )}
 
+        {acquired ? (
+          <div className={`positionMonitor live ${positionLoss ? "loss" : "profit"}`}>
+            <svg viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id={positionGradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={positionLoss ? "#ff718c" : "#9aff4f"} stopOpacity=".34" />
+                  <stop offset="100%" stopColor={positionLoss ? "#ff718c" : "#9aff4f"} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path className="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
+              <path className="positionFill" style={{ fill: `url(#${positionGradientId})` }} d={positionLoss ? "M0 28L32 24L64 31L96 27L128 42L160 36L192 50L224 45L256 56L288 51L320 59V72H0Z" : "M0 58L32 51L64 54L96 40L128 45L160 31L192 36L224 20L256 25L288 13L320 9V72H0Z"} />
+              <polyline className="positionLine" points={positionLoss ? "0,28 32,24 64,31 96,27 128,42 160,36 192,50 224,45 256,56 288,51 320,59" : "0,58 32,51 64,54 96,40 128,45 160,31 192,36 224,20 256,25 288,13 320,9"} />
+              <circle className="positionEnd" cx="318" cy={positionLoss ? "59" : "9"} r="4" />
+            </svg>
+            <div className="positionMonitorFooter">
+              <span><i />Signal tracked</span>
+              <span className="chartLink">View chart <b>↗</b></span>
+            </div>
+          </div>
+        ) : (
+          <div className="targetLock">
+            <div className="targetLockHead">
+              <strong>{lockLabel(launch, lockScore)}</strong>
+              <b>{lockScore}<small>%</small></b>
+            </div>
+            <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
+              {Array.from({ length: 16 }, (_, index) => {
+                const filled = index < filledSegments;
+                const active = index === filledSegments - 1;
+                const colour = targetMeterColours[index];
+                return <i className={`${filled ? "filled" : ""}${active ? " active" : ""}`} style={filled ? { backgroundColor: colour, borderColor: colour, boxShadow: active ? `0 0 9px ${colour}88` : undefined } : undefined} key={index} />;
+              })}
+            </div>
+            <div className="lockFooter">
+              <span>{launch.research_state === "target_locked" ? "Awaiting execution" : "Ponseye monitoring"}</span>
+              <span className="signalPrivate">Signal engine active</span>
+            </div>
+          </div>
+        )}
       </article>
     </Link>
   );
 }
 
-function LaunchLane({ title, count, tone, launches, empty }: {
+function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
   title: string;
   count: number;
   tone: "new" | "completing" | "completed";
+  icon: string;
+  mode: "sighted" | "surveillance" | "acquired";
   launches: Launch[];
   empty: string;
 }) {
   return (
     <section className={`launchLane ${tone}`}>
       <header className="laneHead">
-        <div><i /><strong>{title}</strong></div>
+        <div><Image src={icon} alt="" width={38} height={38} /><strong>{title}</strong></div>
         <span>{count}</span>
       </header>
       <div className="launchLaneBody">
-        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} />) : (
+        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} />) : (
           <div className="laneEmpty">{empty}</div>
         )}
       </div>
@@ -109,10 +167,10 @@ export default async function Home() {
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
-  const targetLocked = launches
+  const acquired = launches
     .filter((launch) => launch.research_state === "target_locked")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
-  const underWatch = launches
+  const surveillance = launches
     .filter((launch) => launch.research_state === "under_watch")
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
   const sightings = launches
@@ -122,35 +180,70 @@ export default async function Home() {
   return (
     <main>
       <AutoRefresh intervalMs={3_000} />
+      <div className="heroPixelField" aria-hidden="true">
+        {Array.from({ length: 72 }, (_, index) => (
+          <i
+            key={index}
+            style={{
+              left: `${(index * 37 + 9) % 98}%`,
+              top: index < 42 ? `${24 + ((index * 73) % 390)}px` : `${470 + (((index - 42) * 113) % 1030)}px`,
+              width: `${4 + ((index * 7) % 18)}px`,
+              height: `${3 + ((index * 5) % 10)}px`,
+              animationDelay: `-${(index % 9) * 0.7}s`,
+            }}
+          />
+        ))}
+      </div>
       <header className="header">
+        <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         <div className="systemMeta">
-          <Link className="labHeaderLink" href="/lab">PonsEye Lab <span>↗</span></Link>
-          <span>Robinhood Chain</span>
+          <span className="chainLabel"><Image src="/robinhood-feather.svg" alt="" width={24} height={24} />Robinhood Chain</span>
           <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {recorderLive ? "Recorder live" : "Recorder paused"}</div>
         </div>
       </header>
 
-      <section className="hero">
-        <div className="heroCopy">
-          <div className="heroBrand">
-            <Image className="heroRobot" src="/ponseye-robot-scanning.gif" alt="" width={512} height={512} priority unoptimized />
-            <Image className="heroWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
+      <section className="consolePrelude" aria-label="Ponseye system status">
+        <div className="consoleSignal">
+          <span className="consoleNode">System trace // session 0847</span>
+          <div className="consoleLog">
+            <span><time>00:00:01</time><b>Optic array initialised</b></span>
+            <span><time>00:00:03</time><b>{recorderLive ? "Robinhood feed linked" : "Robinhood feed closed"}</b></span>
+            <span><time>00:00:07</time><b>Launch field mapped</b></span>
+            <span><time>00:00:09</time><b>Contract trace active</b></span>
+            <span><time>00:00:12</time><b>Signal memory loaded</b></span>
+            <span><time>00:00:15</time><b>{recorderLive ? "Acquisition gate active" : "Recorder safely paused"}</b></span>
           </div>
+          <span className="consoleAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
         </div>
       </section>
 
-      <section className="boardSection">
-        {launches.length === 0 ? (
-          <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
-        ) : (
-          <div className="launchBoard">
-            <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" launches={sightings} empty="Watching for a new launch" />
-            <LaunchLane title="Under Watch" count={researchCounts.under_watch} tone="completing" launches={underWatch} empty="No launches have passed screening" />
-            <LaunchLane title="Target Locked" count={researchCounts.target_locked} tone="completed" launches={targetLocked} empty="No research signals have fired" />
-          </div>
-        )}
-        <footer className="panelFoot"><span>Tracking {launchCount.toLocaleString("en-GB")} launches</span><span>Signals recorded at detection</span></footer>
-      </section>
+      <div className="boardStage">
+        <Link href="/targets" className="capitalCircuitLink">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 18.5V5.5M3 18.5H21" />
+            <path className="circuitTrace" d="M5.5 15.5L9 12l3 2 6.5-7" />
+            <path className="circuitArrow" d="M15.5 7h3v3" />
+          </svg>
+          <span>Capital circuit</span>
+        </Link>
+        <div className="boardWatcher" aria-hidden="true">
+          <Image className="watcherCore" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
+          <Image className="watcherGlitch glitchPurple" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
+          <Image className="watcherGlitch glitchGreen" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
+        </div>
+        <section className="boardSection">
+          {launches.length === 0 ? (
+            <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
+          ) : (
+            <div className="launchBoard">
+              <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
+              <LaunchLane title="Surveilling" count={researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
+              <LaunchLane title="Acquired" count={researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a target yet" />
+            </div>
+          )}
+          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Signals appear after confirmation</span></footer>
+        </section>
+      </div>
     </main>
   );
 }

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getTokenDatabase, type DatabaseSort } from "../../../lib/database";
+import { getRecorderControlState, getTokenDatabase, type DatabaseSort } from "../../../lib/database";
+import { AutoRefresh } from "../../auto-refresh";
 import { TokenImage } from "../../token-image";
 import { LabHeader } from "../lab-header";
 import { DatabaseCopyAddress } from "./database-copy-address";
+import { RecorderControl } from "./recorder-control";
 
 export const dynamic = "force-dynamic";
 
@@ -70,12 +72,10 @@ export default async function DatabasePage({
     : "newest";
   const requestedPage = Number(first(query.page) ?? 1);
   const currentPage = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
-  const { tokens, filteredCount, stats } = await getTokenDatabase({
-    page: currentPage,
-    pageSize,
-    search,
-    sort,
-  });
+  const [{ tokens, filteredCount, stats }, recorder] = await Promise.all([
+    getTokenDatabase({ page: currentPage, pageSize, search, sort }),
+    getRecorderControlState(),
+  ]);
   const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
   const pageQuery = (page: number) => ({
     ...(search ? { q: search } : {}),
@@ -85,7 +85,10 @@ export default async function DatabasePage({
 
   return (
     <main className="databasePage">
+      <AutoRefresh intervalMs={3_000} />
       <LabHeader current="database" />
+
+      <RecorderControl enabled={recorder.enabled} feeds={recorder.feeds} />
 
       <section className="databaseStats">
         <article><small>Collected</small><strong>{stats.total.toLocaleString("en-GB")}</strong></article>

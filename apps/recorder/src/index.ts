@@ -4,10 +4,12 @@ import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { runHolderCollector } from "./holders.js";
 import { marketTrades, PONS_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
+let recorderMode: "paused" | "starting" | "recording" | "reconnecting" = "paused";
+let pauseReported = false;
 const traffic = {
   launchRows: 0,
   factoryRows: 0,
@@ -158,6 +160,7 @@ async function recordingCycle() {
   const collectorAbort = new AbortController();
   const client = createBitqueryClient(auth.access_token, () => {
     healthy = true;
+    recorderMode = "recording";
     connectedAt = new Date().toISOString();
     console.log("Bitquery WebSocket connected");
   });
@@ -181,12 +184,34 @@ async function recordingCycle() {
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
-  await delay(refreshAfter);
-  healthy = false;
+  const pauseMonitor = (async () => {
+    while (!collectorAbort.signal.aborted) {
+      await delayOrAbort(2_000, collectorAbort.signal);
+      if (collectorAbort.signal.aborted) return "cycle-ended" as const;
+      try {
+        if (!await getRecorderEnabled()) return "paused" as const;
+      } catch (error) {
+        console.error("Recorder control check failed", error);
+      }
+    }
+    return "cycle-ended" as const;
+  })();
+  const cycleResult = await Promise.race([
+    delayOrAbort(refreshAfter, collectorAbort.signal).then(() => "refresh" as const),
+    pauseMonitor,
+  ]);
   collectorAbort.abort();
   await holderCollector;
   await poolFeeds.stop();
   await client.dispose();
+  if (cycleResult === "paused") {
+    recorderMode = "paused";
+    connectedAt = null;
+    await markRecorderPaused();
+    pauseReported = true;
+  } else {
+    recorderMode = "reconnecting";
+  }
 }
 
 async function main() {
@@ -196,7 +221,7 @@ async function main() {
       return;
     }
     response.writeHead(healthy ? 200 : 503, { "content-type": "application/json" });
-    response.end(JSON.stringify({ healthy, connectedAt, traffic }));
+    response.end(JSON.stringify({ healthy, recorderMode, connectedAt, traffic }));
   }).listen(config.PORT, "0.0.0.0", () => console.log(`Health server listening on ${config.PORT}`));
 
   const trafficLog = setInterval(() => console.log("Recorder traffic", traffic), 60_000);
@@ -204,9 +229,23 @@ async function main() {
 
   while (true) {
     try {
+      if (!await getRecorderEnabled()) {
+        healthy = true;
+        recorderMode = "paused";
+        connectedAt = null;
+        if (!pauseReported) {
+          await markRecorderPaused();
+          pauseReported = true;
+        }
+        await delay(2_000);
+        continue;
+      }
+      pauseReported = false;
+      recorderMode = "starting";
       await recordingCycle();
     } catch (error) {
       healthy = false;
+      recorderMode = "reconnecting";
       console.error("Recorder cycle failed", error);
       await delay(10_000);
     }
