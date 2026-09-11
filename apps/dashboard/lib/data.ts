@@ -210,7 +210,7 @@ export async function getLaunchDetail(tokenAddress: string) {
       return null;
     }
     console.warn("[launch] using dashboard fallback", result.error?.message ?? "Detail response missing");
-    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[], chartCandles: [] as ChartCandle[], bondPriceUsd: null as number | null };
+    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[], chartCandles: [] as ChartCandle[], bondPriceUsd: null as number | null, poolStartedAt: null as string | null };
   }
 
   const payload = result.data as {
@@ -219,6 +219,7 @@ export async function getLaunchDetail(tokenAddress: string) {
     marketTrades: MarketTrade[];
     chartCandles: ChartCandle[];
     bondPriceUsd: number | null;
+    poolStartedAt: string | null;
   };
   const launch = payload.launch;
 
@@ -253,5 +254,6 @@ export async function getLaunchDetail(tokenAddress: string) {
       close: Number(candle.close),
     })) as ChartCandle[],
     bondPriceUsd: payload.bondPriceUsd == null ? null : Number(payload.bondPriceUsd),
+    poolStartedAt: payload.poolStartedAt ?? null,
   };
 }
