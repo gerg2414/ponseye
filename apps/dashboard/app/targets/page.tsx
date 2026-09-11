@@ -3,8 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Targets Acquired | PonsEye",
-  description: "Verified runners spotted by PonsEye before they moved.",
+  title: "Capital Circuit | PonsEye",
+  description: "PonsEye position results and verified returns.",
 };
 
 type Period = "1d" | "7d" | "30d" | "all";
@@ -42,22 +42,6 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
         <Link className="backLink" href="/">Launch dashboard <span>↗</span></Link>
       </header>
 
-      <section className="targetsHero">
-        <div>
-          <p className="previewLabel"><i /> Design preview using sample data</p>
-          <p className="eyebrow"><span>03</span> Verified signal archive</p>
-          <h1>Targets<br /><em>Acquired.</em></h1>
-          <p className="targetsIntro">Spotted by PonsEye before they ran.</p>
-        </div>
-        <div className="targetScanner" aria-hidden="true">
-          <span className="scannerCorner tl" /><span className="scannerCorner tr" />
-          <span className="scannerCorner bl" /><span className="scannerCorner br" />
-          <div className="scannerRings"><i /><b /></div>
-          <small>Signal locked</small>
-          <strong>{summary.best}</strong>
-        </div>
-      </section>
-
       <nav className="periodTabs" aria-label="Result period">
         {periodLabels.map(([value, label]) => (
           <Link key={value} className={period === value ? "active" : ""} href={`/targets?period=${value}`}>{label}</Link>
@@ -83,7 +67,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
 
       <section className="targetsResults">
         <header>
-          <div><p className="eyebrow"><span>04</span> Targets history</p><h2>Closed positions</h2></div>
+          <div><p className="eyebrow"><span>04</span> Capital circuit</p><h1>Closed positions</h1></div>
           <div className="verifiedKey"><i /> Onchain timestamp verified</div>
         </header>
 
@@ -97,7 +81,13 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
             <span role="columnheader" aria-label="Chart" />
           </div>
           {targets.map((target, index) => (
-            <article className="targetHistoryRow" role="row" key={target.symbol}>
+            <Link
+              className="targetHistoryRow"
+              href={\`/launch/preview-acquired-\${index % 2 === 0 ? "one" : "two"}\`}
+              role="row"
+              aria-label={\`View \${target.name} chart\`}
+              key={target.symbol}
+            >
               <div className="targetHistoryToken" role="cell">
                 <span className="targetRank">{String(index + 1).padStart(2, "0")}</span>
                 <div className="historyTokenThumb">{target.symbol.slice(0, 2)}</div>
@@ -107,8 +97,8 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
               <strong role="cell" data-label="Exit MC">{target.exit}</strong>
               <strong className="historyReturn" role="cell" data-label="Return">{target.multiple.toFixed(2)}x</strong>
               <span className="historyClosed" role="cell" data-label="Closed"><i />{target.closed}</span>
-              <Link className="historyChartLink" href="#" role="cell" aria-label={`View ${target.name} chart`}>View chart <b>↗</b></Link>
-            </article>
+              <span className="historyChartLink" role="cell">View chart <b>↗</b></span>
+            </Link>
           ))}
         </div>
       </section>
