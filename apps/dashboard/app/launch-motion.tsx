@@ -7,10 +7,12 @@ type CardState = "sighted" | "under_watch" | "target_locked";
 type CardSnapshot = {
   element: HTMLElement;
   launchedAt: number;
+  rect: DOMRect;
   state: CardState;
 };
 
 const animationLength = 1_050;
+const binnedLength = 780;
 
 function animate(element: HTMLElement | null, className: string, duration = animationLength) {
   if (!element) return;
@@ -30,13 +32,14 @@ function cardsOnBoard() {
       element,
       state,
       launchedAt: Date.parse(element.dataset.launchedAt ?? "") || 0,
+      rect: element.getBoundingClientRect(),
     });
   });
   return cards;
 }
 
 function createBinnedGhost(snapshot: CardSnapshot) {
-  const rect = snapshot.element.getBoundingClientRect();
+  const rect = snapshot.rect;
   if (!rect.width || !rect.height) return;
 
   const ghost = snapshot.element.cloneNode(true) as HTMLElement;
@@ -49,8 +52,67 @@ function createBinnedGhost(snapshot: CardSnapshot) {
     height: `${rect.height}px`,
   });
   document.body.appendChild(ghost);
-  animate(ghost, "motionBinned", animationLength);
-  window.setTimeout(() => ghost.remove(), animationLength + 80);
+  animate(ghost, "motionBinned", binnedLength);
+  window.setTimeout(() => ghost.remove(), binnedLength + 80);
+}
+
+function flySnapshot(prior: CardSnapshot, next: CardSnapshot, tone: "purple" | "green") {
+  if (!prior.rect.width || !next.rect.width) return;
+  const ghost = prior.element.cloneNode(true) as HTMLElement;
+  ghost.removeAttribute("href");
+  ghost.className = `launchCardLink motionGhost flightGhost ${tone}`;
+  Object.assign(ghost.style, {
+    left: `${prior.rect.left}px`, top: `${prior.rect.top}px`, width: `${prior.rect.width}px`, height: `${prior.rect.height}px`,
+  });
+  next.element.style.visibility = "hidden";
+  document.body.appendChild(ghost);
+  const dx = next.rect.left - prior.rect.left;
+  const dy = next.rect.top - prior.rect.top;
+  ghost.animate([
+    { transform: "translate3d(0,0,0) scale(1)", opacity: 1 },
+    { transform: `translate3d(${dx * .48}px,${dy * .2 - 8}px,0) scale(1.018)`, opacity: 1, offset: .48 },
+    { transform: `translate3d(${dx}px,${dy}px,0) scale(1)`, opacity: 1 },
+  ], { duration: 880, easing: "cubic-bezier(.22,.74,.2,1)", fill: "forwards" }).finished.then(() => {
+    ghost.remove();
+    next.element.style.removeProperty("visibility");
+    animate(next.element, tone === "green" ? "motionAcquired" : "motionFromSighted", tone === "green" ? 1_250 : 760);
+  }).catch(() => {
+    ghost.remove();
+    next.element.style.removeProperty("visibility");
+  });
+}
+
+function removeAndSlideUp(element: HTMLElement) {
+  const lane = element.parentElement;
+  if (!lane) { element.remove(); return; }
+  const remaining = [...lane.children].filter((item): item is HTMLElement => item instanceof HTMLElement && item !== element);
+  const before = new Map(remaining.map((item) => [item, item.getBoundingClientRect().top]));
+  element.remove();
+  remaining.forEach((item) => {
+    const delta = (before.get(item) ?? 0) - item.getBoundingClientRect().top;
+    if (Math.abs(delta) > 1) item.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], { duration: 430, easing: "cubic-bezier(.2,.76,.24,1)" });
+  });
+}
+
+function flyDemoCard(element: HTMLElement, destination: HTMLElement, tone: "purple" | "green", onArrival: () => void) {
+  const start = element.getBoundingClientRect();
+  const targetLane = destination.getBoundingClientRect();
+  const targetTop = targetLane.top + 10;
+  const targetLeft = targetLane.left + 10;
+  const ghost = element.cloneNode(true) as HTMLElement;
+  ghost.className = `launchCardLink motionGhost flightGhost ${tone}`;
+  Object.assign(ghost.style, { left: `${start.left}px`, top: `${start.top}px`, width: `${start.width}px`, height: `${start.height}px` });
+  element.style.visibility = "hidden";
+  document.body.appendChild(ghost);
+  ghost.animate([
+    { transform: "translate3d(0,0,0) scale(1)", opacity: 1 },
+    { transform: `translate3d(${(targetLeft - start.left) * .5}px,-10px,0) scale(1.025)`, opacity: 1, offset: .5 },
+    { transform: `translate3d(${targetLeft - start.left}px,${targetTop - start.top}px,0) scale(1)`, opacity: 1 },
+  ], { duration: 920, easing: "cubic-bezier(.2,.72,.18,1)", fill: "forwards" }).finished.then(() => {
+    ghost.remove();
+    removeAndSlideUp(element);
+    onArrival();
+  }).catch(() => { ghost.remove(); removeAndSlideUp(element); onArrival(); });
 }
 
 function createDemoCard(name: string, symbol: string, score: number, acquired = false) {
@@ -82,10 +144,10 @@ export function LaunchMotionController() {
       current.forEach((next, token) => {
         const prior = previous.current.get(token);
         if (prior?.state === "sighted" && next.state === "under_watch") {
-          animate(next.element, "motionFromSighted");
+          flySnapshot(prior, next, "purple");
         }
         if (prior?.state === "under_watch" && next.state === "target_locked") {
-          animate(next.element, "motionAcquired", 1_250);
+          flySnapshot(prior, next, "green");
         }
       });
 
@@ -116,30 +178,30 @@ export function LaunchMotionController() {
 
       const binnedDemo = createDemoCard("Rejected launch", "BIN", 23);
       const promotedDemo = createDemoCard("Fast flow", "FLOW", 72);
-      sightedLane.prepend(promotedDemo);
-      sightedLane.prepend(binnedDemo);
-      animate(binnedDemo, "motionBinned");
-      window.setTimeout(() => binnedDemo.remove(), 1_100);
+      [binnedDemo, promotedDemo, createDemoCard("Night watch", "NITE", 61), createDemoCard("Robin run", "ROBN", 47), createDemoCard("Early bird", "BIRD", 35)].forEach((card) => sightedLane.append(card));
+      [createDemoCard("Vector", "VCTR", 84), createDemoCard("Purple eye", "EYE", 78), createDemoCard("Lockstep", "LOCK", 69), createDemoCard("Scout", "SCT", 58)].forEach((card) => watchedLane.append(card));
+      [createDemoCard("Runner one", "RUN", 100, true), createDemoCard("Orbit", "ORBT", 100, true), createDemoCard("Vaulted", "VLT", 100, true)].forEach((card) => acquiredLane.append(card));
+
+      animate(binnedDemo, "motionBinned", binnedLength);
+      window.setTimeout(() => removeAndSlideUp(binnedDemo), binnedLength);
       window.setTimeout(() => {
-        animate(promotedDemo, "motionToSurveillance");
-      }, 1_300);
-      window.setTimeout(() => {
-        promotedDemo.remove();
-        const watchedDemo = createDemoCard("Fast flow", "FLOW", 91);
-        watchedLane.prepend(watchedDemo);
-        animate(watchedDemo, "motionFromSighted");
-        window.setTimeout(() => animate(watchedDemo, "motionToAcquired"), 1_350);
-        window.setTimeout(() => {
-          watchedDemo.remove();
-          const acquiredDemo = createDemoCard("Fast flow", "FLOW", 100, true);
-          acquiredLane.prepend(acquiredDemo);
-          animate(acquiredDemo, "motionAcquired", 1_250);
-        }, 2_050);
-      }, 2_050);
+        flyDemoCard(promotedDemo, watchedLane, "purple", () => {
+          const watchedDemo = createDemoCard("Fast flow", "FLOW", 91);
+          watchedLane.prepend(watchedDemo);
+          animate(watchedDemo, "motionFromSighted", 760);
+          window.setTimeout(() => {
+            flyDemoCard(watchedDemo, acquiredLane, "green", () => {
+              const acquiredDemo = createDemoCard("Fast flow", "FLOW", 100, true);
+              acquiredLane.prepend(acquiredDemo);
+              animate(acquiredDemo, "motionAcquired", 1_050);
+            });
+          }, 1_250);
+        });
+      }, 1_250);
       window.setTimeout(() => {
         document.querySelectorAll(".launchAnimationDemo").forEach((element) => element.remove());
         document.querySelectorAll<HTMLElement>('.launchLane .laneEmpty[data-demo-hidden="true"]').forEach((element) => { element.style.removeProperty("display"); delete element.dataset.demoHidden; });
-      }, 5_500);
+      }, 5_800);
     };
 
     window.addEventListener("ponseye:test-transitions", preview);
@@ -161,7 +223,7 @@ export function LaunchMotionPreview() {
     setRunning(true);
     document.querySelector<HTMLDetailsElement>(".pixelMenu")?.removeAttribute("open");
     window.dispatchEvent(new Event("ponseye:test-transitions"));
-    window.setTimeout(() => setRunning(false), 5_600);
+    window.setTimeout(() => setRunning(false), 5_900);
   }
 
   return (
