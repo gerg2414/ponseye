@@ -31,6 +31,7 @@ export default async function LabPage() {
             <strong>{tokens.length.toLocaleString("en-GB")}</strong>
             <small>{completeJourneys} full journeys · {tokens.length - completeJourneys} curve only</small>
           </div>
+          <Link className="backLink" href="/lab/database">Token database <b>↗</b></Link>
           <Link className="backLink" href="/">Launch dashboard <b>↗</b></Link>
         </div>
       </header>
