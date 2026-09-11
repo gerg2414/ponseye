@@ -33,25 +33,8 @@ export type DatabaseResult = {
   };
 };
 
-const columns = [
-  "token_address",
-  "name",
-  "symbol",
-  "image_url",
-  "status",
-  "launched_at",
-  "graduated_at",
-  "market_cap_usd",
-  "ath_market_cap_usd",
-  "peak_multiple",
-  "trade_count",
-  "buys",
-  "sells",
-  "unique_traders",
-  "buy_pressure_pct",
-  "volume_usd",
-  "holder_count",
-].join(",");
+// Keep this as a literal so Supabase can infer the selected row shape at build time.
+const columns = "token_address,name,symbol,image_url,status,launched_at,graduated_at,market_cap_usd,ath_market_cap_usd,peak_multiple,trade_count,buys,sells,unique_traders,buy_pressure_pct,volume_usd,holder_count";
 
 const sortColumns: Record<DatabaseSort, string> = {
   newest: "launched_at",
