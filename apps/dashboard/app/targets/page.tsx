@@ -26,6 +26,14 @@ function money(value: number) {
   }).format(value);
 }
 
+function axisMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function compactMoney(value: number | null) {
   if (!value || !Number.isFinite(value)) return "Pending";
   return `$${new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 2 }).format(value)}`;
@@ -33,6 +41,22 @@ function compactMoney(value: number | null) {
 
 function multiple(value: number | null) {
   return value == null || !Number.isFinite(value) ? "Pending" : `${value.toFixed(value >= 10 ? 1 : 2)}x`;
+}
+
+function smoothPath(points: Array<{ x: number; y: number }>) {
+  if (points.length < 2) return "";
+  return points.slice(0, -1).reduce((path, point, index) => {
+    const previous = points[index - 1] ?? point;
+    const next = points[index + 1];
+    const afterNext = points[index + 2] ?? next;
+    const controlOneX = point.x + (next.x - previous.x) / 6;
+    const controlTwoX = next.x - (afterNext.x - point.x) / 6;
+    const lowY = Math.min(point.y, next.y);
+    const highY = Math.max(point.y, next.y);
+    const controlOneY = Math.max(lowY, Math.min(highY, point.y + (next.y - previous.y) / 6));
+    const controlTwoY = Math.max(lowY, Math.min(highY, next.y - (afterNext.y - point.y) / 6));
+    return `${path} C${controlOneX.toFixed(1)} ${controlOneY.toFixed(1)},${controlTwoX.toFixed(1)} ${controlTwoY.toFixed(1)},${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
+  }, `M${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`);
 }
 
 function modelOutcome(token: LabToken) {
@@ -66,17 +90,15 @@ function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
     const y = padTop + ((max - value) / range) * (height - padTop - padBottom);
     return { x, y };
   });
-  const line = points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const line = smoothPath(points);
   const areaBottom = height - padBottom;
   const area = `${line} L${points.at(-1)?.x ?? padLeft} ${areaBottom} L${padLeft} ${areaBottom} Z`;
-  const last = points.at(-1) ?? { x: padLeft, y: areaBottom };
   const axisDate = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     ...(dates.length && Date.parse(dates.at(-1) ?? "") - Date.parse(dates[0]) < 172_800_000 ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
   const xTicks = [...new Set([0, Math.round((values.length - 1) * .25), Math.round((values.length - 1) * .5), Math.round((values.length - 1) * .75), values.length - 1])];
-  const pointStep = Math.max(1, Math.ceil(points.length / 14));
 
   return (
     <svg className="equityChart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Modelled PonsEye equity curve">
@@ -94,7 +116,7 @@ function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
       {[0, 1, 2, 3, 4].map((row) => {
         const y = padTop + ((height - padTop - padBottom) / 4) * row;
         const value = max - (range / 4) * row;
-        return <g key={row}><line className="equityGridLine" x1={padLeft} x2={width - padRight} y1={y} y2={y} /><text className="equityAxisValue" x={padLeft - 12} y={y + 4}>{money(value)}</text></g>;
+        return <g key={row}><line className="equityGridLine" x1={padLeft} x2={width - padRight} y1={y} y2={y} /><text className="equityAxisValue" x={padLeft - 12} y={y + 4}>{axisMoney(value)}</text></g>;
       })}
       {xTicks.map((index) => {
         const point = points[index];
@@ -104,13 +126,6 @@ function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
       <path className="equityArea" d={area} />
       <path className="equityGlow" d={line} />
       <path className="equityLine" d={line} />
-      {points.map((point, index) => index % pointStep === 0 || index === points.length - 1 ? (
-        <circle className="equityPoint" cx={point.x} cy={point.y} r="3.2" key={index}>
-          <title>{dates[index] ? `${new Date(dates[index]).toLocaleString("en-GB")}: ` : ""}{money(values[index])}</title>
-        </circle>
-      ) : null)}
-      <circle className="equityEndPulse" cx={last.x} cy={last.y} r="11" />
-      <circle className="equityEnd" cx={last.x} cy={last.y} r="5" />
     </svg>
   );
 }
@@ -161,7 +176,6 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       </header>
 
       <section className="circuitHeading">
-        <h1>Performance</h1>
         <nav className="circuitPeriods" aria-label="Performance period">
           {periodLabels.map(([value, label]) => (
             <Link className={period === value ? "active" : ""} href={`/targets?period=${value}&view=${view}`} key={value}>{label}</Link>
@@ -175,8 +189,6 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
         </header>
         <div className="equityPlot">
           <EquityCurve values={equityValues.length > 1 ? equityValues : [startingEquity, startingEquity]} dates={equityDates.length > 1 ? equityDates : [new Date().toISOString(), new Date().toISOString()]} />
-          <span className="equityStart">{money(startingEquity)}</span>
-          <span className="equityFinish">{money(balance)}</span>
         </div>
         <footer>Model replay using recorded trade order. Open positions are marked at the final recorded value. Fees and slippage are excluded.</footer>
       </section>
