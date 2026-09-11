@@ -139,6 +139,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .pixelMenuDemo { width: 100%; justify-content: space-between; cursor: pointer; }
 .pixelMenuDemo i { color: var(--purple); font-size: 12px; font-style: normal; }
 .pixelMenuDemo:disabled { cursor: wait; }
+.mobileMenuSocials { display: none; }
 .pixelMenu nav > :last-child { border-bottom: 0; }
 .pixelMenu nav a:hover,.pixelMenu nav a:focus-visible,.pixelMenuDemo:hover,.pixelMenuDemo:focus-visible { color: var(--green); background: #11161b; outline: none; }
 @keyframes pixelMenuReveal { from { opacity: 0; transform: translateY(-7px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -899,7 +900,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 @media (max-width: 620px) {
   main { width: 100%; padding: 0 12px 34px; }
   .homePage { height: 100dvh; padding-bottom: 0; grid-template-rows: 70px minmax(0,1fr); }
-  .header { height: 70px; }
+  .header { height: 70px; gap: 8px; }
   .headerBrand { gap: 0; margin-left: -10px; }
   .headerMark { width: 60px; height: 60px; margin-right: -10px; }
   .headerWordmark { width: 190px; }
@@ -907,12 +908,16 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .systemMeta { align-self: center; margin-top: 0; }
   .systemMeta > span { display: none; }
   .headerActions { margin-top: 6px; gap: 10px; }
-  .headerSocials { gap: 1px; }
+  .headerSocials { display: none; }
   .headerSocials a { width: 36px; height: 40px; border-radius: 9px; }
   .headerSocials img { width: 28px; height: 28px; }
   .headerSocials a:nth-child(3) img { width: 26px; height: 26px; }
   .pixelMenu > summary { width: 46px; height: 42px; }
   .pixelMenu nav { top: 49px; width: min(290px,calc(100vw - 24px)); }
+  .mobileMenuSocials { min-height: 58px; padding: 8px 10px; display: flex; align-items: center; gap: 5px; }
+  .pixelMenu nav .mobileMenuSocials a { width: 38px; min-height: 38px; height: 38px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 7px; background: #11141a; }
+  .mobileMenuSocials img { width: 27px; height: 27px; object-fit: contain; image-rendering: pixelated; }
+  .mobileMenuSocials a:nth-child(3) img { width: 25px; height: 25px; }
   .hero { min-height: auto; padding: 22px 0 30px; }
   .heroBrand { gap: 0; margin-bottom: 22px; }
   .heroRobot { width: 115px; height: 115px; }
@@ -928,10 +933,13 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .panelFoot span:last-child { display: none; }
   .boardHead { min-height: 82px; padding: 19px 17px; }
   .boardHead h2 { font-size: 19px; }
-  .launchBoard { margin-right: -1px; padding: 8px; gap: 8px; }
-  .boardUtility { gap: 12px; }
-  .boardUtility .chainLabel { font-size: 0; }
+  .launchBoard { margin-right: -1px; padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow-x: hidden; overflow-y: auto; scroll-snap-type: y proximity; }
+  .launchLane { width: 100%; height: auto; min-height: 240px; flex: 0 0 auto; scroll-snap-align: start; }
+  .launchLaneBody { overflow: visible; }
+  .boardUtility { gap: 9px; }
+  .boardUtility .chainLabel { font-size: 8px; white-space: nowrap; }
   .boardUtility .chainLabel img { width: 22px; height: 22px; }
+  .boardUtility .consoleAwait { font-size: 8px; letter-spacing: .035em; }
   .targetsNav { height: 68px; }
   .targetsNav > a:first-child { width: 175px; }
   .backLink { font-size: 0; }

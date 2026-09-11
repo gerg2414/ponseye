@@ -218,6 +218,11 @@ export default async function Home() {
               <Link href="/lab/database">Token database</Link>
               <Link href="/targets">Capital circuit</Link>
               <LaunchMotionPreview />
+              <div className="mobileMenuSocials" aria-label="Market and social links">
+                <a href="https://x.com/" target="_blank" rel="noreferrer" aria-label="X"><Image src="/social-x.png" alt="" width={112} height={112} /></a>
+                <a href="https://gmgn.ai/" target="_blank" rel="noreferrer" aria-label="GMGN"><Image src="/social-gmgn.png" alt="" width={112} height={112} /></a>
+                <a href="https://dexscreener.com/" target="_blank" rel="noreferrer" aria-label="Dexscreener"><Image src="/social-dexscreener.png" alt="" width={112} height={112} /></a>
+              </div>
             </nav>
           </details>
         </div>
