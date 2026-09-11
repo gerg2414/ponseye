@@ -181,20 +181,6 @@ export default async function Home() {
   return (
     <main>
       <AutoRefresh intervalMs={3_000} />
-      <div className="heroPixelField" aria-hidden="true">
-        {Array.from({ length: 72 }, (_, index) => (
-          <i
-            key={index}
-            style={{
-              left: `${(index * 37 + 9) % 98}%`,
-              top: index < 42 ? `${24 + ((index * 73) % 390)}px` : `${470 + (((index - 42) * 113) % 1030)}px`,
-              width: `${4 + ((index * 7) % 18)}px`,
-              height: `${3 + ((index * 5) % 10)}px`,
-              animationDelay: `-${(index % 9) * 0.7}s`,
-            }}
-          />
-        ))}
-      </div>
       <header className="header">
         <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         <div className="systemMeta">
@@ -229,7 +215,6 @@ export default async function Home() {
         </Link>
         <div className="boardWatcher" aria-hidden="true">
           <Image className="watcherCore" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
-          <Image className="watcherGlitch glitchPurple" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
         </div>
         <section className="boardSection">
           {launches.length === 0 ? (

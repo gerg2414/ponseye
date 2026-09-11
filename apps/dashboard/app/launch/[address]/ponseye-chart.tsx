@@ -64,16 +64,7 @@ function buildCandles(seedCandles: ChartCandle[], trades: MarketTrade[], interva
     }
   }
 
-  const candles = [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time));
-
-  for (let index = 1; index < candles.length; index += 1) {
-    const previousClose = candles[index - 1].close;
-    candles[index].open = previousClose;
-    candles[index].high = Math.max(candles[index].high, previousClose);
-    candles[index].low = Math.min(candles[index].low, previousClose);
-  }
-
-  return candles;
+  return [...buckets.values()].sort((a, b) => Number(a.time) - Number(b.time));
 }
 
 function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
