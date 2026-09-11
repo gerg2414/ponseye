@@ -28,7 +28,7 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 main { position: relative; isolation: isolate; width: 100%; margin: 0; padding: 0 22px; }
 .homePage { height: 100dvh; overflow: hidden; display: grid; grid-template-rows: 114px minmax(0,1fr); }
 main::before { content: ""; position: absolute; z-index: -1; top: 0; left: -22px; width: calc(100% + 44px); height: 455px; pointer-events: none; background-image: linear-gradient(180deg,rgba(19,10,33,.82) 0%,rgba(9,9,13,.34) 74%,transparent 100%), radial-gradient(ellipse at 72% 24%,rgba(119,55,216,.3) 0%,rgba(56,25,105,.13) 35%,transparent 66%), radial-gradient(circle,rgba(165,108,255,.2) 0 2px,transparent 2.5px), linear-gradient(rgba(165,108,255,.055) 1px,transparent 1px), linear-gradient(90deg,rgba(165,108,255,.055) 1px,transparent 1px); background-size: auto,auto,96px 96px,32px 32px,32px 32px; border-bottom: 1px solid rgba(165,108,255,.08); -webkit-mask-image: linear-gradient(#000 0%,#000 72%,transparent 100%); mask-image: linear-gradient(#000 0%,#000 72%,transparent 100%); }
-main::after { content: ""; position: absolute; z-index: 0; top: -2px; left: -22px; width: calc(100% + 44px); height: 520px; pointer-events: none; background: url("/ponseye-pixel-field.svg") center top / 100% 100% no-repeat; opacity: .34; -webkit-mask-image: linear-gradient(#000 0%,#000 66%,transparent 100%); mask-image: linear-gradient(#000 0%,#000 66%,transparent 100%); }
+main::after { content: none; }
 main > * { position: relative; z-index: 1; }
 .header { height: 114px; padding-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .homePage .header { z-index: 100; }
