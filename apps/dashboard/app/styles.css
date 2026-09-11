@@ -788,6 +788,35 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .positionChartFrame .priceChart { height: min(610px,55vw); min-height: 480px; }
 .positionChartFrame .tvToolbar { height: 48px; padding-inline: 18px; }
 .positionChartFrame .tvToolbar strong { font-size: 14px; }
+
+@media (min-width: 901px) {
+.positionPage { padding-bottom: 36px; }
+.positionPage .launchNav { height: 54px; }
+.positionHero { min-height: 148px; padding: 16px 4px; gap: 28px; }
+.positionHero .detailTokenImage { width: 72px; height: 72px; flex-basis: 72px; border-radius: 15px; }
+.positionHero .detailTokenImage img { border-radius: 11px; }
+.positionHero .launchIdentity { gap: 16px; }
+.positionHero h1 { font-size: clamp(32px,4vw,54px); }
+.positionEyebrow { margin-bottom: 6px; font-size: 10px; }
+.positionHero .tokenSubline { margin-top: 7px; font-size: 10px; }
+.positionMultiple { min-width: 220px; }
+.positionMultiple > span { font-size: 10px; }
+.positionMultiple strong { font-size: clamp(52px,6vw,80px); }
+.positionMultiple small { font-size: 10px; }
+.positionStats article { min-height: 78px; padding: 12px 18px; gap: 5px; }
+.positionStats span { font-size: 11px; }
+.positionStats strong { font-size: clamp(23px,2.35vw,34px); }
+.positionChartPanel { margin-top: 10px; }
+.positionChartPanel > header { min-height: 62px; padding: 10px 16px; }
+.positionChartKicker { font-size: 9px; }
+.positionChartPanel > header strong { font-size: 19px; }
+.positionLegend { gap: 16px; font-size: 10px; }
+.positionLegend i { width: 20px; height: 20px; font-size: 13px; }
+.positionChartFrame .priceChart { height: clamp(340px,43vh,440px); min-height: 340px; }
+.positionChartFrame .tvToolbar { height: 42px; padding-inline: 14px; }
+.positionChartFrame .tvToolbar strong { font-size: 12px; }
+}
+
 @media (max-width: 900px) {
 .positionHero { min-height: 200px; }
 .positionMultiple strong { font-size: 72px; }
