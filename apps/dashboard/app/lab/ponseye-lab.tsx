@@ -739,11 +739,6 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         <details className="labDrawer exit">
           <summary>
             <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitSettings.runnerTarget}x target · {exitModel === "nostop" ? "no stop" : `${exitSettings.stopLossPct}% stop`}</span></div>
-            <aside className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}>
-              <small>Simulated result</small>
-              <strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong>
-              <span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% ROI</span>
-            </aside>
             <b>Tune exit</b>
           </summary>
           <section className="labStrategyPanel">
