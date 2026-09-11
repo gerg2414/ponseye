@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLaunchDetail, type LaunchRecord, type MarketTrade } from "../../../lib/data";
 import { quoteValue } from "../../../lib/market";
@@ -15,6 +17,17 @@ export const metadata: Metadata = {
 };
 
 type PositionLinkKind = "gmgn" | "website" | "x" | "telegram" | "discord";
+type TradeMetricKind = "size" | "entry" | "value" | "pnl" | "roi" | "peak" | "time";
+
+function TradeMetricIcon({ kind }: { kind: TradeMetricKind }) {
+  if (kind === "size") return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M3 5h14v11H3zM6 3h8v2H6zM5 8h10v2H5zm0 4h5v2H5z" /></svg>;
+  if (kind === "entry") return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M3 15h14v2H3zM5 13V9h3V6h3V3h4v2h-2v3h-3v3H7v2z" /></svg>;
+  if (kind === "value") return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M4 3h12v14H4zM6 5v2h8V5zm0 4v2h5V9zm0 4v2h8v-2z" /></svg>;
+  if (kind === "pnl") return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M3 16V4h2v9l4-4 3 2 4-6h2v4h-2V8l-4 6-3-2-4 4z" /></svg>;
+  if (kind === "roi") return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M4 4h4v4H4zm8 8h4v4h-4zM14 3h3L6 17H3z" /></svg>;
+  if (kind === "peak") return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M2 16l5-8 3 4 4-8 4 12h-3l-2-6-3 6-3-4-2 4z" /></svg>;
+  return <svg viewBox="0 0 20 20" shapeRendering="crispEdges"><path d="M4 3h12v14H4zM6 1h2v4H6zm6 0h2v4h-2zM6 8h3v3H6zm5 0h3v3h-3zM6 13h3v2H6z" /></svg>;
+}
 
 function safeExternalUrl(value: string | null) {
   if (!value) return null;
@@ -137,7 +150,14 @@ export default async function LaunchPage({ params, searchParams }: {
   if (!detail) notFound();
 
   const { launch, marketTrades, chartCandles, bondPriceUsd } = detail;
+  if (!isPreview && launch.research_state !== "target_locked") notFound();
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "No price yet";
+  const money = (value: number | null) => value == null || !Number.isFinite(value)
+    ? "Pending"
+    : new Intl.NumberFormat("en-GB", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  const timestamp = (value: string | null) => value
+    ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(new Date(value)) + " UTC"
+    : "Pending";
   const requestedEntryAt = query.entry && Number.isFinite(Date.parse(query.entry)) ? query.entry : null;
   const requestedEntryMarketCap = query.entryMc && Number(query.entryMc) > 0 ? Number(query.entryMc) : null;
   const entryMarketCap = requestedEntryMarketCap ?? launch.entry_market_cap_usd ?? null;
@@ -148,6 +168,10 @@ export default async function LaunchPage({ params, searchParams }: {
   const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const acquired = Boolean(entryAt && entryMarketCap && entryMarketCap > 0);
   const gainTone = gainMultiple != null && gainMultiple < 1 ? "negative" : "positive";
+  const positionSizeUsd = 25;
+  const positionValueUsd = gainMultiple == null ? null : positionSizeUsd * gainMultiple;
+  const pnlUsd = positionValueUsd == null ? null : positionValueUsd - positionSizeUsd;
+  const roiPct = gainMultiple == null ? null : (gainMultiple - 1) * 100;
   const websiteUrl = safeExternalUrl(launch.website_url);
   const xUrl = safeExternalUrl(launch.twitter_url);
   const telegramUrl = safeExternalUrl(launch.telegram_url);
@@ -162,9 +186,18 @@ export default async function LaunchPage({ params, searchParams }: {
 
   return (
     <main className="launchPage positionPage">
-      <header className="launchNav">
-        <LaunchBackLink />
-        <div className={`positionNavStatus ${closed ? "closed" : acquired ? "live" : "watching"}`}><i /> {closed ? "Position closed" : acquired ? "Position live" : "Tracked token"}</div>
+      <header className="labNav launchLabNav">
+        <div className="labBrand">
+          <Link href="/" aria-label="PonsEye dashboard">
+            <Image src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
+          </Link>
+        </div>
+        <nav className="labNavLinks" aria-label="Chart navigation">
+          <LaunchBackLink />
+          <Link className="backLink" href="/lab">Testing Lab <b>↗</b></Link>
+          <Link className="backLink" href="/lab/database">Token database <b>↗</b></Link>
+          <Link className="backLink" href="/">Launch dashboard <b>↗</b></Link>
+        </nav>
       </header>
 
       <section className="positionHero">
@@ -173,7 +206,6 @@ export default async function LaunchPage({ params, searchParams }: {
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={92} priority />
           </div>
           <div className="launchIdentityCopy">
-            <span className="positionEyebrow">{acquired ? "PonsEye acquired" : "PonsEye tracked"}</span>
             <h1>{launch.name ?? "Unnamed token"}</h1>
             <div className="tokenSubline">
               <span>{launch.symbol ? `${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
@@ -195,58 +227,46 @@ export default async function LaunchPage({ params, searchParams }: {
             </div>
           </div>
         </div>
-        {acquired ? (
-          <aside className={`positionMultiple ${gainTone}`}>
-            <span>{closed ? "Final return" : "Current return"}</span>
-            <strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "No return yet"}</strong>
-            <small>{closed ? "Position banked" : "Ponseye is still holding"}</small>
-          </aside>
-        ) : (
-          <aside className="positionMultiple">
-            <span>Peak market cap</span>
-            <strong>{usd(launch.ath_market_cap_usd)}</strong>
-            <small>Observed by PonsEye</small>
-          </aside>
-        )}
       </section>
 
-      <section className="positionStats">
-        {acquired ? <>
-          <article><span>Entry MC</span><strong>{usd(entryMarketCap)}</strong></article>
-          <article><span>{closed ? "Exit MC" : "Current MC"}</span><strong>{usd(currentMarketCap)}</strong></article>
-          <article className={gainTone}><span>{closed ? "Banked" : "Gains"}</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "No return yet"}</strong></article>
-          <article><span>Peak MC</span><strong>{usd(launch.ath_market_cap_usd)}</strong><small>{peakMultiple ? `${peakMultiple.toFixed(2)}x from entry` : "Peak tracking"}</small></article>
-        </> : <>
-          <article><span>Current MC</span><strong>{usd(currentMarketCap)}</strong></article>
-          <article><span>Peak MC</span><strong>{usd(launch.ath_market_cap_usd)}</strong></article>
-          <article><span>Trades</span><strong>{launch.trade_count.toLocaleString("en-GB")}</strong></article>
-          <article><span>Holders</span><strong>{launch.holder_count?.toLocaleString("en-GB") ?? "Not recorded"}</strong></article>
-        </>}
-      </section>
+      <section className="positionTerminal">
+        <section className="positionChartPanel">
+          <header>
+            <div><strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"}</strong></div>
+            <div className="positionLegend" aria-label="Position chart markers">
+              <span className="buy"><i>↑</i> Ponseye buy</span>
+              {closed ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> Tracking live</span>}
+            </div>
+          </header>
+          <div className="positionChartFrame">
+            <PonsEyeChart
+              trades={marketTrades}
+              candles={chartCandles}
+              tokenAddress={launch.token_address}
+              graduatedAt={launch.graduated_at}
+              bondPriceUsd={bondPriceUsd}
+              acquiredAt={entryAt}
+              closedAt={launch.closed_at ?? null}
+              entryMarketCap={entryMarketCap}
+            />
+          </div>
+        </section>
 
-      <section className="positionChartPanel">
-        <header>
-          <div>
-            <span className="positionChartKicker">{acquired ? "PonsEye position tracker" : "PonsEye market tracker"}</span>
-            <strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"} / Market cap</strong>
+        <aside className="positionTradeRail">
+          <header>
+            <div><small>Trade summary</small><strong>{closed ? "Closed position" : "Open position"}</strong></div>
+            <span className={closed ? "closed" : "live"}><i />{closed ? "Closed" : "Live"}</span>
+          </header>
+          <div className="positionTradeMetrics">
+            <article><i><TradeMetricIcon kind="size" /></i><div><span>Position size</span><strong>{money(positionSizeUsd)}</strong></div></article>
+            <article><i><TradeMetricIcon kind="entry" /></i><div><span>Entry market cap</span><strong>{usd(entryMarketCap)}</strong></div></article>
+            <article><i><TradeMetricIcon kind="value" /></i><div><span>{closed ? "Returned" : "Current value"}</span><strong>{money(positionValueUsd)}</strong></div></article>
+            <article className={gainTone}><i><TradeMetricIcon kind="pnl" /></i><div><span>Net P&amp;L</span><strong>{pnlUsd != null && pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong></div></article>
+            <article className={gainTone}><i><TradeMetricIcon kind="roi" /></i><div><span>ROI</span><strong>{roiPct == null ? "Pending" : `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(1)}%`}</strong></div></article>
+            <article><i><TradeMetricIcon kind="peak" /></i><div><span>Peak market cap</span><strong>{usd(launch.ath_market_cap_usd)}</strong><small>{peakMultiple ? `${peakMultiple.toFixed(2)}x from entry` : "Peak pending"}</small></div></article>
+            <article className="tradeTime"><i><TradeMetricIcon kind="time" /></i><div><span>Entered</span><strong>{timestamp(entryAt)}</strong></div></article>
           </div>
-          <div className="positionLegend" aria-label="Position chart markers">
-            {acquired ? <span className="buy"><i>↑</i> Ponseye buy</span> : null}
-            {closed ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> Tracking live</span>}
-          </div>
-        </header>
-        <div className="positionChartFrame">
-          <PonsEyeChart
-            trades={marketTrades}
-            candles={chartCandles}
-            tokenAddress={launch.token_address}
-            graduatedAt={launch.graduated_at}
-            bondPriceUsd={bondPriceUsd}
-            acquiredAt={entryAt}
-            closedAt={launch.closed_at ?? null}
-            entryMarketCap={entryMarketCap}
-          />
-        </div>
+        </aside>
       </section>
     </main>
   );

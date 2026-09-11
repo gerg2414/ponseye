@@ -118,7 +118,12 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .status.graduated { border-color: rgba(154,255,79,.28); color: var(--green); background: rgba(154,255,79,.04); }
 .status.graduated i { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .panelFoot { padding: 14px 18px; display: flex; justify-content: space-between; color: #555b68; background: #0a0c0f; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
-.pixelMenu { position: relative; z-index: 110; align-self: flex-start; margin-top: 15px; }
+.headerActions { position: relative; z-index: 110; align-self: flex-start; margin-top: 15px; display: flex; align-items: center; gap: 8px; }
+.headerSocials { display: flex; align-items: center; gap: 7px; }
+.headerSocials a { width: 46px; height: 46px; display: grid; place-items: center; overflow: hidden; border: 1px solid #3b404c; border-radius: 10px; background: #0d1015; box-shadow: inset 0 0 16px rgba(165,108,255,.045),0 8px 22px rgba(0,0,0,.24); transition: transform .16s steps(2,end),border-color .16s ease,background .16s ease; }
+.headerSocials a:hover,.headerSocials a:focus-visible { z-index: 1; border-color: rgba(154,255,79,.55); background: #111610; outline: none; transform: translateY(-2px); }
+.headerSocials img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+.pixelMenu { position: relative; z-index: 110; }
 .pixelMenu > summary { position: relative; width: 50px; height: 46px; padding: 10px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid #3b404c; border-radius: 10px; color: #b986ff; background: #0d1015; cursor: pointer; list-style: none; box-shadow: inset 0 0 16px rgba(165,108,255,.055),0 8px 22px rgba(0,0,0,.28); transition: border-color .18s ease,background .18s ease,box-shadow .18s ease; }
 .pixelMenu > summary::-webkit-details-marker { display: none; }
 .pixelMenu > summary i { width: 26px; height: 4px; flex: 0 0 4px; display: block; background: repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 6px); filter: drop-shadow(0 0 4px rgba(165,108,255,.38)); transform-origin: center; image-rendering: pixelated; transition: transform .22s ease,opacity .14s ease,width .18s ease; }
@@ -129,11 +134,15 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .pixelMenu[open] > summary i:nth-child(2) { width: 0; opacity: 0; transform: scaleX(0); }
 .pixelMenu[open] > summary i:nth-child(3) { transform: translateY(-9px) rotate(-45deg); }
 .pixelMenu nav { position: absolute; z-index: 120; top: 55px; right: 0; width: 290px; padding: 10px; display: grid; border: 1px solid #343945; border-radius: 10px; background: linear-gradient(145deg,rgba(165,108,255,.055),transparent 45%),#0c0f14; box-shadow: 0 24px 70px rgba(0,0,0,.78),0 0 32px rgba(165,108,255,.1); transform-origin: top right; animation: pixelMenuReveal .18s ease-out both; }
-.pixelMenu nav a { min-height: 50px; padding: 0 14px; display: flex; align-items: center; border-bottom: 1px solid #282d36; color: #c3c8d0; font-size: 13px; font-weight: 700; letter-spacing: .055em; text-decoration: none; text-transform: uppercase; }
-.pixelMenu nav a:last-child { border-bottom: 0; }
-.pixelMenu nav a:hover,.pixelMenu nav a:focus-visible { color: var(--green); background: #11161b; outline: none; }
+.pixelMenu nav a,.pixelMenuDemo { min-height: 50px; padding: 0 14px; display: flex; align-items: center; border: 0; border-bottom: 1px solid #282d36; color: #c3c8d0; background: transparent; font: inherit; font-size: 13px; font-weight: 700; letter-spacing: .055em; text-decoration: none; text-transform: uppercase; }
+.pixelMenuDemo { width: 100%; justify-content: space-between; cursor: pointer; }
+.pixelMenuDemo i { color: var(--purple); font-size: 12px; font-style: normal; }
+.pixelMenuDemo:disabled { cursor: wait; }
+.pixelMenu nav > :last-child { border-bottom: 0; }
+.pixelMenu nav a:hover,.pixelMenu nav a:focus-visible,.pixelMenuDemo:hover,.pixelMenuDemo:focus-visible { color: var(--green); background: #11161b; outline: none; }
 @keyframes pixelMenuReveal { from { opacity: 0; transform: translateY(-7px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) {
+  .headerSocials a { transition: none; }
   .pixelMenu > summary i { transition: none; }
   .pixelMenu nav { animation: none; }
 }
@@ -164,6 +173,29 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .launchLane.completed .laneHead { background: linear-gradient(90deg,rgba(154,255,79,.07),transparent 58%),#0a0c0f; }
 .launchLaneBody { min-height: 0; flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
 .launchCardLink { display: block; color: inherit; text-decoration: none; }
+.motionGhost { position: fixed; z-index: 250; margin: 0; pointer-events: none; }
+.motionBinned { pointer-events: none; animation: targetBinned 1.05s steps(8,end) both; }
+.motionBinned .launchCard { border-color: rgba(255,75,105,.85); background-color: #1a0c11; box-shadow: inset 0 0 30px rgba(255,75,105,.16),0 0 20px rgba(255,75,105,.12); }
+.motionToSurveillance { pointer-events: none; animation: targetToSurveillance 1.05s cubic-bezier(.3,.7,.2,1) both; }
+.motionFromSighted { animation: targetFromSighted 1.05s cubic-bezier(.18,.8,.24,1) both; }
+.motionFromSighted .launchCard { animation: surveillanceScan 1.05s steps(8,end) both; }
+.motionToAcquired { pointer-events: none; animation: targetToAcquired 1.05s cubic-bezier(.3,.7,.2,1) both; }
+.motionAcquired { animation: targetAcquired 1.25s cubic-bezier(.16,.9,.22,1) both; }
+.motionAcquired .launchCard { animation: acquiredLock 1.25s steps(8,end) both; }
+@keyframes targetBinned {
+  0% { opacity: 1; transform: translate(0); clip-path: inset(0); filter: none; }
+  18% { transform: translate(-5px,0); filter: saturate(1.8); }
+  32% { transform: translate(6px,-1px); clip-path: inset(9% 0 0); }
+  48% { transform: translate(-4px,1px); clip-path: inset(24% 0 5%); }
+  68% { opacity: .72; transform: translate(8px,0); clip-path: inset(48% 0 4%); }
+  100% { opacity: 0; transform: translate(0,18px) scaleX(.92); clip-path: inset(100% 0 0); filter: brightness(1.6); }
+}
+@keyframes targetToSurveillance { 0% { opacity: 1; transform: translateX(0); } 45% { opacity: 1; transform: translateX(10px); filter: drop-shadow(0 0 12px rgba(165,108,255,.65)); } 100% { opacity: 0; transform: translateX(42px) scale(.97); } }
+@keyframes targetFromSighted { 0% { opacity: 0; transform: translateX(-34px) scale(.97); } 54% { opacity: 1; transform: translateX(4px); } 100% { transform: translateX(0) scale(1); } }
+@keyframes surveillanceScan { 0%,100% { border-color: #272b35; box-shadow: none; } 18%,48%,78% { border-color: rgba(165,108,255,.85); box-shadow: inset 18px 0 24px rgba(165,108,255,.1),0 0 18px rgba(165,108,255,.13); } }
+@keyframes targetToAcquired { 0% { opacity: 1; transform: translateX(0); } 45% { opacity: 1; transform: translateX(10px); filter: drop-shadow(0 0 12px rgba(154,255,79,.58)); } 100% { opacity: 0; transform: translateX(42px) scale(.97); } }
+@keyframes targetAcquired { 0% { opacity: 0; transform: translateX(-30px) scale(.93); } 50% { opacity: 1; transform: translateX(3px) scale(1.025); } 72% { transform: translateX(0) scale(.99); } 100% { transform: scale(1); } }
+@keyframes acquiredLock { 0%,22% { border-color: rgba(154,255,79,.2); box-shadow: none; } 38%,64% { border-color: var(--green); box-shadow: inset 0 0 34px rgba(154,255,79,.15),0 0 22px rgba(154,255,79,.2); } 100% { border-color: rgba(154,255,79,.34); } }
 .launchCard { position: relative; height: 320px; overflow: hidden; padding: 17px; display: flex; flex-direction: column; border: 1px solid #272b35; border-radius: 9px; background: radial-gradient(circle at 100% 0,rgba(165,108,255,.07),transparent 13rem),#101218; }
 .launchCardLink:hover .launchCard,.launchCardLink:focus-visible .launchCard { border-color: #62468d; background-color: #13161c; outline: none; }
 .launchCard.isAcquired { border-color: rgba(154,255,79,.34); background: radial-gradient(circle at 100% 0,rgba(154,255,79,.12),transparent 14rem),#101418; box-shadow: inset 0 0 28px rgba(154,255,79,.025); }
@@ -426,6 +458,10 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .circuitOutcome { grid-column: 2; grid-row: 1 / span 2; }
 }
 .launchPage { padding-bottom: 80px; }
+.launchLabNav { border-bottom: 1px solid var(--line); }
+.launchLabNav .labBrand > a { width: 220px; }
+.launchLabNav .labNavLinks { gap: 24px; }
+.launchLabNav .backLink { font-size: 10px; }
 .launchNav { height: 70px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .launchNav .backLink { font-size: 10px; }
 .detailLive { display: flex; align-items: center; gap: 8px; color: var(--green); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
@@ -852,7 +888,10 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .brandLogo { width: 220px; }
   .systemMeta { align-self: center; margin-top: 0; }
   .systemMeta > span { display: none; }
-  .pixelMenu { margin-top: 6px; }
+  .headerActions { margin-top: 6px; gap: 5px; }
+  .headerSocials { gap: 5px; }
+  .headerSocials a { width: 40px; height: 42px; border-radius: 9px; }
+  .headerSocials img { width: 31px; height: 31px; }
   .pixelMenu > summary { width: 46px; height: 42px; }
   .pixelMenu nav { top: 49px; width: min(290px,calc(100vw - 24px)); }
   .hero { min-height: auto; padding: 22px 0 30px; }
@@ -1034,6 +1073,30 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionChartFrame .priceChart { height: min(610px,55vw); min-height: 480px; }
 .positionChartFrame .tvToolbar { height: 48px; padding-inline: 18px; }
 .positionChartFrame .tvToolbar strong { font-size: 14px; }
+.positionTerminal { margin-top: 10px; display: grid; grid-template-columns: minmax(0,1fr) 370px; align-items: stretch; gap: 12px; }
+.positionTerminal .positionChartPanel { min-width: 0; margin-top: 0; }
+.positionTerminal .positionChartFrame .priceChart { height: clamp(430px,55vh,610px); min-height: 430px; }
+.positionTradeRail { min-width: 0; overflow: hidden; border: 1px solid #343844; border-radius: var(--radius-shell); background: radial-gradient(circle at 100% 0,rgba(165,108,255,.09),transparent 16rem),#0c0e12; box-shadow: 0 28px 90px rgba(0,0,0,.3); }
+.positionTradeRail > header { min-height: 72px; padding: 13px 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #292c35; }
+.positionTradeRail > header > div { display: grid; gap: 4px; }
+.positionTradeRail > header small { color: #747b88; font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.positionTradeRail > header strong { color: var(--white); font-family: Arial,sans-serif; font-size: 17px; }
+.positionTradeRail > header > span { padding: 6px 8px; display: flex; align-items: center; gap: 6px; border: 1px solid currentColor; border-radius: var(--radius-control); font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.positionTradeRail > header > span i { width: 6px; height: 6px; display: block; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.positionTradeRail > header > span.live { color: var(--green); }
+.positionTradeRail > header > span.closed { color: #ff718c; }
+.positionTradeMetrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.positionTradeMetrics article { min-width: 0; min-height: 104px; padding: 13px 12px; display: grid; grid-template-columns: 31px minmax(0,1fr); align-items: center; gap: 10px; border-right: 1px solid #292c35; border-bottom: 1px solid #292c35; }
+.positionTradeMetrics article:nth-child(2n) { border-right: 0; }
+.positionTradeMetrics article.tradeTime { min-height: 76px; grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
+.positionTradeMetrics article > i { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #3b404c; border-radius: var(--radius-control); color: var(--purple); background: #11141a; font-style: normal; }
+.positionTradeMetrics article > i svg { width: 18px; height: 18px; fill: currentColor; }
+.positionTradeMetrics article > div { min-width: 0; display: grid; gap: 5px; }
+.positionTradeMetrics article span { color: #777e8c; font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.positionTradeMetrics article strong { overflow: hidden; color: var(--white); font-family: Arial,sans-serif; font-size: 19px; letter-spacing: -.025em; white-space: nowrap; text-overflow: ellipsis; }
+.positionTradeMetrics article small { color: #737a87; font-size: 8px; }
+.positionTradeMetrics article.positive > i,.positionTradeMetrics article.positive strong { color: var(--green); }
+.positionTradeMetrics article.negative > i,.positionTradeMetrics article.negative strong { color: #ff718c; }
 
 @media (min-width: 901px) {
 .positionPage { padding-bottom: 36px; }
@@ -1061,11 +1124,14 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionChartFrame .priceChart { height: clamp(340px,43vh,440px); min-height: 340px; }
 .positionChartFrame .tvToolbar { height: 42px; padding-inline: 14px; }
 .positionChartFrame .tvToolbar strong { font-size: 12px; }
+.positionTerminal .positionChartFrame .priceChart { height: clamp(430px,55vh,610px); min-height: 430px; }
 }
 
 @media (max-width: 900px) {
 .positionHero { min-height: 200px; }
 .positionMultiple strong { font-size: 72px; }
+.positionTerminal { grid-template-columns: 1fr; }
+.positionTradeRail { order: 2; }
 .positionStats { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .positionStats article:nth-child(2) { border-right: 0; }
 .positionStats article:nth-child(-n+2) { border-bottom: 1px solid #2b2e38; }
@@ -1086,6 +1152,8 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionLegend { width: 100%; gap: 15px; font-size: 10px; }
 .positionLegend .tracking { margin-left: auto; }
 .positionChartFrame .priceChart { height: 410px; min-height: 410px; }
+.positionTerminal .positionChartFrame .priceChart { height: 410px; min-height: 410px; }
+.positionTradeMetrics article { min-height: 96px; }
 
 }
 

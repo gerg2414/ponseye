@@ -123,10 +123,10 @@ export default async function DatabasePage({
               {tokens.map((token) => (
                 <tr key={token.token_address}>
                   <td>
-                    <Link className="databaseToken" href={`/launch/${token.token_address}`}>
+                    <div className="databaseToken">
                       <TokenImage src={token.image_url} alt="" size={46} />
                       <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : shortAddress(token.token_address)}</small></span>
-                    </Link>
+                    </div>
                   </td>
                   <td><time dateTime={token.launched_at}>{launched(token.launched_at)}</time></td>
                   <td><span className={`databaseStatus ${token.graduated_at ? "graduated" : ""}`}>{statusLabel(token.status, token.graduated_at)}</span></td>
@@ -138,9 +138,6 @@ export default async function DatabasePage({
                   <td>
                     <div className="databaseActions">
                       <DatabaseCopyAddress address={token.token_address} />
-                      <Link href={`/launch/${token.token_address}`} aria-label={`Open ${token.name ?? token.symbol ?? "token"} chart`} title="Open chart">
-                        <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M1 13h14v2H1zM2 8h3v4H2zm5-5h3v9H7zm5 3h3v6h-3z" /></svg>
-                      </Link>
                       <a href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer" aria-label={`Open ${token.name ?? token.symbol ?? "token"} on GMGN`} title="Open on GMGN">
                         <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M2 2h12v3H5v6h6V9H8V6h6v8H2z" /></svg>
                       </a>

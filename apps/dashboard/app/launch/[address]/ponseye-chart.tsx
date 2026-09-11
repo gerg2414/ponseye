@@ -330,7 +330,6 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
   return (
     <div className="tvChartShell">
       <div className="tvToolbar">
-        <strong>PONS / MCAP</strong>
         <div className="tvIntervals" aria-label="Chart interval">
           {INTERVALS.map((option) => (
             <button

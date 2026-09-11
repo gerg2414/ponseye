@@ -4,6 +4,7 @@ import type { Launch } from "../lib/data";
 import { getDashboardData } from "../lib/data";
 import { quoteValue } from "../lib/market";
 import { AutoRefresh } from "./auto-refresh";
+import { LaunchMotionController, LaunchMotionPreview } from "./launch-motion";
 import { TokenImage } from "./token-image";
 
 export const dynamic = "force-dynamic";
@@ -61,8 +62,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
   const positionGradientId = `position-fill-${launch.token_address.replace(/[^a-z0-9-]/gi, "")}`;
   const filledSegments = Math.ceil(lockScore / 6.25);
 
-  return (
-    <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
+  const card = (
       <article className={`launchCard ${acquired ? "isAcquired" : "isCompact"}`}>
         <div className="cardTop">
           <div className="tokenImage">
@@ -135,7 +135,18 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
           </div>
         )}
       </article>
-    </Link>
+  );
+
+  const motionData = {
+    "data-token": launch.token_address,
+    "data-state": launch.research_state,
+    "data-launched-at": launch.launched_at,
+  };
+
+  return acquired ? (
+    <Link className="launchCardLink" href={`/launch/${launch.token_address}`} {...motionData}>{card}</Link>
+  ) : (
+    <div className="launchCardLink launchCardStatic" {...motionData}>{card}</div>
   );
 }
 
@@ -181,20 +192,35 @@ export default async function Home() {
   return (
     <main className="homePage">
       <AutoRefresh intervalMs={3_000} />
+      <LaunchMotionController />
       <header className="header">
         <div className="headerBrand">
           <Image className="headerMark" src="/ponseye-screen-icon-mark.png" alt="" width={256} height={256} priority />
           <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         </div>
-        <details className="pixelMenu">
-          <summary aria-label="Open navigation"><i /><i /><i /></summary>
-          <nav aria-label="Main navigation">
-            <Link href="/">Launch board</Link>
-            <Link href="/lab">Testing lab</Link>
-            <Link href="/lab/database">Token database</Link>
-            <Link href="/targets">Capital circuit</Link>
+        <div className="headerActions">
+          <nav className="headerSocials" aria-label="Market and social links">
+            <a href="https://x.com/" target="_blank" rel="noreferrer" aria-label="X">
+              <Image src="/social-x.png" alt="" width={112} height={112} />
+            </a>
+            <a href="https://gmgn.ai/" target="_blank" rel="noreferrer" aria-label="GMGN">
+              <Image src="/social-gmgn.png" alt="" width={112} height={112} />
+            </a>
+            <a href="https://dexscreener.com/" target="_blank" rel="noreferrer" aria-label="Dexscreener">
+              <Image src="/social-dexscreener.png" alt="" width={112} height={112} />
+            </a>
           </nav>
-        </details>
+          <details className="pixelMenu">
+            <summary aria-label="Open navigation"><i /><i /><i /></summary>
+            <nav aria-label="Main navigation">
+              <Link href="/">Launch board</Link>
+              <Link href="/lab">Testing lab</Link>
+              <Link href="/lab/database">Token database</Link>
+              <Link href="/targets">Capital circuit</Link>
+              <LaunchMotionPreview />
+            </nav>
+          </details>
+        </div>
       </header>
 
       <div className="boardStage">
