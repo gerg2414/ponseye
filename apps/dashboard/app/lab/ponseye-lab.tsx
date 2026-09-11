@@ -806,7 +806,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <article className={analysis.simulatedRoi >= 0 ? "positive" : "negative"}><small>ROI</small><strong>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}%</strong><span>on {formatUsd(analysis.capitalTested)} tested</span></article>
           <article className={`simulatedResult ${analysis.simulatedPnl >= 0 ? "positive" : "negative"}`}><small>Simulated result</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{formatUsd(exitSettings.positionSizeUsd)} each · {formatUsd(totalOutgoing)} total outgoing</span></article>
           <article><small>Under 1.2x</small><strong>{analysis.falsePositives.length}</strong><span>selected but stalled</span></article>
-          <article><small>Graduated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
+          <article><small>Migrated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
         </div>
 
         <details className="labMoreAnalysis">
