@@ -24,6 +24,19 @@ main { position: relative; isolation: isolate; width: 100%; margin: 0; padding: 
 main::before { content: ""; position: absolute; z-index: 0; top: 0; left: -22px; width: calc(100% + 44px); height: 455px; pointer-events: none; background: radial-gradient(ellipse at 72% 58%,rgba(111,47,211,.34) 0%,rgba(54,23,103,.18) 34%,transparent 64%), linear-gradient(180deg,rgba(24,13,40,.72) 0%,rgba(9,9,13,.2) 72%,transparent 100%), repeating-linear-gradient(90deg,rgba(165,108,255,.035) 0 1px,transparent 1px 48px), repeating-linear-gradient(0deg,rgba(165,108,255,.028) 0 1px,transparent 1px 48px); border-bottom: 1px solid rgba(165,108,255,.08); }
 main::after { content: ""; position: absolute; z-index: 0; top: 54px; left: -22px; width: calc(100% + 44px); height: 340px; pointer-events: none; opacity: .54; background-image: linear-gradient(90deg,transparent 0 86%,rgba(165,108,255,.18) 86% 89%,transparent 89%), linear-gradient(0deg,transparent 0 77%,rgba(154,255,79,.1) 77% 80%,transparent 80%); background-size: 73px 57px,91px 71px; -webkit-mask-image: linear-gradient(90deg,transparent 0%,rgba(0,0,0,.38) 30%,#000 64%,#000 100%); mask-image: linear-gradient(90deg,transparent 0%,rgba(0,0,0,.38) 30%,#000 64%,#000 100%); }
 main > * { position: relative; z-index: 1; }
+.heroPixelField { position: absolute; z-index: 0; inset: 0 -22px auto; width: calc(100% + 44px); height: 455px; overflow: hidden; pointer-events: none; }
+.heroPixelField i { position: absolute; display: block; background: rgba(165,108,255,.42); box-shadow: 0 0 10px rgba(165,108,255,.24); opacity: .28; animation: heroPixelFlicker 6.3s steps(1,end) infinite; }
+.heroPixelField i:nth-child(3n) { background: rgba(154,255,79,.34); box-shadow: 0 0 9px rgba(154,255,79,.18); }
+.heroPixelField i:nth-child(4n) { clip-path: polygon(0 0,72% 0,72% 34%,100% 34%,100% 100%,26% 100%,26% 68%,0 68%); }
+.heroPixelField i:nth-child(5n) { opacity: .48; }
+.heroPixelField i:nth-child(7n) { box-shadow: 8px 0 0 rgba(165,108,255,.13),16px 0 0 rgba(165,108,255,.07); }
+@keyframes heroPixelFlicker {
+  0%,68%,100% { opacity: .2; transform: translate(0,0); }
+  70% { opacity: .62; transform: translate(4px,-2px); }
+  72% { opacity: .16; transform: translate(-3px,1px); }
+  75% { opacity: .46; transform: translate(1px,0); }
+  78% { opacity: .2; transform: translate(0,0); }
+}
 .header { height: 90px; padding-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .headerWordmark { display: block; width: 310px; height: auto; image-rendering: pixelated; }
 .brand { display: flex; align-items: center; }
@@ -622,6 +635,6 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .boardWatcher .watcherGlitch,.boardWatcher::before { animation: none; }
+  .boardWatcher .watcherGlitch,.boardWatcher::before,.heroPixelField i { animation: none; }
   .boardWatcher .watcherGlitch { display: none; }
 }
