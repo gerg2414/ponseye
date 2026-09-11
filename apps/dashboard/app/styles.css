@@ -1445,58 +1445,18 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 
 
 /* Lab token database */
-.databasePage {
+.labPage,.databasePage {
   width: min(1680px,calc(100% - 32px));
   margin: 0 auto;
-  padding-bottom: 42px;
-}
-.databaseIntro {
-  min-height: 156px;
-  padding: 28px 2px 22px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 30px;
-}
-.databaseIntro > div { display: grid; gap: 6px; }
-.databaseIntro small {
-  color: var(--green);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-.databaseIntro h1 {
-  margin: 0;
-  color: #f3f4f6;
-  font-family: Arial,sans-serif;
-  font-size: clamp(38px,5vw,72px);
-  line-height: .95;
-  letter-spacing: -.055em;
-}
-.databaseIntro p { margin: 3px 0 0; color: #7e8692; font-size: 12px; }
-.databaseIntro > strong {
-  display: grid;
-  color: #f3f4f6;
-  font-family: Arial,sans-serif;
-  font-size: clamp(38px,4vw,62px);
-  line-height: .85;
-  letter-spacing: -.05em;
-  text-align: right;
-}
-.databaseIntro > strong span {
-  margin-top: 8px;
-  color: #727a86;
-  font-family: "SFMono-Regular",Consolas,monospace;
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: .09em;
-  text-transform: uppercase;
+  padding: 0 0 70px;
 }
 .databaseStats {
+  margin-top: 9px;
   display: grid;
   grid-template-columns: repeat(4,minmax(0,1fr));
-  border-block: 1px solid #282d35;
+  overflow: hidden;
+  border: 1px solid #282d35;
+  border-radius: 3px;
   background: #0d1014;
 }
 .databaseStats article {
@@ -1509,7 +1469,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 }
 .databaseStats article:last-child { border-right: 0; }
 .databaseStats small { color: #707884; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
-.databaseStats strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 25px; letter-spacing: -.035em; }
+.databaseStats strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 29px; letter-spacing: -.035em; }
 .databaseStats article:last-child strong { color: var(--green); }
 .databaseFilters {
   margin: 10px 0;
@@ -1565,85 +1525,88 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   background: #10141a;
 }
 .databaseLedger > header > div { display: grid; gap: 3px; }
-.databaseLedger > header small { color: #707884; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
-.databaseLedger > header strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 16px; }
-.databaseLedger > header > span { color: #7b838f; font-size: 10px; }
+.databaseLedger > header small { color: #707884; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.databaseLedger > header strong { color: #eef0f3; font-family: Arial,sans-serif; font-size: 18px; }
+.databaseLedger > header > span { color: #7b838f; font-size: 11px; }
 .databaseTableWrap { overflow-x: auto; }
 .databaseLedger table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1200px;
   border-collapse: collapse;
   table-layout: fixed;
 }
 .databaseLedger th {
-  height: 37px;
-  padding: 0 11px;
+  height: 42px;
+  padding: 0 13px;
   border-bottom: 1px solid #282d35;
   color: #69717d;
   background: #090c10;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: .08em;
   text-align: left;
   text-transform: uppercase;
 }
-.databaseLedger th:first-child { width: 250px; }
-.databaseLedger th:nth-child(2) { width: 115px; }
-.databaseLedger th:nth-child(3) { width: 90px; }
-.databaseLedger th:nth-child(4),.databaseLedger th:nth-child(5) { width: 105px; }
-.databaseLedger th:nth-child(6) { width: 72px; }
-.databaseLedger th:nth-child(7) { width: 110px; }
-.databaseLedger th:nth-child(8) { width: 90px; }
-.databaseLedger th:last-child { width: 174px; }
+.databaseLedger th:first-child { width: 280px; }
+.databaseLedger th:nth-child(2) { width: 125px; }
+.databaseLedger th:nth-child(3) { width: 100px; }
+.databaseLedger th:nth-child(4),.databaseLedger th:nth-child(5) { width: 115px; }
+.databaseLedger th:nth-child(6) { width: 80px; }
+.databaseLedger th:nth-child(7) { width: 120px; }
+.databaseLedger th:nth-child(8) { width: 100px; }
+.databaseLedger th:last-child { width: 130px; }
 .databaseLedger td {
-  height: 57px;
-  padding: 7px 11px;
+  height: 70px;
+  padding: 9px 13px;
   border-bottom: 1px solid #20252d;
   color: #aeb4be;
-  font-size: 10px;
+  font-size: 11px;
   vertical-align: middle;
 }
 .databaseLedger tbody tr:last-child td { border-bottom: 0; }
 .databaseLedger tbody tr:hover td { background: #11161c; }
-.databaseLedger td > strong { color: #e1e4e8; font-family: Arial,sans-serif; font-size: 12px; }
-.databaseLedger td > small { margin-top: 3px; display: block; color: #646c78; font-size: 8px; }
+.databaseLedger td > strong { color: #e1e4e8; font-family: Arial,sans-serif; font-size: 14px; }
+.databaseLedger td > small { margin-top: 4px; display: block; color: #737b87; font-size: 9px; }
 .databaseLedger .peakValue { color: var(--green); }
 .databaseToken {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
   color: inherit;
   text-decoration: none;
 }
-.databaseToken img { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; image-rendering: auto; }
-.databaseToken > span { min-width: 0; display: grid; gap: 3px; }
-.databaseToken strong { overflow: hidden; color: #eef0f3; font-family: Arial,sans-serif; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
-.databaseToken small { color: #69717d; font-size: 8px; }
+.databaseToken img { width: 46px; height: 46px; border-radius: 4px; object-fit: cover; image-rendering: pixelated; }
+.databaseToken > span { min-width: 0; display: grid; gap: 4px; }
+.databaseToken strong { overflow: hidden; color: #eef0f3; font-family: Arial,sans-serif; font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.databaseToken small { color: #737b87; font-size: 10px; }
 .databaseToken:hover strong { color: var(--green); }
 .databaseStatus {
-  padding: 4px 6px;
+  padding: 6px 8px;
   display: inline-block;
   color: #929aa6;
   background: #171c22;
-  font-size: 8px;
+  font-size: 9px;
   text-transform: capitalize;
 }
 .databaseStatus.graduated { color: var(--green); background: rgba(154,255,79,.08); }
-.databaseActions { display: flex; gap: 5px; }
+.databaseActions { display: flex; gap: 7px; }
 .databaseActions a,.databaseActions button {
-  padding: 5px 7px;
-  border: 1px solid #303640;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
   color: #aeb5bf;
-  background: transparent;
-  font-family: inherit;
-  font-size: 8px;
+  background: #11151a;
+  clip-path: polygon(4px 0,calc(100% - 4px) 0,calc(100% - 4px) 2px,100% 2px,100% calc(100% - 4px),calc(100% - 2px) calc(100% - 4px),calc(100% - 2px) 100%,4px 100%,4px calc(100% - 2px),0 calc(100% - 2px),0 4px,2px 4px,2px 2px,4px 2px);
+  box-shadow: inset 0 0 0 1px #303640;
   text-decoration: none;
-  text-transform: uppercase;
-  white-space: nowrap;
   cursor: pointer;
 }
-.databaseActions a:hover,.databaseActions button:hover,.databaseActions button:focus-visible { color: #0a0d10; border-color: var(--green); background: var(--green); }
+.databaseActions svg { width: 17px; height: 17px; fill: currentColor; }
+.databaseActions a:hover,.databaseActions button:hover,.databaseActions a:focus-visible,.databaseActions button:focus-visible { color: #0a0d10; background: var(--green); box-shadow: none; outline: none; }
 .databaseEmpty { height: 150px !important; color: #747c88 !important; text-align: center; }
 .databasePagination {
   min-height: 56px;
@@ -1689,13 +1652,11 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 }
 .databaseSkeletonFilters i { height: 38px; }
 .databaseSkeletonLedger > div { padding: 0 12px; }
-.databaseSkeletonLedger > div i { height: 57px; border-bottom: 1px solid #20252d; background-color: #0b0e12; }
+.databaseSkeletonLedger > div i { height: 70px; border-bottom: 1px solid #20252d; background-color: #0b0e12; }
 @keyframes databaseLoading { to { background-position: -220% 0; } }
 
 @media (max-width: 760px) {
   .labPage,.databasePage { width: min(100% - 20px,1680px); }
-  .databaseIntro { min-height: 136px; align-items: flex-start; flex-direction: column; gap: 20px; }
-  .databaseIntro > strong { display: none; }
   .databaseStats { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .databaseStats article:nth-child(2) { border-right: 0; }
   .databaseStats article:nth-child(-n+2) { border-bottom: 1px solid #282d35; }
