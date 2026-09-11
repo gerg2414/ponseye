@@ -192,7 +192,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
         horzLines: { color: "#181c23", style: 1 },
       },
       rightPriceScale: {
-        mode: PriceScaleMode.Logarithmic,
+        mode: PriceScaleMode.Normal,
         borderColor: "#252a34",
         scaleMargins: { top: 0.12, bottom: 0.1 },
       },
