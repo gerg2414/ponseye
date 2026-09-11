@@ -135,7 +135,7 @@ async function loadDashboardData() {
     db: { retry: false },
   });
   const dashboardResult = await db
-    .rpc("get_dashboard_home", { p_limit: 12 })
+    .rpc("get_dashboard_home", { p_limit: 200 })
     .abortSignal(AbortSignal.timeout(20_000));
 
   if (dashboardResult.error || !dashboardResult.data) {

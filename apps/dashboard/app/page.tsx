@@ -164,7 +164,7 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
 }
 
 export default async function Home() {
-  const { launches, streams, launchCount, researchCounts } = await getDashboardData();
+  const { launches, streams, launchCount } = await getDashboardData();
   const recorderFeeds = streams.filter((stream) => currentFeeds.has(stream.feed));
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
@@ -181,19 +181,6 @@ export default async function Home() {
   return (
     <main>
       <AutoRefresh intervalMs={3_000} />
-      <div className="heroPixelField" aria-hidden="true">
-        {Array.from({ length: 72 }, (_, index) => (
-          <i
-            key={index}
-            style={{
-              left: `${(index * 37 + 9) % 98}%`,
-              top: index < 42 ? `${24 + ((index * 73) % 390)}px` : `${470 + (((index - 42) * 113) % 1030)}px`,
-              width: `${4 + ((index * 7) % 18)}px`,
-              height: `${3 + ((index * 5) % 10)}px`,
-            }}
-          />
-        ))}
-      </div>
       <header className="header">
         <div className="headerBrand">
           <Image className="headerMark" src="/ponseye-screen-icon-mark.png" alt="" width={256} height={256} priority />
@@ -205,11 +192,8 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="consolePrelude" aria-label="Ponseye system status">
-        <span className="consoleAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
-      </section>
-
       <div className="boardStage">
+        <span className="consoleAwait boardAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
         <Link href="/targets" className="capitalCircuitLink">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 18.5V5.5M3 18.5H21" />
@@ -223,9 +207,9 @@ export default async function Home() {
             <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
           ) : (
             <div className="launchBoard">
-              <LaunchLane title="Sighted" count={researchCounts.sighted} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
-              <LaunchLane title="Surveilling" count={researchCounts.under_watch} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
-              <LaunchLane title="Acquired" count={researchCounts.target_locked} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a target yet" />
+              <LaunchLane title="Sighted" count={sightings.length} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
+              <LaunchLane title="Surveilling" count={surveillance.length} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
+              <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a target yet" />
             </div>
           )}
           <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Targets appear after confirmation</span></footer>
