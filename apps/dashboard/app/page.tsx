@@ -237,15 +237,11 @@ export default async function Home() {
           <span>Capital circuit</span>
         </Link>
         <section className="boardSection">
-          {launches.length === 0 ? (
-            <div className="empty"><span className="emptyEye"><i /></span><h3>Watching for the next launch</h3><p>New PONS launches will appear here automatically when the recorder is running.</p></div>
-          ) : (
-            <div className="launchBoard">
-              <LaunchLane title="Sighted" count={sightings.length} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
-              <LaunchLane title="Surveilling" count={surveillance.length} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
-              <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a target yet" />
-            </div>
-          )}
+          <div className="launchBoard">
+            <LaunchLane title="Sighted" count={sightings.length} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
+            <LaunchLane title="Surveilling" count={surveillance.length} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
+            <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="Ponseye has not acquired a target yet" />
+          </div>
           <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Targets appear after confirmation</span></footer>
         </section>
       </div>
