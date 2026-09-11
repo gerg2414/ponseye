@@ -18,8 +18,12 @@ export function DatabaseCopyAddress({ address }: { address: string }) {
   }
 
   return (
-    <button type="button" onClick={copyAddress} aria-label={`Copy contract address ${address}`} title={address}>
-      {copied ? "Copied" : "Copy CA"}
+    <button type="button" onClick={copyAddress} aria-label={`Copy contract address ${address}`} title={copied ? "Copied" : "Copy CA"}>
+      {copied ? (
+        <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M1 8h3v3h2v3h3v-3h2V8h2V5h2V2h-3v3h-2v3H8v3H7V8H4V6H1z" /></svg>
+      ) : (
+        <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M5 1h10v10h-3V4H5zm-4 4h10v10H1zm3 3v4h4V8z" /></svg>
+      )}
     </button>
   );
 }
