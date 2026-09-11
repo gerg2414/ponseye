@@ -190,7 +190,6 @@ export default async function Home() {
               top: index < 42 ? `${24 + ((index * 73) % 390)}px` : `${470 + (((index - 42) * 113) % 1030)}px`,
               width: `${4 + ((index * 7) % 18)}px`,
               height: `${3 + ((index * 5) % 10)}px`,
-              animationDelay: `-${(index % 9) * 0.7}s`,
             }}
           />
         ))}
