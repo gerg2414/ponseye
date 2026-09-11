@@ -91,11 +91,12 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, acquiredAt, closedAt, entryMarketCap }: {
+export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, poolStartedAt, acquiredAt, closedAt, entryMarketCap }: {
   trades: MarketTrade[];
   candles: ChartCandle[];
   tokenAddress: string;
   graduatedAt: string | null;
+  poolStartedAt: string | null;
   bondPriceUsd: number | null;
   acquiredAt: string | null;
   closedAt: string | null;
@@ -121,7 +122,8 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
   };
   const entryCandle = useMemo(() => nearestCandle(acquiredAt), [acquiredAt, candles]);
   const exitCandle = useMemo(() => nearestCandle(closedAt), [candles, closedAt]);
-  const bondCandle = useMemo(() => nearestCandle(graduatedAt), [candles, graduatedAt]);
+  const transitionAt = graduatedAt ?? poolStartedAt;
+  const bondCandle = useMemo(() => nearestCandle(transitionAt), [candles, transitionAt]);
 
   useEffect(() => {
     setLiveTrades((current) => mergeTrades(current, trades));
@@ -352,7 +354,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
         <b><i /> LIVE</b>
       </div>
       <div ref={containerRef} className="priceChart tradingViewCanvas" aria-label="TradingView Lightweight Chart showing PonsEye dollar market cap" />
-      <div ref={bondMarkerRef} className="chartBondMarker" hidden><span>Bonded</span></div>
+      <div ref={bondMarkerRef} className="chartBondMarker" hidden><span>{graduatedAt ? "Bonded" : "Pool live"}</span></div>
       <div ref={entryMarkerRef} className="chartEntryMarker" hidden>
         <span className="chartEntryChevron">⌃</span>
         <div className="chartEntryBadge">
