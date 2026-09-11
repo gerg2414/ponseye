@@ -38,7 +38,7 @@ main > * { position: relative; z-index: 1; }
 .headerWordmark { display: block; width: 310px; height: auto; image-rendering: pixelated; }
 .brand { display: flex; align-items: center; }
 .brandLogo { display: block; width: 280px; height: auto; image-rendering: pixelated; }
-.systemMeta { display: flex; align-items: center; gap: 26px; font-size: 10px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.systemMeta { display: flex; align-self: flex-start; align-items: center; gap: 26px; margin-top: 4px; font-size: 10px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
 .chainLabel { display: flex; align-items: center; gap: 8px; color: var(--green); }
 .chainLabel img { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; }
 .recorder { display: flex; gap: 9px; align-items: center; color: #8b91a0; }
@@ -836,6 +836,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   main { width: 100%; padding: 0 12px 34px; }
   .header { height: 58px; }
   .brandLogo { width: 220px; }
+  .systemMeta { align-self: center; margin-top: 0; }
   .systemMeta > span { display: none; }
   .hero { min-height: auto; padding: 22px 0 30px; }
   .heroBrand { gap: 0; margin-bottom: 22px; }
