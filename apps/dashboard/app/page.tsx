@@ -215,6 +215,7 @@ export default async function Home() {
         </Link>
         <div className="boardWatcher" aria-hidden="true">
           <Image className="watcherCore" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
+          <Image className="watcherGlitch glitchPurple" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
         </div>
         <section className="boardSection">
           {launches.length === 0 ? (
