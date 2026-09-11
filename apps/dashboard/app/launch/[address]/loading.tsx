@@ -1,5 +1,4 @@
 import { LaunchBackLink } from "./launch-back-link";
-import { RouteLoader } from "../../route-loader";
 
 export default function LoadingLaunch() {
   return (
@@ -8,7 +7,13 @@ export default function LoadingLaunch() {
         <LaunchBackLink />
         <div className="positionNavStatus watching"><i /> Opening live record</div>
       </header>
-      <RouteLoader label="Loading chart data" />
+      <section className="chartLoadingSkeleton" aria-hidden="true">
+        <div className="chartSkeletonTitle"><i /><b /></div>
+        <div className="chartSkeletonPlot"><i /><i /><i /><i /></div>
+        <div className="chartSkeletonStats">
+          {Array.from({ length: 4 }, (_, index) => <i key={index} />)}
+        </div>
+      </section>
     </main>
   );
 }
