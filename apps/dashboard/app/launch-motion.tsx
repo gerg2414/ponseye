@@ -75,6 +75,7 @@ function flySnapshot(prior: CardSnapshot, next: CardSnapshot, tone: "purple" | "
   ], { duration: 880, easing: "cubic-bezier(.22,.74,.2,1)", fill: "forwards" }).finished.then(() => {
     ghost.remove();
     next.element.style.removeProperty("visibility");
+    keepArrivalOnTop(next.element);
     animate(next.element, tone === "green" ? "motionAcquired" : "motionFromSighted", tone === "green" ? 1_250 : 760);
   }).catch(() => {
     ghost.remove();
@@ -94,10 +95,16 @@ function removeAndSlideUp(element: HTMLElement) {
   });
 }
 
+function keepArrivalOnTop(element: HTMLElement, duration = 900) {
+  element.classList.add("motionArrivalTop");
+  window.setTimeout(() => element.classList.remove("motionArrivalTop"), duration);
+}
+
 function prependAndSlideDown(lane: HTMLElement, element: HTMLElement) {
   const existing = [...lane.children].filter((item): item is HTMLElement => item instanceof HTMLElement);
   const before = new Map(existing.map((item) => [item, item.getBoundingClientRect().top]));
   lane.prepend(element);
+  keepArrivalOnTop(element);
   existing.forEach((item) => {
     const delta = (before.get(item) ?? 0) - item.getBoundingClientRect().top;
     if (Math.abs(delta) > 1) item.animate([

@@ -162,7 +162,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
       layout: {
         background: { type: ColorType.Solid, color: "#090b0f" },
         textColor: "#747b89",
-        fontFamily: '"SFMono-Regular", Consolas, monospace',
+        fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
         fontSize: 11,
         attributionLogo: true,
       },
@@ -215,8 +215,8 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
       horzAlign: "center",
       vertAlign: "center",
       lines: [
-        { text: "PONSEYE", color: "rgba(255,255,255,.045)", fontSize: 58, fontFamily: "Arial, sans-serif", fontStyle: "bold" },
-        { text: "LAUNCH INTELLIGENCE", color: "rgba(165,108,255,.16)", fontSize: 10, fontFamily: "Consolas, monospace", fontStyle: "normal" },
+        { text: "PONSEYE", color: "rgba(255,255,255,.045)", fontSize: 58, fontFamily: "\"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace", fontStyle: "bold" },
+        { text: "LAUNCH INTELLIGENCE", color: "rgba(165,108,255,.16)", fontSize: 10, fontFamily: "\"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace", fontStyle: "normal" },
       ],
     });
 
