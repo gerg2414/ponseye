@@ -137,9 +137,9 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .panelFoot { padding: 14px 18px; display: flex; justify-content: space-between; color: #555b68; background: #0a0c0f; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; }
 .boardStage { position: relative; padding-top: 115px; }
 .boardSection { position: relative; z-index: 2; overflow: hidden; background: rgba(12,14,18,.98); border: 1px solid var(--line); border-top-color: rgba(170,108,255,.38); border-radius: 12px; box-shadow: 0 -18px 70px rgba(108,54,190,.16), 0 24px 80px rgba(0,0,0,.42); }
-.boardWatcher { position: absolute; z-index: 1; inset: 0 0 auto; height: 350px; overflow: visible; pointer-events: none; }
+.boardWatcher { position: absolute; z-index: 1; inset: 0 0 auto; height: 115px; overflow: visible; pointer-events: none; }
 .boardWatcher::after { content: ""; position: absolute; z-index: 2; inset: 0; background: linear-gradient(90deg,var(--bg) 0%,rgba(7,8,10,.52) 25%,transparent 52%); }
-.boardWatcher img { position: absolute; z-index: 1; right: -35px; top: -330px; width: min(1180px,76vw); height: auto; object-fit: contain; image-rendering: auto; opacity: 1; filter: brightness(1.55) saturate(1.38) contrast(1.14) drop-shadow(0 0 38px rgba(137,73,240,.34)); }
+.boardWatcher img { position: absolute; z-index: 1; right: -35px; top: auto; bottom: 0; width: min(1500px,82vw); height: auto; object-fit: contain; image-rendering: auto; opacity: 1; filter: brightness(1.55) saturate(1.38) contrast(1.14) drop-shadow(0 0 38px rgba(137,73,240,.34)); }
 .boardWatcher .watcherGlitch { z-index: 2; opacity: 0; pointer-events: none; }
 .boardWatcher .glitchPurple { filter: brightness(1.7) saturate(1.7) contrast(1.2) drop-shadow(-9px 0 0 rgba(165,108,255,.58)); animation: watcherGlitchPurple 5.2s steps(1,end) infinite; }
 .boardWatcher .glitchGreen { filter: brightness(1.65) saturate(1.55) contrast(1.2) drop-shadow(8px 0 0 rgba(154,255,79,.42)); animation: watcherGlitchGreen 6.4s steps(1,end) .8s infinite; }
@@ -572,9 +572,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .consoleAwait { gap: 7px; font-size: 8px; }
   .boardStage { padding-top: 72px; }
   .capitalCircuitLink { right: 8px; top: 21px; min-height: 36px; font-size: 9px; }
-  .boardWatcher { height: 215px; }
+  .boardWatcher { height: 72px; }
   .boardWatcher::after { background: linear-gradient(90deg,var(--bg) 0%,rgba(7,8,10,.38) 12%,transparent 45%); }
-  .boardWatcher img { right: -40px; top: -210px; width: 650px; max-width: none; opacity: 1; }
+  .boardWatcher img { right: -40px; top: auto; bottom: 0; width: 650px; max-width: none; opacity: 1; }
   .boardHead { min-height: 82px; padding: 19px 17px; }
   .boardHead h2 { font-size: 19px; }
   .launchBoard { margin-right: -1px; padding: 8px; gap: 8px; }
