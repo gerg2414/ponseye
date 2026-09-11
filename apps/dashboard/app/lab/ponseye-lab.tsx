@@ -387,8 +387,10 @@ function formatUsd(value: number) {
 
 function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget: number }) {
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
+  const entryQuery = new URLSearchParams({ entry: token.signal_at });
+  if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
   return (
-    <Link className="labResultRow" href={`/launch/${token.token_address}`}>
+    <Link className="labResultRow" href={`/launch/${token.token_address}?${entryQuery.toString()}`}>
       <div className="labResultIdentity">
         <TokenImage src={token.image_url} alt={token.name ?? "Token image"} size={48} />
         <span><strong>{token.name ?? "Unknown token"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "No ticker"}</small></span>
