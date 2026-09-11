@@ -255,8 +255,6 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionMonitor.closed .positionMonitorFooter { border-color: #262b34; }
 .positionMonitor.closed .positionMonitorFooter > span:first-child { color: #ff718c; }
 .positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #ff718c; box-shadow: 0 0 7px rgba(255,113,140,.55); }
-.positionMonitor.loss .positionMonitorFooter > span:first-child { color: #ff718c; }
-.positionMonitor.loss .positionMonitorFooter > span:first-child i { background: #ff718c; }
 .progressTrack { height: 6px; overflow: hidden; background: #242732; }
 .progressTrack i { display: block; height: 100%; max-width: 100%; background: linear-gradient(90deg,var(--purple),#d56fff); box-shadow: 0 0 9px rgba(165,108,255,.55); }
 .completing .progressTrack i { background: linear-gradient(90deg,#ff7f50,#ffbf69); box-shadow: 0 0 9px rgba(255,159,67,.5); }
@@ -892,8 +890,6 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionMonitor.closed .positionMonitorFooter { border-color: #262b34; }
 .positionMonitor.closed .positionMonitorFooter > span:first-child { color: #ff718c; }
 .positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #ff718c; box-shadow: 0 0 7px rgba(255,113,140,.55); }
-.positionMonitor.loss .positionMonitorFooter > span:first-child { color: #ff718c; }
-.positionMonitor.loss .positionMonitorFooter > span:first-child i { background: #ff718c; }
 .chartEntryMarker { position: absolute; z-index: 5; display: grid; justify-items: center; transform: translate(-50%,12px); pointer-events: none; filter: drop-shadow(0 8px 14px rgba(0,0,0,.7)); }
 .chartEntryMarker[hidden] { display: none; }
 .chartEntryChevron { height: 14px; color: var(--green); font-family: Arial,sans-serif; font-size: 25px; font-weight: 900; line-height: 19px; text-shadow: 0 0 10px rgba(154,255,79,.75); }

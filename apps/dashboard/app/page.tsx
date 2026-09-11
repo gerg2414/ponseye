@@ -51,6 +51,7 @@ function lockLabel(launch: Launch, score: number) {
 function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired" }) {
   const lockScore = targetLockScore(launch);
   const acquired = mode === "acquired";
+  const positionClosed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
   const gainMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
@@ -75,7 +76,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
               </div>
               <div className="cardMetaStack">
                 <time>{age(launch.launched_at)}</time>
-                {acquired ? <span className="positionBadge live">Signal</span> : null}
+                {acquired ? <span className={`positionBadge ${positionClosed ? "closed" : "live"}`}>{positionClosed ? "Closed" : "Open"}</span> : null}
               </div>
             </div>
           </div>
@@ -95,7 +96,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
         )}
 
         {acquired ? (
-          <div className={`positionMonitor live ${positionLoss ? "loss" : "profit"}`}>
+          <div className={`positionMonitor ${positionClosed ? "closed" : "live"} ${positionLoss ? "loss" : "profit"}`}>
             <svg viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true">
               <defs>
                 <linearGradient id={positionGradientId} x1="0" y1="0" x2="0" y2="1">
@@ -109,7 +110,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
               <circle className="positionEnd" cx="318" cy={positionLoss ? "59" : "9"} r="4" />
             </svg>
             <div className="positionMonitorFooter">
-              <span><i />Signal tracked</span>
+              <span><i />{positionClosed ? "Position closed" : "Position open"}</span>
               <span className="chartLink">View chart <b>↗</b></span>
             </div>
           </div>
