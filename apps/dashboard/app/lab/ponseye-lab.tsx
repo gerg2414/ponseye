@@ -640,10 +640,14 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   return (
     <>
       <section className="labModelDock">
+        <header className="labBenchHeader">
+          <div><small>PonsEye test bench</small><strong>One entry. One exit. One result.</strong></div>
+          <span>Recorded launches · recalculates instantly</span>
+        </header>
         <details className="labDrawer entry">
           <summary>
             <div><small>Entry model</small><strong>{entryLabel}</strong><span>{analysis.selected.length} acquired · {hitRate.toFixed(1)}% hit rate</span></div>
-            <b>Settings</b>
+            <b>Tune entry</b>
           </summary>
           <aside className="labControls">
         <header>
@@ -725,6 +729,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </aside>
         </details>
 
+        <div className="labChainCore">
+          <small>Signals routed</small>
+          <div className="labChainPulse"><i /><b /></div>
+          <strong>{analysis.selected.length}</strong>
+          <span>Acquired</span>
+        </div>
+
         <details className="labDrawer exit">
           <summary>
             <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitSettings.runnerTarget}x target · {exitModel === "nostop" ? "no stop" : `${exitSettings.stopLossPct}% stop`}</span></div>
@@ -733,7 +744,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               <strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong>
               <span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% ROI</span>
             </aside>
-            <b>Settings</b>
+            <b>Tune exit</b>
           </summary>
           <section className="labStrategyPanel">
           <header><div><small>Trade replay</small><h2>Test the exit</h2></div><span>Using the selected Entry Model</span></header>
