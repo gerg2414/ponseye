@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 import { getPonsEyeLabData } from "../../lib/lab-data";
+import { LabHeader } from "./lab-header";
 import { PonsEyeLab } from "./ponseye-lab";
 
 export const dynamic = "force-dynamic";
@@ -13,28 +12,9 @@ export const metadata: Metadata = {
 
 export default async function LabPage() {
   const tokens = await getPonsEyeLabData();
-  const completeJourneys = tokens.filter((token) => token.outcome_scope === "full_market").length;
-
   return (
     <main className="labPage">
-      <header className="labNav">
-        <div className="labBrand">
-          <Link href="/" aria-label="PonsEye dashboard">
-            <Image src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
-          </Link>
-          <span>Lab</span>
-        </div>
-        <div className="labNavLinks">
-          <div className="labHeaderDataset">
-            <i />
-            <span>Dataset loaded</span>
-            <strong>{tokens.length.toLocaleString("en-GB")}</strong>
-            <small>{completeJourneys} full journeys · {tokens.length - completeJourneys} curve only</small>
-          </div>
-          <Link className="backLink" href="/lab/database">Token database <b>↗</b></Link>
-          <Link className="backLink" href="/">Launch dashboard <b>↗</b></Link>
-        </div>
-      </header>
+      <LabHeader current="testing" />
 
       {tokens.length ? (
         <PonsEyeLab tokens={tokens} />
