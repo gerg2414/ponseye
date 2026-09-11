@@ -1,21 +1,9 @@
-import Image from "next/image";
-import Link from "next/link";
+import { LabHeader } from "../lab-header";
 
 export default function DatabaseLoading() {
   return (
     <main className="databasePage" aria-busy="true">
-      <header className="labNav">
-        <div className="labBrand">
-          <Link href="/" aria-label="PonsEye dashboard">
-            <Image src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
-          </Link>
-          <span>Lab database</span>
-        </div>
-        <div className="labNavLinks">
-          <Link className="backLink" href="/lab">Testing Lab <b>↗</b></Link>
-          <Link className="backLink" href="/">Launch dashboard <b>↗</b></Link>
-        </div>
-      </header>
+      <LabHeader current="database" />
 
       <section className="databaseIntro">
         <div>
