@@ -32,7 +32,6 @@ type LabSettings = {
 
 type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
 type ControlTab = "models" | "rules" | "gates";
-type WorkspaceTab = "entry" | "exit";
 type ExitModel = "fixed" | "nostop" | "breakeven" | "initials";
 type SavedModel = { name: string; settings: LabSettings };
 
@@ -439,7 +438,6 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.balanced));
   const [activePreset, setActivePreset] = useState<PresetName | "custom">("balanced");
   const [controlTab, setControlTab] = useState<ControlTab>("models");
-  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("entry");
   const [exitModel, setExitModel] = useState<ExitModel>("fixed");
   const [savedModels, setSavedModels] = useState<SavedModel[]>([]);
   const [modelName, setModelName] = useState("");
@@ -583,22 +581,23 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
 
   const hitRate = analysis.selected.length ? analysis.hits.length * 100 / analysis.selected.length : 0;
   const visibleResults = resultView === "signals" ? analysis.orderedSignals : analysis.orderedMisses;
+  const entryLabel = activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label;
+  const exitLabel = {
+    fixed: "Fixed target",
+    nostop: "No initial stop",
+    breakeven: "Break even at 2x",
+    initials: "Initials at 2x",
+  }[exitModel];
 
   return (
     <>
-      <nav className="labModeTabs" aria-label="PonsEye Lab model type">
-        <button type="button" className={workspaceTab === "entry" ? "active" : ""} onClick={() => setWorkspaceTab("entry")}>
-          <small>Signal selection</small>
-          <strong>Entry Models</strong>
-        </button>
-        <button type="button" className={workspaceTab === "exit" ? "active" : ""} onClick={() => setWorkspaceTab("exit")}>
-          <small>Position management</small>
-          <strong>Exit Models</strong>
-        </button>
-      </nav>
-      <div className={`labWorkspace ${workspaceTab === "exit" ? "exitMode" : ""}`}>
-      {workspaceTab === "entry" && (
-      <aside className="labControls">
+      <section className="labModelDock">
+        <details className="labDrawer entry">
+          <summary>
+            <div><small>Entry model</small><strong>{entryLabel}</strong><span>{analysis.selected.length} acquired · {hitRate.toFixed(1)}% hit rate</span></div>
+            <b>Settings</b>
+          </summary>
+          <aside className="labControls">
         <header>
           <div><small>Signal model</small><h2>{activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label}</h2></div>
           <button type="button" onClick={() => choosePreset("balanced")}>Reset</button>
@@ -675,12 +674,20 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
             <label><span><b>Holder concentration</b><small>Reject above the Top 10 rule limit</small></span><input type="checkbox" checked={settings.concentrationGate} onChange={(event) => { setSettings({ ...settings, concentrationGate: event.target.checked }); setActivePreset("custom"); }} /></label>
           </section>
         )}
-      </aside>
-      )}
+          </aside>
+        </details>
 
-      <section className="labOutput">
-        {workspaceTab === "exit" && (
-        <section className="labStrategyPanel">
+        <details className="labDrawer exit">
+          <summary>
+            <div><small>Exit model</small><strong>{exitLabel}</strong><span>{settings.runnerTarget}x target · {exitModel === "nostop" ? "no stop" : `${settings.stopLossPct}% stop`}</span></div>
+            <aside className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}>
+              <small>Simulated result</small>
+              <strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong>
+              <span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% ROI</span>
+            </aside>
+            <b>Settings</b>
+          </summary>
+          <section className="labStrategyPanel">
           <header><div><small>Trade replay</small><h2>Test the exit</h2></div><span>Using the selected Entry Model</span></header>
           <nav className="labExitModels" aria-label="Exit model">
             <button type="button" className={exitModel === "fixed" ? "active" : ""} onClick={() => setExitModel("fixed")}><strong>Fixed target</strong><small>Stop first, then sell everything at target</small></button>
@@ -711,9 +718,11 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
             <article className="open"><small>Neither hit</small><strong>{analysis.openAtEnd}</strong><span>valued at final recorded price</span></article>
             <article className="unknown"><small>No replay data</small><strong>{analysis.selected.length - analysis.replayable.length}</strong><span>excluded from money result</span></article>
           </div>
-        </section>
-        )}
+          </section>
+        </details>
+      </section>
 
+      <section className="labOutput">
         <div className="labSummaryGrid">
           <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
           <article><small>{settings.runnerTarget}x peak reached</small><strong>{analysis.hits.length}</strong><span>before applying the stop</span></article>
@@ -723,6 +732,9 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <article><small>Graduated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
         </div>
 
+        <details className="labMoreAnalysis">
+          <summary><div><small>Optional detail</small><strong>More analysis</strong></div><span>Runner ladder, money breakdown and peak bands</span></summary>
+          <div className="labMoreAnalysisContent">
         <section className="labRunnerLadder">
           <header><div><small>Runner ladder</small><h2>Runners surviving the {settings.stopLossPct}% stop</h2></div><span>Caught from all Surveillance runners</span></header>
           <div>
@@ -759,6 +771,9 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </div>
         </section>
 
+          </div>
+        </details>
+
         <section className="labResults">
           <header>
             <div className="labResultTabs">
@@ -779,7 +794,6 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <span>Rules use only metrics recorded when each token first reached Surveillance. Curve and migrated pool prices are joined in USD. Tokens without a safe USD match fall back to curve performance. Holder rules are ignored when no holder snapshot existed at signal time.</span>
         </footer>
       </section>
-      </div>
     </>
   );
 }
