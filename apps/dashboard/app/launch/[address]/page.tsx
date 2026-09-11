@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getLaunchDetail, type LaunchRecord, type MarketTrade } from "../../../lib/data";
 import { quoteValue } from "../../../lib/market";
 import { TokenImage } from "../../token-image";
+import { CopyField } from "./copy-field";
 import { PonsEyeChart } from "./ponseye-chart";
 
 export const revalidate = 5;
@@ -12,6 +13,26 @@ export const metadata: Metadata = {
   title: "Position Tracker | PonsEye",
   description: "Follow PonsEye's autonomous position from entry to exit.",
 };
+
+type PositionLinkKind = "gmgn" | "website" | "x" | "telegram" | "discord";
+
+function safeExternalUrl(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function PixelLinkIcon({ kind }: { kind: PositionLinkKind }) {
+  if (kind === "gmgn") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M2 2h12v3H5v6h6V9H8V6h6v8H2z" /></svg>;
+  if (kind === "website") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M3 1h10v2h2v10h-2v2H3v-2H1V3h2zm2 2v2h6V3zm-2 4v2h10V7zm2 4v2h6v-2z" /></svg>;
+  if (kind === "x") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M2 2h3l3 4 3-4h3L9.5 8 14 14h-3l-3-4-3 4H2l4.5-6z" /></svg>;
+  if (kind === "telegram") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M1 7l14-6-3 14-4-4-3 3V10zm4 2l3 1 4-5z" /></svg>;
+  return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M3 3h2V2h6v1h2l2 9h-3v2H4v-2H1zm3 5v2h2V8zm4 0v2h2V8z" /></svg>;
+}
 
 const previewPositions = {
   "preview-acquired-one": { name: "Open Signal", symbol: "OPEN", entry: 33_200, current: 48_600, closed: false },
@@ -126,6 +147,17 @@ export default async function LaunchPage({ params, searchParams }: {
   const peakMultiple = entryMarketCap && launch.ath_market_cap_usd ? launch.ath_market_cap_usd / entryMarketCap : null;
   const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const gainTone = gainMultiple != null && gainMultiple < 1 ? "negative" : "positive";
+  const websiteUrl = safeExternalUrl(launch.website_url);
+  const xUrl = safeExternalUrl(launch.twitter_url);
+  const telegramUrl = safeExternalUrl(launch.telegram_url);
+  const discordUrl = safeExternalUrl(launch.discord_url);
+  const positionLinks: Array<{ kind: PositionLinkKind; label: string; href: string }> = [
+    { kind: "gmgn", label: "Open on GMGN", href: `https://gmgn.ai/robinhood/token/${launch.token_address}` },
+    ...(websiteUrl ? [{ kind: "website" as const, label: "Website", href: websiteUrl }] : []),
+    ...(xUrl ? [{ kind: "x" as const, label: "X", href: xUrl }] : []),
+    ...(telegramUrl ? [{ kind: "telegram" as const, label: "Telegram", href: telegramUrl }] : []),
+    ...(discordUrl ? [{ kind: "discord" as const, label: "Discord", href: discordUrl }] : []),
+  ];
 
   return (
     <main className="launchPage positionPage">
@@ -143,9 +175,22 @@ export default async function LaunchPage({ params, searchParams }: {
             <span className="positionEyebrow">PonsEye acquired</span>
             <h1>{launch.name ?? "Metadata pending"}</h1>
             <div className="tokenSubline">
-              <span>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
+              <span>{launch.symbol ? `${launch.symbol.replace(/^\$/, "")}` : "Unknown ticker"}</span>
               <b>◈</b>
               <span>Robinhood Chain</span>
+            </div>
+            <div className="positionResources">
+              <div className="positionContract">
+                <span>CA</span>
+                <CopyField value={launch.token_address} />
+              </div>
+              <nav className="positionLinks" aria-label="Token links">
+                {positionLinks.map((link) => (
+                  <a key={link.kind} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label} title={link.label}>
+                    <PixelLinkIcon kind={link.kind} />
+                  </a>
+                ))}
+              </nav>
             </div>
           </div>
         </div>
