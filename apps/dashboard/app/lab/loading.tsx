@@ -1,13 +1,11 @@
 import { LabHeader } from "./lab-header";
+import { RouteLoader } from "../route-loader";
 
 export default function LabLoading() {
   return (
-    <main className="labPage">
+    <main className="labPage" aria-busy="true">
       <LabHeader current="testing" />
-      <section className="labLoadingPanel">
-        <span className="emptyEye"><i /></span>
-        <strong>Loading the test bench</strong>
-      </section>
+      <RouteLoader label="Loading the test bench" />
     </main>
   );
 }
