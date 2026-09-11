@@ -33,6 +33,8 @@ export type LabToken = {
   future_peak_multiple: number | null;
   future_low_multiple: number | null;
   final_multiple: number | null;
+  closed_at?: string | null;
+  position_status?: "open" | "closed" | null;
   pre_target_low_multiples: Record<string, number | null>;
   post_2x_pre_target_low_multiples: Record<string, number | null>;
 };
