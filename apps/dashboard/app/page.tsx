@@ -250,6 +250,20 @@ export default async function Home() {
   return (
     <main>
       <AutoRefresh intervalMs={3_000} />
+      <div className="heroPixelField" aria-hidden="true">
+        {Array.from({ length: 34 }, (_, index) => (
+          <i
+            key={index}
+            style={{
+              left: `${(index * 37 + 9) % 98}%`,
+              top: `${34 + ((index * 61) % 330)}px`,
+              width: `${3 + ((index * 7) % 15)}px`,
+              height: `${3 + ((index * 5) % 8)}px`,
+              animationDelay: `-${(index % 9) * 0.7}s`,
+            }}
+          />
+        ))}
+      </div>
       <header className="header">
         <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         <div className="systemMeta">
