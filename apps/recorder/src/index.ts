@@ -8,6 +8,15 @@ import { getActiveMarketTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrad
 
 let healthy = false;
 let connectedAt: string | null = null;
+const traffic = {
+  launchRows: 0,
+  factoryRows: 0,
+  curveRowsReceived: 0,
+  curveRowsStored: 0,
+  marketRowsReceived: 0,
+  marketRowsStored: 0,
+  subscriptionRestarts: 0,
+};
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -29,32 +38,72 @@ function subscribe(
   client: Client,
   feed: string | string[],
   query: string,
-  handler: (row: never, collection: string) => Promise<void>,
+  handler: (row: never, collection: string) => Promise<unknown>,
+  signal: AbortSignal,
 ) {
   const feeds = Array.isArray(feed) ? feed : [feed];
   const label = feeds.join("+");
-  return client.subscribe({ query }, {
-    next: async (result) => {
-      try {
-        const data = result.data as { EVM?: Record<string, never[]>; Trading?: Record<string, never[]> } | undefined;
-        const root = data?.EVM ?? data?.Trading;
-        const collections = root ? Object.entries(root) : [];
-        for (const [collection, rows] of collections) {
-          for (const row of rows) await handler(row as never, collection);
+  let stopped = false;
+  let disposeCurrent: (() => void) | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let processing = Promise.resolve();
+  let restartAttempt = 0;
+
+  const reportError = async (error: unknown, context: string) => {
+    const message = error instanceof Error ? error.message : JSON.stringify(error);
+    console.error(`[${label}] ${context}`, error);
+    await Promise.all(feeds.map((name) => updateStreamStatus(name, "error", message)));
+  };
+
+  const scheduleRestart = (error?: unknown) => {
+    if (stopped || signal.aborted || retryTimer) return;
+    if (error !== undefined) void reportError(error, "subscription error");
+    traffic.subscriptionRestarts += 1;
+    restartAttempt += 1;
+    const retryAfter = Math.min(60_000, 5_000 * 2 ** Math.min(restartAttempt - 1, 4));
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (!stopped && !signal.aborted) start();
+    }, retryAfter);
+  };
+
+  const start = () => {
+    if (stopped || signal.aborted) return;
+    void Promise.all(feeds.map((name) => updateStreamStatus(name, "connecting")));
+    disposeCurrent = client.subscribe({ query }, {
+      next: (result) => {
+        restartAttempt = 0;
+        processing = processing.then(async () => {
+          const data = result.data as { EVM?: Record<string, never[]>; Trading?: Record<string, never[]> } | undefined;
+          const root = data?.EVM ?? data?.Trading;
+          const collections = root ? Object.entries(root) : [];
+          for (const [collection, rows] of collections) {
+            for (const row of rows) await handler(row as never, collection);
+          }
+          await Promise.all(feeds.map((name) => updateStreamStatus(name, "connected")));
+        }).catch((error) => reportError(error, "processing failed"));
+      },
+      error: scheduleRestart,
+      complete: () => {
+        if (!stopped && !signal.aborted) {
+          console.warn(`[${label}] subscription completed unexpectedly`);
+          scheduleRestart();
         }
-        await Promise.all(feeds.map((name) => updateStreamStatus(name, "connected")));
-      } catch (error) {
-        console.error(`[${label}] processing failed`, error);
-        await Promise.all(feeds.map((name) =>
-          updateStreamStatus(name, "error", error instanceof Error ? error.message : String(error))));
-      }
-    },
-    error: async (error) => {
-      console.error(`[${label}] subscription error`, error);
-      await Promise.all(feeds.map((name) => updateStreamStatus(name, "error", JSON.stringify(error))));
-    },
-    complete: () => console.log(`[${label}] subscription completed`),
-  });
+      },
+    });
+  };
+
+  const stop = () => {
+    stopped = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    disposeCurrent?.();
+    disposeCurrent = null;
+  };
+
+  signal.addEventListener("abort", stop, { once: true });
+  start();
+  return stop;
 }
 
 function createPoolFeedController(client: Client, signal: AbortSignal) {
@@ -71,7 +120,10 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
 
       disposeMarketFeed?.();
       disposeMarketFeed = addresses.length
-        ? subscribe(client, "market_trades", marketTrades(addresses), saveMarketTrade)
+        ? subscribe(client, "market_trades", marketTrades(addresses), async (row) => {
+          traffic.marketRowsReceived += 1;
+          if (await saveMarketTrade(row)) traffic.marketRowsStored += 1;
+        }, signal)
         : null;
       addressSignature = nextSignature;
       if (!addresses.length) await updateStreamStatus("market_trades", "connected", "No active watchlist tokens");
@@ -112,12 +164,20 @@ async function recordingCycle() {
   const poolFeeds = createPoolFeedController(client, collectorAbort.signal);
 
   subscribe(client, ["launch_activity", "curve_trades"], PONS_ACTIVITY, async (row, collection) => {
-    if (collection === "Calls") return saveLaunchCall(row);
-    if (collection === "CurveEvents") return saveTrade(row);
+    if (collection === "Calls") {
+      traffic.launchRows += 1;
+      return saveLaunchCall(row);
+    }
+    if (collection === "CurveEvents") {
+      traffic.curveRowsReceived += 1;
+      if (await saveTrade(row)) traffic.curveRowsStored += 1;
+      return;
+    }
+    traffic.factoryRows += 1;
     await saveFactoryEvent(row);
     const event = row as { Log?: { Signature?: { Name?: string } } };
     if (event.Log?.Signature?.Name === "PoolGraduated") await poolFeeds.refresh();
-  });
+  }, collectorAbort.signal);
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
@@ -136,8 +196,11 @@ async function main() {
       return;
     }
     response.writeHead(healthy ? 200 : 503, { "content-type": "application/json" });
-    response.end(JSON.stringify({ healthy, connectedAt }));
+    response.end(JSON.stringify({ healthy, connectedAt, traffic }));
   }).listen(config.PORT, "0.0.0.0", () => console.log(`Health server listening on ${config.PORT}`));
+
+  const trafficLog = setInterval(() => console.log("Recorder traffic", traffic), 60_000);
+  trafficLog.unref();
 
   while (true) {
     try {
