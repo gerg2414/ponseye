@@ -179,21 +179,29 @@ export default async function Home() {
     .sort((a, b) => new Date(b.launched_at).getTime() - new Date(a.launched_at).getTime());
 
   return (
-    <main>
+    <main className="homePage">
       <AutoRefresh intervalMs={3_000} />
       <header className="header">
         <div className="headerBrand">
           <Image className="headerMark" src="/ponseye-screen-icon-mark.png" alt="" width={256} height={256} priority />
           <Image className="headerWordmark" src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
         </div>
-        <div className="systemMeta">
-          <span className="chainLabel"><Image src="/robinhood-feather.svg" alt="" width={24} height={24} />Robinhood Chain</span>
-          <div className={`recorder ${recorderLive ? "live" : "offline"}`}><i /> {recorderLive ? "Recorder live" : "Recorder paused"}</div>
-        </div>
+        <details className="pixelMenu">
+          <summary aria-label="Open navigation"><i /><i /><i /></summary>
+          <nav aria-label="Main navigation">
+            <Link href="/">Launch board</Link>
+            <Link href="/lab">Testing lab</Link>
+            <Link href="/lab/database">Token database</Link>
+            <Link href="/targets">Capital circuit</Link>
+          </nav>
+        </details>
       </header>
 
       <div className="boardStage">
-        <span className="consoleAwait boardAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
+        <div className="boardUtility">
+          <span className="chainLabel"><Image src="/robinhood-feather.svg" alt="" width={24} height={24} />Robinhood Chain</span>
+          <span className="consoleAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
+        </div>
         <Link href="/targets" className="capitalCircuitLink">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 18.5V5.5M3 18.5H21" />
