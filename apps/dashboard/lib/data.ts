@@ -194,13 +194,16 @@ export async function getLaunchDetail(tokenAddress: string) {
     auth: { persistSession: false },
     db: { retry: false },
   });
-  const [result, dashboard] = await Promise.all([
+  const [result, dashboard, migrationPriceResult] = await Promise.all([
     db.rpc("get_launch_detail", {
       p_token_address: tokenAddress,
       p_trade_limit: 100,
       p_market_limit: 1000,
     }).abortSignal(AbortSignal.timeout(20_000)),
     getDashboardData(),
+    db.rpc("get_launch_migration_price_usd", {
+      p_token_address: tokenAddress,
+    }).abortSignal(AbortSignal.timeout(20_000)),
   ]);
 
   if (result.error || !result.data?.launch) {
@@ -253,7 +256,9 @@ export async function getLaunchDetail(tokenAddress: string) {
       low: Number(candle.low),
       close: Number(candle.close),
     })) as ChartCandle[],
-    bondPriceUsd: payload.bondPriceUsd == null ? null : Number(payload.bondPriceUsd),
+    bondPriceUsd: payload.bondPriceUsd != null
+      ? Number(payload.bondPriceUsd)
+      : migrationPriceResult.data == null ? null : Number(migrationPriceResult.data),
     poolStartedAt: payload.poolStartedAt ?? null,
   };
 }
