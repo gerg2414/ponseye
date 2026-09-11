@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLaunchDetail, type LaunchRecord, type MarketTrade } from "../../../lib/data";
 import { quoteValue } from "../../../lib/market";
 import { TokenImage } from "../../token-image";
 import { CopyField } from "./copy-field";
+import { LaunchBackLink } from "./launch-back-link";
 import { PonsEyeChart } from "./ponseye-chart";
 
 export const revalidate = 5;
@@ -163,7 +163,7 @@ export default async function LaunchPage({ params, searchParams }: {
   return (
     <main className="launchPage positionPage">
       <header className="launchNav">
-        <Link href="/" className="backLink"><span>←</span> Back to signals</Link>
+        <LaunchBackLink />
         <div className={`positionNavStatus ${closed ? "closed" : acquired ? "live" : "watching"}`}><i /> {closed ? "Position closed" : acquired ? "Position live" : "Tracked token"}</div>
       </header>
 
