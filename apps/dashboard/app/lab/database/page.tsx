@@ -87,15 +87,6 @@ export default async function DatabasePage({
     <main className="databasePage">
       <LabHeader current="database" />
 
-      <section className="databaseIntro">
-        <div>
-          <small>All recorded launches</small>
-          <h1>Token database</h1>
-          <p>Every token collected by PonsEye, including launches that never received a signal.</p>
-        </div>
-        <strong>{stats.total.toLocaleString("en-GB")}<span>tokens stored</span></strong>
-      </section>
-
       <section className="databaseStats">
         <article><small>Collected</small><strong>{stats.total.toLocaleString("en-GB")}</strong></article>
         <article><small>USD priced</small><strong>{stats.priced.toLocaleString("en-GB")}</strong></article>
@@ -130,7 +121,7 @@ export default async function DatabasePage({
                 <tr key={token.token_address}>
                   <td>
                     <Link className="databaseToken" href={`/launch/${token.token_address}`}>
-                      <TokenImage src={token.image_url} alt="" size={36} />
+                      <TokenImage src={token.image_url} alt="" size={46} />
                       <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : shortAddress(token.token_address)}</small></span>
                     </Link>
                   </td>
@@ -141,7 +132,17 @@ export default async function DatabasePage({
                   <td>{token.peak_multiple ? `${token.peak_multiple.toFixed(2)}x` : "Pending"}</td>
                   <td><span>{token.trade_count.toLocaleString("en-GB")}</span><small>{token.buys} buys · {token.sells} sells</small></td>
                   <td>{money(token.volume_usd)}</td>
-                  <td><div className="databaseActions"><DatabaseCopyAddress address={token.token_address} /><Link href={`/launch/${token.token_address}`}>Chart</Link><a href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer">GMGN</a></div></td>
+                  <td>
+                    <div className="databaseActions">
+                      <DatabaseCopyAddress address={token.token_address} />
+                      <Link href={`/launch/${token.token_address}`} aria-label={`Open ${token.name ?? token.symbol ?? "token"} chart`} title="Open chart">
+                        <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M1 13h14v2H1zM2 8h3v4H2zm5-5h3v9H7zm5 3h3v6h-3z" /></svg>
+                      </Link>
+                      <a href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer" aria-label={`Open ${token.name ?? token.symbol ?? "token"} on GMGN`} title="Open on GMGN">
+                        <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M2 2h12v3H5v6h6V9H8V6h6v8H2z" /></svg>
+                      </a>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!tokens.length ? <tr><td className="databaseEmpty" colSpan={9}>No tokens match that search.</td></tr> : null}
