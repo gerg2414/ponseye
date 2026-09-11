@@ -678,7 +678,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
                 <div className="labSavedList">
                   {savedModels.map((model) => (
                     <article key={model.name}>
-                      <button type="button" onClick={() => loadModel(model)}><strong>{model.name}</strong><small>{model.settings.scoreThreshold}% score · {model.exitSettings.runnerTarget}x target</small></button>
+                      <button type="button" onClick={() => loadModel(model)}><strong>{model.name}</strong><small>{model.settings.scoreThreshold}% score to acquire</small></button>
                       <button type="button" aria-label={`Delete ${model.name}`} onClick={() => deleteModel(model.name)}>×</button>
                     </article>
                   ))}
@@ -737,12 +737,34 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </summary>
           <section className="labStrategyPanel">
           <header><div><small>Trade replay</small><h2>Test the exit</h2></div><span>Using the selected Entry Model</span></header>
-          <nav className="labExitModels" aria-label="Exit model">
+          <nav className="labPresetGrid labExitModels" aria-label="Exit model">
             <button type="button" className={exitModel === "fixed" ? "active" : ""} onClick={() => chooseExitModel("fixed")}><strong>Fixed target</strong><small>Stop first, then sell everything at target</small></button>
             <button type="button" className={exitModel === "nostop" ? "active" : ""} onClick={() => chooseExitModel("nostop")}><strong>No initial stop</strong><small>Hold until target or the recorded end price</small></button>
             <button type="button" className={exitModel === "breakeven" ? "active" : ""} onClick={() => chooseExitModel("breakeven")}><strong>Break even at 2x</strong><small>Move the stop to entry after price reaches 2x</small></button>
             <button type="button" className={exitModel === "initials" ? "active" : ""} onClick={() => chooseExitModel("initials")}><strong>Initials at 2x</strong><small>Sell half at 2x and leave the rest running</small></button>
           </nav>
+
+          <div className="labSavedModels labExitSavedModels">
+            <header><div><small>Saved exit profiles</small><strong>This browser</strong></div></header>
+            <form onSubmit={(event) => { event.preventDefault(); saveExitProfile(); }}>
+              <input aria-label="Exit profile name" placeholder={`Exit setup ${savedExitProfiles.length + 1}`} value={exitProfileName} onChange={(event) => setExitProfileName(event.target.value)} />
+              <button type="submit">Save current</button>
+            </form>
+            {savedExitProfiles.length ? (
+              <div className="labSavedList">
+                {savedExitProfiles.map((profile) => (
+                  <article key={profile.name}>
+                    <button type="button" onClick={() => loadExitProfile(profile)}>
+                      <strong>{profile.name}</strong>
+                      <small>{profile.settings.runnerTarget}x target · {profile.settings.exitModel === "nostop" ? "no stop" : `${profile.settings.stopLossPct}% stop`}</small>
+                    </button>
+                    <button type="button" aria-label={`Delete ${profile.name}`} onClick={() => deleteExitProfile(profile.name)}>×</button>
+                  </article>
+                ))}
+              </div>
+            ) : <p>No saved exit profiles yet.</p>}
+          </div>
+
           <div className="labStrategyControls">
             <div className="target">
               <label>Take profit</label>
