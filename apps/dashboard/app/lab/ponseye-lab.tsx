@@ -26,10 +26,11 @@ type LabSettings = {
   stopLossPct: number;
   creatorGate: boolean;
   concentrationGate: boolean;
+  fastConvictionOverride?: boolean;
   rules: Rule[];
 };
 
-type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x";
+type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
 type ControlTab = "models" | "rules" | "gates";
 type WorkspaceTab = "entry" | "exit";
 type ExitModel = "fixed" | "nostop" | "breakeven" | "initials";
@@ -238,6 +239,24 @@ const basePresets: Record<PresetName, LabSettings> = {
       { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 90, min: 30, max: 95, step: 5, weight: 10, direction: "max", suffix: "%" },
     ],
   },
+  fast3x: {
+    fastConvictionOverride: true,
+    scoreThreshold: 90,
+    runnerTarget: 3,
+    positionSizeUsd: 25,
+    stopLossPct: 10,
+    creatorGate: true,
+    concentrationGate: true,
+    rules: [
+      { key: "trade_count", label: "Trade depth", short: "trades", threshold: 12, min: 5, max: 60, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "unique_traders", label: "Trader spread", short: "traders", threshold: 12, min: 2, max: 30, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "buy_pressure_pct", label: "Buy pressure", short: "buy pressure", threshold: 65, min: 40, max: 75, step: 1, weight: 10, direction: "min", suffix: "%" },
+      { key: "first_minute_buyers", label: "Early buyers", short: "early buyers", threshold: 8, min: 1, max: 15, step: 1, weight: 15, direction: "min", suffix: "" },
+      { key: "momentum_multiple", label: "Launch momentum", short: "momentum", threshold: 0.75, min: 0.4, max: 2, step: 0.05, weight: 20, direction: "min", suffix: "x" },
+      { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 70, min: 20, max: 100, step: 5, weight: 15, direction: "min", suffix: "%" },
+      { key: "top_10_holder_pct", label: "Top 10 holders", short: "holder spread", threshold: 90, min: 30, max: 95, step: 5, weight: 10, direction: "max", suffix: "%" },
+    ],
+  },
 };
 
 const presets = Object.fromEntries(
@@ -265,6 +284,7 @@ const presetDetails: Array<{ name: PresetName; label: string; description: strin
   { name: "wide3x", label: "Wider 3x", description: "56 signals · broader tested search" },
   { name: "tight3x", label: "Tight 3x", description: "33 signals · stop fill stress tested" },
   { name: "market3x", label: "Market 3x", description: "28 signals · market and early crowd rules" },
+  { name: "fast3x", label: "Fast Conviction", description: "Market 3x plus exceptional sub 3 second launches" },
 ];
 
 const savedModelsKey = "ponseye-lab-saved-models-v1";
@@ -346,10 +366,21 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
   }
 
   const labScore = availableWeight > 0 ? (passedWeight / availableWeight) * 100 : 0;
+  const fastConviction = settings.fastConvictionOverride === true
+    && token.signal_age_seconds != null
+    && token.signal_age_seconds <= 3
+    && token.trade_count >= 12
+    && token.unique_traders >= 10
+    && (token.buy_pressure_pct ?? 0) >= 80
+    && token.first_minute_buyers >= 8
+    && (token.momentum_multiple ?? 0) >= 2
+    && (token.peak_hold_pct ?? 0) >= 65
+    && (token.signal_market_cap_usd ?? 0) >= 10_000
+    && token.first_minute_buyers * 100 / Math.max(1, token.unique_traders) >= 75;
   return {
     ...token,
     labScore,
-    selected: blockedBy.length === 0 && labScore >= settings.scoreThreshold,
+    selected: blockedBy.length === 0 && (labScore >= settings.scoreThreshold || fastConviction),
     blockedBy,
     passedRules,
     availableRules,
