@@ -334,65 +334,69 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 
 /* Capital Circuit */
 .circuitPage { max-width: 1500px; margin: 0 auto; padding-bottom: 80px; }
-.circuitHeading { min-height: 148px; padding: 32px 4px 26px; display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; }
-.circuitKicker,.equityPanelHead span,.circuitStats span,.circuitLedger > header span { color: #777d8b; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-.circuitHeading h1 { margin: 8px 0 0; color: var(--white); font-family: Arial,sans-serif; font-size: clamp(42px,5vw,72px); letter-spacing: -.055em; line-height: .9; }
+.circuitPage::before,.circuitPage::after { left: 50%; width: 100vw; transform: translateX(-50%); }
+.circuitHeading { min-height: 96px; padding: 24px 4px 18px; display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; }
+.circuitKicker,.equityPanelHead span,.circuitStats span,.circuitLedger > header span { color: #858b98; font-size: 12px; font-weight: 700; letter-spacing: .075em; text-transform: uppercase; }
+.circuitHeading h1 { margin: 0; color: var(--white); font-family: Arial,sans-serif; font-size: clamp(30px,3.2vw,44px); letter-spacing: -.045em; line-height: 1; }
 .circuitPeriods { padding: 4px; display: flex; gap: 3px; border: 1px solid #262a33; border-radius: 7px; background: #0c0e12; }
-.circuitPeriods a { min-width: 58px; padding: 10px 12px; border-radius: 4px; color: #717784; font-size: 10px; font-weight: 700; text-align: center; text-decoration: none; }
+.circuitPeriods a { min-width: 64px; padding: 11px 14px; border-radius: 4px; color: #838a97; font-size: 12px; font-weight: 700; text-align: center; text-decoration: none; }
 .circuitPeriods a:hover,.circuitPeriods a:focus-visible { color: var(--white); }
 .circuitPeriods a.active { color: var(--white); background: var(--purple); box-shadow: 0 0 18px rgba(165,108,255,.24); }
 .equityPanel { overflow: hidden; border: 1px solid rgba(165,108,255,.34); border-radius: 12px; background: radial-gradient(circle at 72% 12%,rgba(142,74,243,.15),transparent 34rem),#0a0b10; box-shadow: inset 0 1px 0 rgba(255,255,255,.025),0 26px 80px rgba(0,0,0,.32); }
-.equityPanelHead { min-height: 116px; padding: 22px 26px 18px; display: flex; align-items: end; justify-content: space-between; gap: 28px; border-bottom: 1px solid rgba(165,108,255,.16); }
+.equityPanelHead { min-height: 62px; padding: 12px 18px; display: flex; align-items: center; justify-content: flex-end; gap: 28px; border-bottom: 1px solid rgba(165,108,255,.16); }
 .equityPanelHead > div { display: grid; gap: 5px; }
 .equityPanelHead strong { color: #f1ecff; font-family: Arial,sans-serif; font-size: clamp(34px,4vw,56px); letter-spacing: -.055em; line-height: 1; text-shadow: 0 0 30px rgba(165,108,255,.26); }
 .equityPanelHead small { font-size: 12px; font-weight: 700; }
 .positive { color: var(--green) !important; }
 .negative { color: #ff718c !important; }
-.equityPanelHead p { margin: 0; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; color: #888e9b; font-size: 10px; }
-.equityPanelHead p b { margin-right: 5px; color: #bca6e1; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.equityPanelHead p { margin: 0; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; color: #949aa7; font-size: 12px; }
+.equityPanelHead p b { margin-right: 5px; color: #c7afea; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
 .equityPanelHead p span { padding: 7px 9px; border: 1px solid #292d36; border-radius: 4px; color: #9298a5; background: rgba(15,17,22,.72); letter-spacing: .03em; text-transform: none; }
 .equityPlot { position: relative; height: clamp(270px,31vw,440px); padding: 18px 0 0; overflow: hidden; }
 .equityChart { width: 100%; height: 100%; overflow: visible; }
 .equityGridLine { stroke: rgba(165,108,255,.09); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.equityAxisValue { fill: #777e8c; font-family: Arial,sans-serif; font-size: 12px; text-anchor: end; }
+.equityAxisDate { fill: #777e8c; font-family: Arial,sans-serif; font-size: 11px; text-anchor: middle; }
 .equityArea { fill: url(#equityArea); }
 .equityGlow { fill: none; stroke: rgba(165,108,255,.28); stroke-width: 11; filter: url(#equityGlow); vector-effect: non-scaling-stroke; }
 .equityLine { fill: none; stroke: #b27cff; stroke-width: 3.5; stroke-linecap: square; stroke-linejoin: miter; filter: drop-shadow(0 0 7px rgba(165,108,255,.78)); vector-effect: non-scaling-stroke; }
+.equityPoint { fill: #d8b9ff; stroke: #6e30bd; stroke-width: 2; filter: drop-shadow(0 0 5px rgba(165,108,255,.72)); vector-effect: non-scaling-stroke; }
 .equityEndPulse { fill: rgba(165,108,255,.14); stroke: rgba(178,124,255,.32); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .equityEnd { fill: #d0a8ff; stroke: #5c239f; stroke-width: 3; filter: drop-shadow(0 0 9px #a56cff); vector-effect: non-scaling-stroke; }
-.equityStart,.equityFinish { position: absolute; padding: 6px 8px; border: 1px solid #2c303a; border-radius: 4px; color: #888e9a; background: rgba(8,9,13,.86); font-size: 10px; font-weight: 700; }
+.equityStart,.equityFinish { position: absolute; padding: 7px 9px; border: 1px solid #2c303a; border-radius: 4px; color: #969ca8; background: rgba(8,9,13,.86); font-size: 12px; font-weight: 700; }
 .equityStart { left: 22px; bottom: 22px; }
 .equityFinish { right: 22px; top: 22px; color: #d5baff; border-color: rgba(165,108,255,.36); }
-.equityPanel > footer { min-height: 42px; padding: 12px 26px; border-top: 1px solid rgba(165,108,255,.12); color: #646a77; font-family: Arial,sans-serif; font-size: 11px; line-height: 1.5; }
+.equityPanel > footer { min-height: 46px; padding: 13px 26px; border-top: 1px solid rgba(165,108,255,.12); color: #747b88; font-family: Arial,sans-serif; font-size: 13px; line-height: 1.5; }
 .circuitStats { margin: 14px 0; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 1px; overflow: hidden; border: 1px solid #252933; border-radius: 9px; background: #252933; }
 .circuitStats article { min-width: 0; min-height: 124px; padding: 18px; display: grid; align-content: center; gap: 7px; background: #0d0f14; }
 .circuitStats article.best { background: radial-gradient(circle at 85% 0,rgba(165,108,255,.14),transparent 10rem),#0d0f14; }
 .circuitStats strong { overflow: hidden; color: var(--white); font-family: Arial,sans-serif; font-size: clamp(23px,2.6vw,38px); letter-spacing: -.045em; text-overflow: ellipsis; }
 .circuitStats article.best strong { color: #bc89ff; }
-.circuitStats small { color: #666c79; font-family: Arial,sans-serif; font-size: 10px; }
+.circuitStats small { color: #777e8b; font-family: Arial,sans-serif; font-size: 12px; }
 .circuitLedger { overflow: hidden; border: 1px solid #252933; border-radius: 10px; background: #0a0c10; }
 .circuitLedger > header { min-height: 92px; padding: 20px 22px; display: flex; align-items: center; justify-content: space-between; gap: 25px; border-bottom: 1px solid #252933; }
 .circuitLedger h2 { margin: 6px 0 0; color: var(--white); font-family: Arial,sans-serif; font-size: 27px; letter-spacing: -.035em; }
-.circuitLedger > header p { margin: 0; display: flex; align-items: center; gap: 8px; color: #737987; font-size: 10px; }
-.circuitLedger > header p b { color: #c3c7d0; font-size: 13px; }
+.circuitLedger > header p { margin: 0; display: flex; align-items: center; gap: 8px; color: #838997; font-size: 12px; }
+.circuitLedger > header p b { color: #d0d3da; font-size: 15px; }
 .circuitLedger > header p i { width: 1px; height: 18px; margin: 0 5px; background: #30343e; }
 .circuitViews { padding: 10px; display: flex; gap: 5px; overflow-x: auto; border-bottom: 1px solid #22262f; }
-.circuitViews a { padding: 9px 11px; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 5px; color: #747b88; background: #111319; font-size: 10px; font-weight: 700; text-decoration: none; white-space: nowrap; }
-.circuitViews a b { min-width: 20px; padding: 3px 5px; border-radius: 3px; color: #686f7d; background: #090b0f; font-size: 9px; text-align: center; }
+.circuitViews a { padding: 10px 12px; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 5px; color: #858c99; background: #111319; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.circuitViews a b { min-width: 22px; padding: 4px 6px; border-radius: 3px; color: #747b89; background: #090b0f; font-size: 11px; text-align: center; }
 .circuitViews a.active { border-color: rgba(165,108,255,.44); color: #d2bbf7; background: rgba(165,108,255,.09); }
 .circuitViews a.active b { color: var(--purple); }
 .circuitTableHead,.circuitRow { display: grid; grid-template-columns: minmax(220px,1.5fr) 145px 120px 120px 90px minmax(150px,.8fr); align-items: center; gap: 14px; }
-.circuitTableHead { min-height: 42px; padding: 0 18px; border-bottom: 1px solid #20242c; color: #5f6572; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.circuitTableHead { min-height: 46px; padding: 0 18px; border-bottom: 1px solid #20242c; color: #747b88; font-size: 11px; font-weight: 700; letter-spacing: .065em; text-transform: uppercase; }
 .circuitRow { min-height: 76px; padding: 10px 18px; border-bottom: 1px solid #20242c; color: #adb2bd; text-decoration: none; transition: background .15s ease,border-color .15s ease; }
 .circuitRow:last-child { border-bottom: 0; }
 .circuitRow:hover,.circuitRow:focus-visible { outline: none; border-color: rgba(165,108,255,.28); background: rgba(165,108,255,.055); }
 .circuitToken { min-width: 0; display: flex; align-items: center; gap: 12px; }
 .circuitToken > img,.circuitToken > span:first-child { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 7px; object-fit: cover; }
 .circuitToken > span:last-child { min-width: 0; display: grid; gap: 5px; }
-.circuitToken strong { overflow: hidden; color: #e1e3e9; font-family: Arial,sans-serif; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.circuitToken small,.circuitRow time { color: #737986; font-size: 10px; }
-.circuitRow > strong { color: #c4c8d1; font-size: 12px; }
-.circuitRow > strong.runner { color: var(--green); font-family: Arial,sans-serif; font-size: 18px; }
-.circuitOutcome { width: fit-content; padding: 7px 8px; display: flex; align-items: center; gap: 7px; border: 1px solid #30343e; border-radius: 4px; color: #9298a4; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.circuitToken strong { overflow: hidden; color: #e1e3e9; font-family: Arial,sans-serif; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.circuitToken small,.circuitRow time { color: #838a97; font-size: 12px; }
+.circuitRow > strong { color: #d0d3da; font-size: 14px; }
+.circuitRow > strong.runner { color: var(--green); font-family: Arial,sans-serif; font-size: 21px; }
+.circuitOutcome { width: fit-content; padding: 8px 9px; display: flex; align-items: center; gap: 7px; border: 1px solid #30343e; border-radius: 4px; color: #9298a4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .circuitOutcome i { width: 6px; height: 6px; background: currentColor; box-shadow: 0 0 7px currentColor; }
 .circuitOutcome b { margin-left: 3px; color: #c8ccd4; }
 .circuitOutcome.win { border-color: rgba(154,255,79,.25); color: var(--green); background: rgba(154,255,79,.035); }
@@ -405,10 +409,10 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .circuitTableHead span:nth-child(4),.circuitRow > :nth-child(4) { display: none; }
 }
 @media (max-width: 720px) {
-  .circuitHeading { min-height: 170px; padding-top: 28px; display: grid; align-content: center; }
+  .circuitHeading { min-height: 132px; padding-top: 24px; display: grid; align-content: center; }
   .circuitPeriods { width: 100%; }
   .circuitPeriods a { min-width: 0; flex: 1; }
-  .equityPanelHead { min-height: 150px; padding: 20px; display: grid; align-items: start; }
+  .equityPanelHead { min-height: 92px; padding: 14px 18px; display: grid; align-items: center; }
   .equityPanelHead p { justify-content: flex-start; }
   .equityPlot { height: 280px; }
   .equityPanel > footer { padding-inline: 20px; }

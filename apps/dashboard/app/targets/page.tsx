@@ -51,22 +51,32 @@ function modelOutcome(token: LabToken) {
   };
 }
 
-function EquityCurve({ values }: { values: number[] }) {
+function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
   const width = 1000;
-  const height = 300;
-  const padX = 28;
-  const padY = 26;
+  const height = 330;
+  const padLeft = 74;
+  const padRight = 28;
+  const padTop = 24;
+  const padBottom = 42;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = Math.max(1, max - min);
   const points = values.map((value, index) => {
-    const x = padX + (index / Math.max(1, values.length - 1)) * (width - padX * 2);
-    const y = padY + ((max - value) / range) * (height - padY * 2);
+    const x = padLeft + (index / Math.max(1, values.length - 1)) * (width - padLeft - padRight);
+    const y = padTop + ((max - value) / range) * (height - padTop - padBottom);
     return { x, y };
   });
   const line = points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
-  const area = `${line} L${points.at(-1)?.x ?? padX} ${height} L${padX} ${height} Z`;
-  const last = points.at(-1) ?? { x: padX, y: height - padY };
+  const areaBottom = height - padBottom;
+  const area = `${line} L${points.at(-1)?.x ?? padLeft} ${areaBottom} L${padLeft} ${areaBottom} Z`;
+  const last = points.at(-1) ?? { x: padLeft, y: areaBottom };
+  const axisDate = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    ...(dates.length && Date.parse(dates.at(-1) ?? "") - Date.parse(dates[0]) < 172_800_000 ? { hour: "2-digit", minute: "2-digit" } : {}),
+  });
+  const xTicks = [...new Set([0, Math.round((values.length - 1) * .25), Math.round((values.length - 1) * .5), Math.round((values.length - 1) * .75), values.length - 1])];
+  const pointStep = Math.max(1, Math.ceil(points.length / 14));
 
   return (
     <svg className="equityChart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Modelled PonsEye equity curve">
@@ -81,10 +91,24 @@ function EquityCurve({ values }: { values: number[] }) {
           <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-      {[0, 1, 2, 3, 4].map((row) => <line className="equityGridLine" key={row} x1="0" x2={width} y1={(height / 4) * row} y2={(height / 4) * row} />)}
+      {[0, 1, 2, 3, 4].map((row) => {
+        const y = padTop + ((height - padTop - padBottom) / 4) * row;
+        const value = max - (range / 4) * row;
+        return <g key={row}><line className="equityGridLine" x1={padLeft} x2={width - padRight} y1={y} y2={y} /><text className="equityAxisValue" x={padLeft - 12} y={y + 4}>{money(value)}</text></g>;
+      })}
+      {xTicks.map((index) => {
+        const point = points[index];
+        const date = dates[index];
+        return point && date ? <text className="equityAxisDate" key={index} x={point.x} y={height - 13}>{axisDate.format(new Date(date))}</text> : null;
+      })}
       <path className="equityArea" d={area} />
       <path className="equityGlow" d={line} />
       <path className="equityLine" d={line} />
+      {points.map((point, index) => index % pointStep === 0 || index === points.length - 1 ? (
+        <circle className="equityPoint" cx={point.x} cy={point.y} r="3.2" key={index}>
+          <title>{dates[index] ? `${new Date(dates[index]).toLocaleString("en-GB")}: ` : ""}{money(values[index])}</title>
+        </circle>
+      ) : null)}
       <circle className="equityEndPulse" cx={last.x} cy={last.y} r="11" />
       <circle className="equityEnd" cx={last.x} cy={last.y} r="5" />
     </svg>
@@ -107,9 +131,11 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
 
   let balance = startingEquity;
   const equityValues = [balance];
+  const equityDates = [tokens[0]?.signal_at ?? new Date().toISOString()];
   for (const item of outcomes) {
     balance += positionSize * (item.outcome.exitMultiple - 1);
     equityValues.push(balance);
+    equityDates.push(item.token.signal_at);
   }
 
   const capitalDeployed = tokens.length * positionSize;
@@ -135,10 +161,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       </header>
 
       <section className="circuitHeading">
-        <div>
-          <span className="circuitKicker">Signal performance</span>
-          <h1>Capital Circuit</h1>
-        </div>
+        <h1>Performance</h1>
         <nav className="circuitPeriods" aria-label="Performance period">
           {periodLabels.map(([value, label]) => (
             <Link className={period === value ? "active" : ""} href={`/targets?period=${value}&view=${view}`} key={value}>{label}</Link>
@@ -148,15 +171,10 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
 
       <section className="equityPanel">
         <header className="equityPanelHead">
-          <div>
-            <span>Model equity</span>
-            <strong>{money(balance)}</strong>
-            <small className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)} net return</small>
-          </div>
           <p><b>Replay settings</b><span>{money(positionSize)} per acquired token</span><span>{targetMultiple}x target</span><span>10% stop</span></p>
         </header>
         <div className="equityPlot">
-          <EquityCurve values={equityValues.length > 1 ? equityValues : [startingEquity, startingEquity]} />
+          <EquityCurve values={equityValues.length > 1 ? equityValues : [startingEquity, startingEquity]} dates={equityDates.length > 1 ? equityDates : [new Date().toISOString(), new Date().toISOString()]} />
           <span className="equityStart">{money(startingEquity)}</span>
           <span className="equityFinish">{money(balance)}</span>
         </div>
