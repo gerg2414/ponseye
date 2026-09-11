@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 540" preserveAspectRatio="none">
+  <defs>
+    <pattern id="dense" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect x="1" y="3" width="7" height="7" fill="#a56cff" opacity=".72"/>
+      <rect x="17" y="1" width="5" height="5" fill="#7b42d3" opacity=".54"/>
+      <rect x="31" y="8" width="8" height="8" fill="#bd8cff" opacity=".66"/>
+      <rect x="9" y="22" width="4" height="4" fill="#d1b0ff" opacity=".42"/>
+      <rect x="25" y="27" width="6" height="6" fill="#8e52e6" opacity=".62"/>
+      <rect x="41" y="34" width="4" height="4" fill="#b77cff" opacity=".48"/>
+      <rect x="4" y="41" width="5" height="5" fill="#7a3bc8" opacity=".45"/>
+    </pattern>
+    <pattern id="loose" width="92" height="76" patternUnits="userSpaceOnUse">
+      <rect x="8" y="12" width="5" height="5" fill="#a56cff" opacity=".52"/>
+      <rect x="46" y="5" width="7" height="7" fill="#c093ff" opacity=".48"/>
+      <rect x="73" y="31" width="4" height="4" fill="#8243d6" opacity=".46"/>
+      <rect x="27" y="57" width="6" height="6" fill="#ad72ff" opacity=".38"/>
+    </pattern>
+    <linearGradient id="down" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="white"/>
+      <stop offset=".58" stop-color="white" stop-opacity=".72"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="white"/>
+      <stop offset=".55" stop-color="white" stop-opacity=".52"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="right" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="white"/>
+      <stop offset=".55" stop-color="white" stop-opacity=".52"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="fadeLeft"><rect width="700" height="540" fill="url(#left)"/><rect width="700" height="540" fill="url(#down)" style="mix-blend-mode:multiply"/></mask>
+    <mask id="fadeRight"><rect x="900" width="700" height="540" fill="url(#right)"/><rect x="900" width="700" height="540" fill="url(#down)" style="mix-blend-mode:multiply"/></mask>
+    <mask id="fadeTop"><rect width="1600" height="290" fill="url(#down)"/></mask>
+  </defs>
+  <rect width="700" height="540" fill="url(#dense)" mask="url(#fadeLeft)"/>
+  <rect x="900" width="700" height="540" fill="url(#dense)" mask="url(#fadeRight)"/>
+  <rect width="1600" height="290" fill="url(#loose)" mask="url(#fadeTop)" opacity=".78"/>
+</svg>
