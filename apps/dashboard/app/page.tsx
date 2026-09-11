@@ -227,8 +227,9 @@ export default async function Home() {
           <span>Capital circuit</span>
         </Link>
         <div className="boardWatcher" aria-hidden="true">
-          <Image className="watcherCore" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} priority />
-          <Image className="watcherGlitch glitchPurple" src="/ponseye-giant-watcher.webp" alt="" width={1920} height={819} />
+          <video className="watcherCore" autoPlay muted loop playsInline preload="auto" poster="/ponseye-giant-watcher.webp">
+            <source src="/ponseye-hero-1.webm" type="video/webm" />
+          </video>
         </div>
         <section className="boardSection">
           {launches.length === 0 ? (
