@@ -365,7 +365,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
           ))}
         </div>
         <span>USD</span>
-        <span>LOG</span>
+        <span>LINEAR</span>
         <b><i /> LIVE</b>
       </div>
       <div ref={containerRef} className="priceChart tradingViewCanvas" aria-label="TradingView Lightweight Chart showing PonsEye dollar market cap" />
