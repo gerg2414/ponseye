@@ -1,4 +1,5 @@
 import { LaunchBackLink } from "./launch-back-link";
+import { RouteLoader } from "../../route-loader";
 
 export default function LoadingLaunch() {
   return (
@@ -7,9 +8,7 @@ export default function LoadingLaunch() {
         <LaunchBackLink />
         <div className="positionNavStatus watching"><i /> Opening live record</div>
       </header>
-      <section className="chartEmpty" style={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
-        Loading launch intelligence…
-      </section>
+      <RouteLoader label="Loading chart data" />
     </main>
   );
 }
