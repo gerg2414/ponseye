@@ -1318,3 +1318,34 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 @media (prefers-reduced-motion: reduce) {
   .labChainPulse i { animation: none; left: 50%; }
 }
+
+
+/* Lab tune panels float above results */
+.labModelDock { overflow: visible; }
+.labDrawer { position: relative; overflow: visible; }
+.labDrawer[open] { z-index: 40; }
+.labDrawer > .labControls,
+.labDrawer > .labStrategyPanel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  width: 100%;
+  max-height: min(72vh,720px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid #272c35;
+  background: #0a0d11;
+  box-shadow: 0 28px 70px rgba(0,0,0,.58);
+  scrollbar-color: #3a424e #0a0d11;
+}
+.labDrawer.exit > .labStrategyPanel {
+  right: 0;
+  left: auto;
+}
+@media (max-width: 620px) {
+  .labDrawer > .labControls,
+  .labDrawer > .labStrategyPanel {
+    max-height: 68vh;
+  }
+}
