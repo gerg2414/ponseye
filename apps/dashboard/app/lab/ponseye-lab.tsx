@@ -266,7 +266,7 @@ const presets = Object.fromEntries(
       ...settings,
       rules: [
         ...settings.rules,
-        ...additionalRules.map((rule) => name === "market3x" ? { ...rule, weight: 25 } : { ...rule }),
+        ...additionalRules.map((rule) => name === "market3x" || name === "fast3x" ? { ...rule, weight: 25 } : { ...rule }),
       ],
     },
   ]),
