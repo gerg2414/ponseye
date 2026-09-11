@@ -405,37 +405,46 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .labEmpty { min-height: 420px; display: grid; place-content: center; justify-items: center; text-align: center; }
 .labEmpty h2 { margin: 20px 0 8px; color: var(--white); }
 .labEmpty p { margin: 0; color: var(--muted); }
-.routeLoader {
-  min-height: min(620px,calc(100vh - 96px));
-  margin-top: 14px;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 12px;
+.labLoadingSkeleton,.chartLoadingSkeleton { margin-top: 14px; display: grid; gap: 9px; }
+.labSkeletonModels,.chartSkeletonTitle,.chartSkeletonPlot,.labSkeletonRows {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-shell);
-  color: #7c8290;
   background: rgba(12,14,18,.96);
 }
-.routeLoaderCharacter {
-  width: clamp(100px,10vw,148px);
-  height: auto;
-  image-rendering: pixelated;
-  filter: drop-shadow(0 18px 24px rgba(0,0,0,.48));
-  animation: routeLoaderFloat 2.4s ease-in-out infinite;
+.labSkeletonModels { min-height: 132px; padding: 18px; display: grid; grid-template-columns: 1fr 70px 1fr; align-items: center; gap: 18px; }
+.labSkeletonModels i { height: 78px; }
+.labSkeletonModels b { width: 34px; height: 34px; justify-self: center; }
+.labSkeletonStats,.chartSkeletonStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-shell); }
+.labSkeletonStats i,.chartSkeletonStats i { height: 82px; border-right: 1px solid var(--line); }
+.labSkeletonStats i:last-child,.chartSkeletonStats i:last-child { border-right: 0; }
+.labSkeletonRows { padding: 10px; display: grid; gap: 8px; }
+.labSkeletonRows i { height: 54px; }
+.chartSkeletonTitle { min-height: 86px; padding: 20px; display: grid; align-content: center; gap: 10px; }
+.chartSkeletonTitle i { width: 190px; height: 9px; }
+.chartSkeletonTitle b { width: min(360px,70%); height: 24px; }
+.chartSkeletonPlot { position: relative; min-height: min(500px,58vh); }
+.chartSkeletonPlot i { position: absolute; right: 8%; left: 8%; height: 1px; }
+.chartSkeletonPlot i:nth-child(1) { top: 22%; }
+.chartSkeletonPlot i:nth-child(2) { top: 42%; }
+.chartSkeletonPlot i:nth-child(3) { top: 62%; }
+.chartSkeletonPlot i:nth-child(4) { top: 82%; }
+.labSkeletonModels i,.labSkeletonModels b,.labSkeletonStats i,.labSkeletonRows i,.chartSkeletonTitle i,.chartSkeletonTitle b,.chartSkeletonPlot i,.chartSkeletonStats i {
+  display: block;
+  background: linear-gradient(90deg,#15191f 0%,#242a32 48%,#15191f 100%);
+  background-size: 220% 100%;
+  animation: dashboardSkeleton 1.2s linear infinite;
 }
-.routeLoader strong {
-  font-size: 10px;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-}
-@keyframes routeLoaderFloat {
-  0%,100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+@keyframes dashboardSkeleton { to { background-position: -220% 0; } }
+@media (max-width: 620px) {
+  .labSkeletonModels { grid-template-columns: 1fr; }
+  .labSkeletonModels b { display: none; }
+  .labSkeletonStats,.chartSkeletonStats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .labSkeletonStats i:nth-child(2),.chartSkeletonStats i:nth-child(2) { border-right: 0; }
+  .labSkeletonStats i:nth-child(-n+2),.chartSkeletonStats i:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .routeLoaderCharacter { animation: none; }
+  .labSkeletonModels i,.labSkeletonModels b,.labSkeletonStats i,.labSkeletonRows i,.chartSkeletonTitle i,.chartSkeletonTitle b,.chartSkeletonPlot i,.chartSkeletonStats i { animation: none; }
 }
 .labWorkspace { display: grid; grid-template-columns: 460px minmax(0,1fr); gap: 14px; margin-top: 14px; align-items: start; }
 .labControls,.labOutput > section,.labOutcomeTarget,.labSummaryGrid { border: 1px solid var(--line); border-radius: var(--radius-shell); overflow: hidden; background: rgba(12,14,18,.96); }
