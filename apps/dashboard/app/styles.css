@@ -385,7 +385,11 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .labHeaderLink { display: inline-flex; align-items: center; gap: 8px; color: #b9bdc8; text-decoration: none; }
 .labHeaderLink span { color: var(--purple); font-size: 14px; }
 .labHeaderLink:hover { color: var(--white); }
-.labPage { padding-bottom: 70px; }
+.labPage {
+  width: min(1680px,calc(100% - 32px));
+  margin: 0 auto;
+  padding: 0 0 70px;
+}
 .labNav { height: 82px; display: flex; align-items: center; justify-content: space-between; }
 .labBrand { display: flex; align-items: center; }
 .labBrand > a { display: block; width: 220px; }
@@ -1689,7 +1693,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 @keyframes databaseLoading { to { background-position: -220% 0; } }
 
 @media (max-width: 760px) {
-  .databasePage { width: min(100% - 20px,1680px); }
+  .labPage,.databasePage { width: min(100% - 20px,1680px); }
   .databaseIntro { min-height: 136px; align-items: flex-start; flex-direction: column; gap: 20px; }
   .databaseIntro > strong { display: none; }
   .databaseStats { grid-template-columns: repeat(2,minmax(0,1fr)); }
