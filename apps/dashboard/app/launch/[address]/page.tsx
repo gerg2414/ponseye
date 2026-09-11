@@ -136,7 +136,7 @@ export default async function LaunchPage({ params, searchParams }: {
   const detail = isPreview ? previewLaunchDetail(previewAddress) : await getLaunchDetail(address.toLowerCase());
   if (!detail) notFound();
 
-  const { launch, marketTrades, chartCandles, bondPriceUsd, poolStartedAt } = detail;
+  const { launch, marketTrades, chartCandles, bondPriceUsd } = detail;
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "No price yet";
   const requestedEntryAt = query.entry && Number.isFinite(Date.parse(query.entry)) ? query.entry : null;
   const requestedEntryMarketCap = query.entryMc && Number(query.entryMc) > 0 ? Number(query.entryMc) : null;
@@ -241,7 +241,6 @@ export default async function LaunchPage({ params, searchParams }: {
             candles={chartCandles}
             tokenAddress={launch.token_address}
             graduatedAt={launch.graduated_at}
-            poolStartedAt={poolStartedAt}
             bondPriceUsd={bondPriceUsd}
             acquiredAt={entryAt}
             closedAt={launch.closed_at ?? null}
