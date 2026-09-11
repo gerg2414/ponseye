@@ -8,10 +8,10 @@
   --white: #f5f6fa;
   --purple: #a56cff;
   --green: #9aff4f;
-  --radius-shell: 16px;
-  --radius-panel: 14px;
-  --radius-card: 12px;
-  --radius-control: 8px;
+  --radius-shell: 5px;
+  --radius-panel: 5px;
+  --radius-card: 4px;
+  --radius-control: 3px;
 }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
@@ -768,14 +768,14 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .positionMultiple strong { margin: 3px 0 1px; color: var(--green); font-family: Arial,sans-serif; font-size: clamp(64px,8vw,118px); line-height: .95; letter-spacing: -.07em; text-shadow: 0 0 34px rgba(154,255,79,.18); }
 .positionMultiple.negative strong { color: #ff718c; text-shadow: 0 0 34px rgba(255,113,140,.18); }
 .positionMultiple small { color: #777e8c; font-size: 12px; }
-.positionStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border: 1px solid #343844; border-radius: 10px; background: rgba(12,14,18,.94); }
+.positionStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); overflow: hidden; border: 1px solid #343844; border-radius: var(--radius-shell); background: rgba(12,14,18,.94); }
 .positionStats article { min-height: 112px; padding: 20px 24px; display: grid; align-content: center; gap: 8px; border-right: 1px solid #2b2e38; }
 .positionStats article:last-child { border-right: 0; }
 .positionStats span { color: #8e94a2; font-size: 14px; letter-spacing: .055em; text-transform: uppercase; }
 .positionStats strong { color: var(--white); font-family: Arial,sans-serif; font-size: clamp(29px,3vw,43px); letter-spacing: -.04em; }
 .positionStats article.positive strong { color: var(--green); }
 .positionStats article.negative strong { color: #ff718c; }
-.positionChartPanel { margin-top: 14px; overflow: hidden; border: 1px solid #343844; border-radius: 10px; background: radial-gradient(circle at 72% 0,rgba(165,108,255,.11),transparent 34rem),#0c0e12; box-shadow: 0 28px 90px rgba(0,0,0,.34); }
+.positionChartPanel { margin-top: 14px; overflow: hidden; border: 1px solid #343844; border-radius: var(--radius-shell); background: radial-gradient(circle at 72% 0,rgba(165,108,255,.11),transparent 34rem),#0c0e12; box-shadow: 0 28px 90px rgba(0,0,0,.34); }
 .positionChartPanel > header { min-height: 84px; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; gap: 30px; border-bottom: 1px solid #292c35; }
 .positionChartPanel > header > div:first-child { display: grid; gap: 5px; }
 .positionChartKicker { color: var(--purple); font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
@@ -1456,7 +1456,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   grid-template-columns: repeat(4,minmax(0,1fr));
   overflow: hidden;
   border: 1px solid #282d35;
-  border-radius: 3px;
+  border-radius: var(--radius-shell);
   background: #0d1014;
 }
 .databaseStats article {
@@ -1479,6 +1479,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   align-items: end;
   gap: 8px;
   border: 1px solid #282d35;
+  border-radius: var(--radius-shell);
   background: #0d1014;
 }
 .databaseFilters label { min-width: 0; display: grid; gap: 5px; }
@@ -1488,7 +1489,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   height: 38px;
   padding: 0 11px;
   border: 1px solid #303640;
-  border-radius: 0;
+  border-radius: var(--radius-control);
   color: #e6e9ed;
   background: #090c10;
   font: inherit;
@@ -1512,6 +1513,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .databaseLedger {
   overflow: hidden;
   border: 1px solid #282d35;
+  border-radius: var(--radius-shell);
   background: #0b0e12;
 }
 .databaseLedger > header {
@@ -1621,6 +1623,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .databasePagination a {
   padding: 8px 10px;
   border: 1px solid #303640;
+  border-radius: var(--radius-control);
   color: #d9dde2;
   font-size: 9px;
   text-align: center;
