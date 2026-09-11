@@ -63,7 +63,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
 
   return (
     <Link className="launchCardLink" href={`/launch/${launch.token_address}`}>
-      <article className={`launchCard ${acquired ? "isAcquired" : ""}`}>
+      <article className={`launchCard ${acquired ? "isAcquired" : "isCompact"}`}>
         <div className="cardTop">
           <div className="tokenImage">
             <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
