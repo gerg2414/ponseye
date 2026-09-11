@@ -67,7 +67,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
 
       <section className="targetsResults">
         <header>
-          <div><p className="eyebrow"><span>04</span> Capital circuit</p><h1>Closed positions</h1></div>
+          <div><p className="eyebrow">Capital circuit</p><h1>Closed positions</h1></div>
           <div className="verifiedKey"><i /> Onchain timestamp verified</div>
         </header>
 
@@ -89,7 +89,6 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
               key={target.symbol}
             >
               <div className="targetHistoryToken" role="cell">
-                <span className="targetRank">{String(index + 1).padStart(2, "0")}</span>
                 <div className="historyTokenThumb">{target.symbol.slice(0, 2)}</div>
                 <span><strong>{target.name}</strong><small>{"$"}{target.symbol}</small></span>
               </div>
