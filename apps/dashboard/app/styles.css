@@ -25,7 +25,7 @@ body {
   overflow-x: clip;
 }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: .055; background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, #fff 4px); }
-main { position: relative; isolation: isolate; width: 100%; margin: 0; padding: 0 22px 72px; }
+main { position: relative; isolation: isolate; width: 100%; margin: 0; padding: 0 22px 16px; }
 main::before { content: ""; position: absolute; z-index: -1; top: 0; left: -22px; width: calc(100% + 44px); height: 455px; pointer-events: none; background: radial-gradient(ellipse at 72% 58%,rgba(111,47,211,.34) 0%,rgba(54,23,103,.18) 34%,transparent 64%), linear-gradient(180deg,rgba(24,13,40,.72) 0%,rgba(9,9,13,.2) 72%,transparent 100%), repeating-linear-gradient(90deg,rgba(165,108,255,.035) 0 1px,transparent 1px 48px), repeating-linear-gradient(0deg,rgba(165,108,255,.028) 0 1px,transparent 1px 48px); border-bottom: 1px solid rgba(165,108,255,.08); }
 main::after { content: ""; position: absolute; z-index: -1; top: 54px; left: -22px; width: calc(100% + 44px); height: 340px; pointer-events: none; opacity: .54; background-image: linear-gradient(90deg,transparent 0 86%,rgba(165,108,255,.18) 86% 89%,transparent 89%), linear-gradient(0deg,transparent 0 77%,rgba(165,108,255,.1) 77% 80%,transparent 80%); background-size: 73px 57px,91px 71px; -webkit-mask-image: linear-gradient(90deg,transparent 0%,rgba(0,0,0,.38) 30%,#000 64%,#000 100%); mask-image: linear-gradient(90deg,transparent 0%,rgba(0,0,0,.38) 30%,#000 64%,#000 100%); }
 main > * { position: relative; z-index: 1; }
@@ -130,7 +130,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .panelStatus.offline { color: #8b91a0; }
 .panelStatus.offline i { background: #555a68; box-shadow: none; }
 .launchBoard { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 12px; background: #090a0d; }
-.launchLane { min-width: 0; overflow: hidden; border: 1px solid #242833; border-radius: 10px; background: #0d0f13; }
+.launchLane { min-width: 0; align-self: start; overflow: hidden; border: 1px solid #242833; border-radius: 10px; background: #0d0f13; }
 .laneHead { height: 72px; padding: 0 17px 0 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #242833; background: linear-gradient(90deg,rgba(165,108,255,.055),transparent 58%),#0a0c0f; }
 .laneHead > div { display: flex; align-items: center; gap: 10px; }
 .laneHead img { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
@@ -143,7 +143,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .capitalCircuitLink:focus-visible { outline: 1px solid var(--purple); outline-offset: 2px; }
 .launchLane.completing .laneHead { background: linear-gradient(90deg,rgba(165,108,255,.07),transparent 58%),#0a0c0f; }
 .launchLane.completed .laneHead { background: linear-gradient(90deg,rgba(154,255,79,.07),transparent 58%),#0a0c0f; }
-.launchLaneBody { height: 760px; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
+.launchLaneBody { height: auto; max-height: 760px; padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
 .launchCardLink { display: block; color: inherit; text-decoration: none; }
 .launchCard { position: relative; height: 320px; overflow: hidden; padding: 17px; display: flex; flex-direction: column; border: 1px solid #272b35; border-radius: 9px; background: radial-gradient(circle at 100% 0,rgba(165,108,255,.07),transparent 13rem),#101218; }
 .launchCardLink:hover .launchCard,.launchCardLink:focus-visible .launchCard { border-color: #62468d; background-color: #13161c; outline: none; }
@@ -828,7 +828,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .boardHead { min-height: 82px; padding: 19px 17px; }
   .boardHead h2 { font-size: 19px; }
   .launchBoard { margin-right: -1px; padding: 8px; gap: 8px; }
-  .launchLaneBody { height: 680px; }
+  .launchLaneBody { height: auto; max-height: 680px; }
   .targetsNav { height: 68px; }
   .targetsNav > a:first-child { width: 175px; }
   .backLink { font-size: 0; }
