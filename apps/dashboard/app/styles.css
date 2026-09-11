@@ -347,16 +347,20 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .equityPanelHead > div { display: grid; gap: 5px; }
 .equityPanelHead strong { color: #f1ecff; font-family: Arial,sans-serif; font-size: clamp(34px,4vw,56px); letter-spacing: -.055em; line-height: 1; text-shadow: 0 0 30px rgba(165,108,255,.26); }
 .equityPanelHead small { font-size: 12px; font-weight: 700; }
+.equityRunningTotal { display: flex !important; align-items: baseline; gap: 12px !important; }
+.equityRunningTotal strong { font-size: 25px; letter-spacing: -.035em; }
+.equityRunningTotal small { min-width: 68px; font-size: 12px; }
 .positive { color: var(--green) !important; }
 .negative { color: #ff718c !important; }
 .equityPanelHead p { margin: 0; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; color: #949aa7; font-size: 12px; }
 .equityPanelHead p b { margin-right: 5px; color: #c7afea; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
 .equityPanelHead p span { padding: 7px 9px; border: 1px solid #292d36; border-radius: 4px; color: #9298a5; background: rgba(15,17,22,.72); letter-spacing: .03em; text-transform: none; }
 .equityPlot { position: relative; height: clamp(270px,31vw,440px); padding: 18px 0 0; overflow: hidden; }
+.equityChartFrame { position: relative; width: 100%; height: 100%; }
 .equityChart { width: 100%; height: 100%; overflow: visible; }
 .equityGridLine { stroke: rgba(165,108,255,.09); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.equityAxisValue { fill: #777e8c; font-family: Arial,sans-serif; font-size: 12px; text-anchor: end; }
-.equityAxisDate { fill: #777e8c; font-family: Arial,sans-serif; font-size: 11px; text-anchor: middle; }
+.equityYAxis { position: absolute; z-index: 2; left: 13px; top: 7.3%; bottom: 12.7%; display: flex; flex-direction: column; justify-content: space-between; color: #858c99; font-family: Arial,sans-serif; font-size: 12px; line-height: 1; pointer-events: none; }
+.equityXAxis { position: absolute; z-index: 2; right: 2.8%; bottom: 7px; left: 7.4%; display: flex; justify-content: space-between; color: #858c99; font-family: Arial,sans-serif; font-size: 11px; line-height: 1; pointer-events: none; }
 .equityArea { fill: url(#equityArea); }
 .equityGlow { fill: none; stroke: rgba(165,108,255,.28); stroke-width: 11; filter: url(#equityGlow); vector-effect: non-scaling-stroke; }
 .equityLine { fill: none; stroke: #b27cff; stroke-width: 3.5; stroke-linecap: square; stroke-linejoin: miter; filter: drop-shadow(0 0 7px rgba(165,108,255,.78)); vector-effect: non-scaling-stroke; }
@@ -374,11 +378,11 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitLedger > header p b { color: #d0d3da; font-size: 15px; }
 .circuitLedger > header p i { width: 1px; height: 18px; margin: 0 5px; background: #30343e; }
 .circuitViews { padding: 10px; display: flex; gap: 5px; overflow-x: auto; border-bottom: 1px solid #22262f; }
-.circuitViews a { padding: 10px 12px; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 5px; color: #858c99; background: #111319; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
-.circuitViews a b { min-width: 22px; padding: 4px 6px; border-radius: 3px; color: #747b89; background: #090b0f; font-size: 11px; text-align: center; }
-.circuitViews a.active { border-color: rgba(165,108,255,.44); color: #d2bbf7; background: rgba(165,108,255,.09); }
-.circuitViews a.active b { color: var(--purple); }
-.circuitTableHead,.circuitRow { display: grid; grid-template-columns: minmax(220px,1.5fr) 145px 120px 120px 90px minmax(150px,.8fr); align-items: center; gap: 14px; }
+.circuitViews button { padding: 10px 12px; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 5px; color: #858c99; background: #111319; font: inherit; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.circuitViews button b { min-width: 22px; padding: 4px 6px; border-radius: 3px; color: #747b89; background: #090b0f; font-size: 11px; text-align: center; }
+.circuitViews button.active { border-color: rgba(165,108,255,.44); color: #d2bbf7; background: rgba(165,108,255,.09); }
+.circuitViews button.active b { color: var(--purple); }
+.circuitTableHead,.circuitRow { display: grid; grid-template-columns: minmax(220px,1.5fr) 140px 110px 110px 80px 100px minmax(145px,.8fr); align-items: center; gap: 14px; }
 .circuitTableHead { min-height: 46px; padding: 0 18px; border-bottom: 1px solid #20242c; color: #747b88; font-size: 11px; font-weight: 700; letter-spacing: .065em; text-transform: uppercase; }
 .circuitRow { min-height: 76px; padding: 10px 18px; border-bottom: 1px solid #20242c; color: #adb2bd; text-decoration: none; transition: background .15s ease,border-color .15s ease; }
 .circuitRow:last-child { border-bottom: 0; }
@@ -390,6 +394,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitToken small,.circuitRow time { color: #838a97; font-size: 12px; }
 .circuitRow > strong { color: #d0d3da; font-size: 14px; }
 .circuitRow > strong.runner { color: var(--green); font-family: Arial,sans-serif; font-size: 21px; }
+.circuitPnl { font-family: Arial,sans-serif; font-size: 14px !important; }
 .circuitOutcome { width: fit-content; padding: 8px 9px; display: flex; align-items: center; gap: 7px; border: 1px solid #30343e; border-radius: 4px; color: #9298a4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .circuitOutcome i { width: 6px; height: 6px; background: currentColor; box-shadow: 0 0 7px currentColor; }
 .circuitOutcome b { margin-left: 3px; color: #c8ccd4; }
@@ -399,7 +404,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitEmpty { min-height: 190px; display: grid; place-items: center; color: #666c79; font-family: Arial,sans-serif; font-size: 13px; }
 @media (max-width: 1050px) {
   .circuitStats { grid-template-columns: repeat(3,minmax(0,1fr)); }
-  .circuitTableHead,.circuitRow { grid-template-columns: minmax(220px,1.4fr) 125px 105px 85px minmax(150px,.8fr); }
+  .circuitTableHead,.circuitRow { grid-template-columns: minmax(220px,1.4fr) 125px 100px 80px 90px minmax(150px,.8fr); }
   .circuitTableHead span:nth-child(4),.circuitRow > :nth-child(4) { display: none; }
 }
 @media (max-width: 720px) {
@@ -417,6 +422,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .circuitRow { min-height: 102px; grid-template-columns: minmax(0,1fr) auto; gap: 8px 14px; }
   .circuitRow time,.circuitRow > strong:nth-of-type(1),.circuitRow > strong:nth-of-type(2) { display: none; }
   .circuitRow > strong.runner { grid-column: 1; padding-left: 60px; }
+  .circuitRow > .circuitPnl { grid-column: 1; padding-left: 60px; }
   .circuitOutcome { grid-column: 2; grid-row: 1 / span 2; }
 }
 .launchPage { padding-bottom: 80px; }

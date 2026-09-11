@@ -3,15 +3,14 @@ import Image from "next/image";
 import Link from "next/link";
 import type { LabToken } from "../../lib/lab-data";
 import { getPonsEyeLabData } from "../../lib/lab-data";
-import { TokenImage } from "../token-image";
+import { CircuitLedger } from "./circuit-ledger";
 
 export const metadata: Metadata = {
   title: "Capital Circuit | PonsEye",
-  description: "PonsEye signal performance, runner history and modelled equity.",
+  description: "PonsEye signal performance, runner history and equity.",
 };
 
 type Period = "1d" | "7d" | "30d" | "all";
-type View = "all" | "closed" | "open" | "runners";
 
 const startingEquity = 1_000;
 const positionSize = 25;
@@ -34,11 +33,6 @@ function axisMoney(value: number) {
   }).format(value);
 }
 
-function compactMoney(value: number | null) {
-  if (!value || !Number.isFinite(value)) return "Pending";
-  return `$${new Intl.NumberFormat("en-GB", { notation: "compact", maximumFractionDigits: 2 }).format(value)}`;
-}
-
 function multiple(value: number | null) {
   return value == null || !Number.isFinite(value) ? "Pending" : `${value.toFixed(value >= 10 ? 1 : 2)}x`;
 }
@@ -59,7 +53,7 @@ function smoothPath(points: Array<{ x: number; y: number }>) {
   }, `M${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`);
 }
 
-function modelOutcome(token: LabToken) {
+function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number; label: string; tone: "loss" | "win" | "open" } {
   const lowBeforeTarget = token.pre_target_low_multiples[String(targetMultiple)];
   if (lowBeforeTarget != null && lowBeforeTarget <= stopMultiple) {
     return { closed: true, exitMultiple: stopMultiple, label: "Stopped", tone: "loss" };
@@ -98,57 +92,59 @@ function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
     month: "short",
     ...(dates.length && Date.parse(dates.at(-1) ?? "") - Date.parse(dates[0]) < 172_800_000 ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
+  const yTicks = [0, 1, 2, 3, 4].map((row) => max - (range / 4) * row);
   const xTicks = [...new Set([0, Math.round((values.length - 1) * .25), Math.round((values.length - 1) * .5), Math.round((values.length - 1) * .75), values.length - 1])];
 
   return (
-    <svg className="equityChart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Modelled PonsEye equity curve">
-      <defs>
-        <linearGradient id="equityArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#a56cff" stopOpacity=".42" />
-          <stop offset="72%" stopColor="#7d3eea" stopOpacity=".08" />
-          <stop offset="100%" stopColor="#7d3eea" stopOpacity="0" />
-        </linearGradient>
-        <filter id="equityGlow" x="-20%" y="-30%" width="140%" height="160%">
-          <feGaussianBlur stdDeviation="5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      {[0, 1, 2, 3, 4].map((row) => {
-        const y = padTop + ((height - padTop - padBottom) / 4) * row;
-        const value = max - (range / 4) * row;
-        return <g key={row}><line className="equityGridLine" x1={padLeft} x2={width - padRight} y1={y} y2={y} /><text className="equityAxisValue" x={padLeft - 12} y={y + 4}>{axisMoney(value)}</text></g>;
-      })}
-      {xTicks.map((index) => {
-        const point = points[index];
-        const date = dates[index];
-        return point && date ? <text className="equityAxisDate" key={index} x={point.x} y={height - 13}>{axisDate.format(new Date(date))}</text> : null;
-      })}
-      <path className="equityArea" d={area} />
-      <path className="equityGlow" d={line} />
-      <path className="equityLine" d={line} />
-    </svg>
+    <div className="equityChartFrame">
+      <div className="equityYAxis" aria-hidden="true">{yTicks.map((value) => <span key={value}>{axisMoney(value)}</span>)}</div>
+      <svg className="equityChart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="PonsEye equity curve">
+        <defs>
+          <linearGradient id="equityArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a56cff" stopOpacity=".42" />
+            <stop offset="72%" stopColor="#7d3eea" stopOpacity=".08" />
+            <stop offset="100%" stopColor="#7d3eea" stopOpacity="0" />
+          </linearGradient>
+          <filter id="equityGlow" x="-20%" y="-30%" width="140%" height="160%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        {[0, 1, 2, 3, 4].map((row) => {
+          const y = padTop + ((height - padTop - padBottom) / 4) * row;
+          return <line className="equityGridLine" key={row} x1={padLeft} x2={width - padRight} y1={y} y2={y} />;
+        })}
+        <path className="equityArea" d={area} />
+        <path className="equityGlow" d={line} />
+        <path className="equityLine" d={line} />
+      </svg>
+      <div className="equityXAxis" aria-hidden="true">
+        {xTicks.map((index) => dates[index] ? <span key={index}>{axisDate.format(new Date(dates[index]))}</span> : null)}
+      </div>
+    </div>
   );
 }
 
 const periodLabels: Array<[Period, string]> = [["1d", "24H"], ["7d", "7D"], ["30d", "30D"], ["all", "All"]];
-const viewLabels: Array<[View, string]> = [["all", "All acquired"], ["runners", "2x+ runners"], ["closed", "Closed replay"], ["open", "Still tracking"]];
 
-export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ period?: string; view?: string }> }) {
+export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const query = await searchParams;
   const period: Period = query.period === "1d" || query.period === "7d" || query.period === "30d" ? query.period : "all";
-  const view: View = query.view === "closed" || query.view === "open" || query.view === "runners" ? query.view : "all";
   const allTokens = (await getPonsEyeLabData()).filter((token) => token.actual_acquired);
   const cutoff = period === "all" ? 0 : Date.now() - Number.parseInt(period, 10) * 86_400_000;
   const tokens = allTokens
     .filter((token) => new Date(token.signal_at).getTime() >= cutoff)
     .sort((a, b) => new Date(a.signal_at).getTime() - new Date(b.signal_at).getTime());
-  const outcomes = tokens.map((token) => ({ token, outcome: modelOutcome(token) }));
+  const outcomes = tokens.map((token) => {
+    const outcome = modelOutcome(token);
+    return { token, outcome, pnlUsd: positionSize * (outcome.exitMultiple - 1) };
+  });
 
   let balance = startingEquity;
   const equityValues = [balance];
   const equityDates = [tokens[0]?.signal_at ?? new Date().toISOString()];
   for (const item of outcomes) {
-    balance += positionSize * (item.outcome.exitMultiple - 1);
+    balance += item.pnlUsd;
     equityValues.push(balance);
     equityDates.push(item.token.signal_at);
   }
@@ -161,11 +157,6 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
   const closed = outcomes.filter((item) => item.outcome.closed);
   const open = outcomes.filter((item) => !item.outcome.closed);
   const bestRunner = Math.max(0, ...tokens.map((token) => token.future_peak_multiple ?? 0));
-  const visible = (view === "closed" ? closed : view === "open" ? open : view === "runners" ? runners : outcomes)
-    .sort((a, b) => view === "runners"
-      ? (b.token.future_peak_multiple ?? 0) - (a.token.future_peak_multiple ?? 0)
-      : new Date(b.token.signal_at).getTime() - new Date(a.token.signal_at).getTime());
-
   return (
     <main className="targetsPage circuitPage">
       <header className="targetsNav">
@@ -178,19 +169,22 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       <section className="circuitHeading">
         <nav className="circuitPeriods" aria-label="Performance period">
           {periodLabels.map(([value, label]) => (
-            <Link className={period === value ? "active" : ""} href={`/targets?period=${value}&view=${view}`} key={value}>{label}</Link>
+            <Link className={period === value ? "active" : ""} href={`/targets?period=${value}`} key={value}>{label}</Link>
           ))}
         </nav>
       </section>
 
       <section className="equityPanel">
         <header className="equityPanelHead">
-          <p><b>Replay settings</b><span>{money(positionSize)} per acquired token</span><span>{targetMultiple}x target</span><span>10% stop</span></p>
+          <div className="equityRunningTotal">
+            <span>Running total</span>
+            <strong>{money(balance)}</strong>
+            <small className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</small>
+          </div>
         </header>
         <div className="equityPlot">
           <EquityCurve values={equityValues.length > 1 ? equityValues : [startingEquity, startingEquity]} dates={equityDates.length > 1 ? equityDates : [new Date().toISOString(), new Date().toISOString()]} />
         </div>
-        <footer>Model replay using recorded trade order. Open positions are marked at the final recorded value. Fees and slippage are excluded.</footer>
       </section>
 
       <section className="circuitStats">
@@ -201,42 +195,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
         <article className="best"><span>Best runner</span><strong>{multiple(bestRunner)}</strong><small>Peak after acquisition</small></article>
       </section>
 
-      <section className="circuitLedger">
-        <header>
-          <div><span>Position ledger</span><h2>Every acquired target</h2></div>
-          <p><b>{closed.length}</b> model exits closed <i /> <b>{open.length}</b> still tracking</p>
-        </header>
-        <nav className="circuitViews" aria-label="Position view">
-          {viewLabels.map(([value, label]) => (
-            <Link className={view === value ? "active" : ""} href={`/targets?period=${period}&view=${value}`} key={value}>{label}<b>{value === "all" ? outcomes.length : value === "closed" ? closed.length : value === "open" ? open.length : runners.length}</b></Link>
-          ))}
-        </nav>
-
-        <div className="circuitTableHead" aria-hidden="true">
-          <span>Target</span><span>Acquired</span><span>Entry MC</span><span>Peak MC</span><span>Peak</span><span>Model result</span>
-        </div>
-        <div className="circuitRows">
-          {visible.length ? visible.map(({ token, outcome }) => {
-            const peakMarketCap = token.signal_market_cap_usd && token.future_peak_multiple
-              ? token.signal_market_cap_usd * token.future_peak_multiple
-              : null;
-            const href = `/launch/${token.token_address}?from=targets&entry=${encodeURIComponent(token.signal_at)}&entryMc=${token.signal_market_cap_usd ?? ""}`;
-            return (
-              <Link className="circuitRow" href={href} key={token.token_address}>
-                <div className="circuitToken">
-                  <TokenImage src={token.image_url} alt="" size={48} />
-                  <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small></span>
-                </div>
-                <time>{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(token.signal_at))}</time>
-                <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
-                <strong>{compactMoney(peakMarketCap)}</strong>
-                <strong className={(token.future_peak_multiple ?? 0) >= 2 ? "runner" : ""}>{multiple(token.future_peak_multiple)}</strong>
-                <span className={`circuitOutcome ${outcome.tone}`}><i />{outcome.label}<b>{outcome.closed ? multiple(outcome.exitMultiple) : multiple(token.final_multiple)}</b></span>
-              </Link>
-            );
-          }) : <div className="circuitEmpty">No positions match this view yet.</div>}
-        </div>
-      </section>
+      <CircuitLedger items={outcomes} />
     </main>
   );
 }
