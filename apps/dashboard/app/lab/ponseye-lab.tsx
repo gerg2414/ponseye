@@ -628,6 +628,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   }
 
   const hitRate = analysis.selected.length ? analysis.hits.length * 100 / analysis.selected.length : 0;
+  const totalOutgoing = analysis.selected.length * exitSettings.positionSizeUsd;
   const visibleResults = resultView === "signals" ? analysis.orderedSignals : analysis.orderedMisses;
   const entryLabel = activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label;
   const exitLabel = {
@@ -803,7 +804,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
           <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>{analysis.hits.length} reached {exitSettings.runnerTarget}x</span></article>
           <article className={analysis.simulatedRoi >= 0 ? "positive" : "negative"}><small>ROI</small><strong>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}%</strong><span>on {formatUsd(analysis.capitalTested)} tested</span></article>
-          <article className={`simulatedResult ${analysis.simulatedPnl >= 0 ? "positive" : "negative"}`}><small>Simulated result</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{analysis.replayable.length} replayed positions</span></article>
+          <article className={`simulatedResult ${analysis.simulatedPnl >= 0 ? "positive" : "negative"}`}><small>Simulated result</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{formatUsd(exitSettings.positionSizeUsd)} each · {formatUsd(totalOutgoing)} total outgoing</span></article>
           <article><small>Under 1.2x</small><strong>{analysis.falsePositives.length}</strong><span>selected but stalled</span></article>
           <article><small>Graduated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
         </div>
