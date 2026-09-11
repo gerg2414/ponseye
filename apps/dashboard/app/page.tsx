@@ -251,14 +251,14 @@ export default async function Home() {
     <main>
       <AutoRefresh intervalMs={3_000} />
       <div className="heroPixelField" aria-hidden="true">
-        {Array.from({ length: 34 }, (_, index) => (
+        {Array.from({ length: 72 }, (_, index) => (
           <i
             key={index}
             style={{
               left: `${(index * 37 + 9) % 98}%`,
-              top: `${34 + ((index * 61) % 330)}px`,
-              width: `${3 + ((index * 7) % 15)}px`,
-              height: `${3 + ((index * 5) % 8)}px`,
+              top: `${30 + ((index * 113) % 1500)}px`,
+              width: `${4 + ((index * 7) % 18)}px`,
+              height: `${3 + ((index * 5) % 10)}px`,
               animationDelay: `-${(index % 9) * 0.7}s`,
             }}
           />
