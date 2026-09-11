@@ -205,7 +205,7 @@ export default async function LaunchPage({ params, searchParams }: {
         <article><span>Entry MC</span><strong>{usd(entryMarketCap)}</strong></article>
         <article><span>{closed ? "Exit MC" : "Current MC"}</span><strong>{usd(currentMarketCap)}</strong></article>
         <article className={gainTone}><span>{closed ? "Banked" : "Gains"}</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></article>
-        <article><span>Position high</span><strong>{peakMultiple ? `${peakMultiple.toFixed(2)}x` : "Pending"}</strong></article>
+        <article><span>Peak MC</span><strong>{usd(launch.ath_market_cap_usd)}</strong><small>{peakMultiple ? `${peakMultiple.toFixed(2)}x from entry` : "Peak multiple pending"}</small></article>
       </section>
 
       <section className="positionChartPanel">
