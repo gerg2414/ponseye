@@ -168,7 +168,7 @@ export async function saveTrade(row: EventRow) {
   }
 
   // Ignore older or unrelated curves that are not part of this fresh PonsEye run.
-  if (!tokenAddress) return;
+  if (!tokenAddress) return false;
 
   const { error } = await db.from("trades").upsert({
     event_id: id,
@@ -187,12 +187,13 @@ export async function saveTrade(row: EventRow) {
     raw_event: row,
   }, { onConflict: "event_id", ignoreDuplicates: true });
   assertOk(error, "save trade");
+  return true;
 }
 
 export async function saveMarketTrade(row: MarketTradeRow) {
   const tokenAddress = row.Pair.Token.Address?.toLowerCase();
-  if (!tokenAddress) return;
-  if (!knownTokens.has(tokenAddress)) return;
+  if (!tokenAddress) return false;
+  if (!knownTokens.has(tokenAddress)) return false;
 
   const side = row.Side.toLowerCase() === "buy" ? "buy" : "sell";
   const transactionHash = row.TransactionHeader.Hash.toLowerCase();
@@ -238,6 +239,7 @@ export async function saveMarketTrade(row: MarketTradeRow) {
     }).eq("token_address", tokenAddress).is("graduated_at", null);
     assertOk(migrationError, "confirm migration from pool trade");
   }
+  return true;
 }
 
 export async function warmTokenCache() {
