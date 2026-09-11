@@ -387,11 +387,11 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .labHeaderLink:hover { color: var(--white); }
 .labPage { padding-bottom: 70px; }
 .labNav { height: 82px; display: flex; align-items: center; justify-content: space-between; }
-.labBrand { display: flex; align-items: center; gap: 13px; }
+.labBrand { display: flex; align-items: center; }
 .labBrand > a { display: block; width: 220px; }
-.labBrand > span { padding-left: 13px; border-left: 1px solid #343844; color: var(--purple); font-size: 20px; font-weight: 700; letter-spacing: -.03em; }
 .labNav img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 .labNavLinks { display: flex; align-items: center; gap: 28px; }
+.labNavLinks .active { color: var(--green); }
 .labHeaderDataset { display: flex; align-items: center; gap: 9px; }
 .labHeaderDataset i { width: 7px; height: 7px; flex: 0 0 7px; background: var(--green); box-shadow: 0 0 9px rgba(154,255,79,.7); }
 .labHeaderDataset span { color: #888e9b; font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
@@ -666,8 +666,6 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   .labHeaderLink { font-size: 9px; }
   .labNav { height: 68px; }
   .labBrand > a { width: 170px; }
-  .labBrand { gap: 9px; }
-  .labBrand > span { padding-left: 9px; font-size: 16px; }
   .labNavLinks { gap: 12px; }
   .labHeaderDataset small { display: none; }
   .labHeaderDataset span { display: none; }
