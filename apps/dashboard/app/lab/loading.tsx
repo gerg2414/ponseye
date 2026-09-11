@@ -1,11 +1,18 @@
 import { LabHeader } from "./lab-header";
-import { RouteLoader } from "../route-loader";
 
 export default function LabLoading() {
   return (
     <main className="labPage" aria-busy="true">
       <LabHeader current="testing" />
-      <RouteLoader label="Loading the test bench" />
+      <section className="labLoadingSkeleton" aria-hidden="true">
+        <div className="labSkeletonModels"><i /><b /><i /></div>
+        <div className="labSkeletonStats">
+          {Array.from({ length: 4 }, (_, index) => <i key={index} />)}
+        </div>
+        <div className="labSkeletonRows">
+          {Array.from({ length: 5 }, (_, index) => <i key={index} />)}
+        </div>
+      </section>
     </main>
   );
 }
