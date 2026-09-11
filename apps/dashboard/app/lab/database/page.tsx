@@ -52,7 +52,7 @@ function shortAddress(value: string) {
 }
 
 function statusLabel(status: string, graduatedAt: string | null) {
-  if (graduatedAt) return "Graduated";
+  if (graduatedAt) return "Migrated";
   if (status === "bonding") return "Bonding";
   return status.replaceAll("_", " ");
 }
