@@ -103,8 +103,11 @@ function previewLaunchDetail(address: keyof typeof previewPositions) {
   return { launch, trades: [], marketTrades, chartCandles: [], bondPriceUsd: null };
 }
 
-export default async function LaunchPage({ params }: { params: Promise<{ address: string }> }) {
-  const { address } = await params;
+export default async function LaunchPage({ params, searchParams }: {
+  params: Promise<{ address: string }>;
+  searchParams: Promise<{ entry?: string; entryMc?: string }>;
+}) {
+  const [{ address }, query] = await Promise.all([params, searchParams]);
   const previewAddress = address as keyof typeof previewPositions;
   const isPreview = previewAddress in previewPositions;
   if (!isPreview && !/^0x[0-9a-f]{40}$/i.test(address)) notFound();
@@ -114,7 +117,10 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
 
   const { launch, marketTrades, chartCandles, bondPriceUsd } = detail;
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "Pending price";
-  const entryMarketCap = launch.entry_market_cap_usd ?? null;
+  const requestedEntryAt = query.entry && Number.isFinite(Date.parse(query.entry)) ? query.entry : null;
+  const requestedEntryMarketCap = query.entryMc && Number(query.entryMc) > 0 ? Number(query.entryMc) : null;
+  const entryMarketCap = requestedEntryMarketCap ?? launch.entry_market_cap_usd ?? null;
+  const entryAt = requestedEntryAt ?? launch.acquired_at ?? (launch.research_state === "target_locked" ? launch.research_state_at : null);
   const currentMarketCap = launch.market_cap_usd ?? null;
   const gainMultiple = entryMarketCap && currentMarketCap ? currentMarketCap / entryMarketCap : null;
   const peakMultiple = entryMarketCap && launch.ath_market_cap_usd ? launch.ath_market_cap_usd / entryMarketCap : null;
@@ -175,7 +181,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ address
             tokenAddress={launch.token_address}
             graduatedAt={launch.graduated_at}
             bondPriceUsd={bondPriceUsd}
-            acquiredAt={launch.acquired_at ?? (launch.research_state === "target_locked" ? launch.research_state_at : null)}
+            acquiredAt={entryAt}
             closedAt={launch.closed_at ?? null}
             entryMarketCap={entryMarketCap}
           />
