@@ -206,18 +206,7 @@ export default async function Home() {
       </header>
 
       <section className="consolePrelude" aria-label="Ponseye system status">
-        <div className="consoleSignal">
-          <span className="consoleNode">System trace // session 0847</span>
-          <div className="consoleLog">
-            <span><time>00:00:01</time><b>Optic array initialised</b></span>
-            <span><time>00:00:03</time><b>{recorderLive ? "Robinhood feed linked" : "Robinhood feed closed"}</b></span>
-            <span><time>00:00:07</time><b>Launch field mapped</b></span>
-            <span><time>00:00:09</time><b>Contract trace active</b></span>
-            <span><time>00:00:12</time><b>Target memory loaded</b></span>
-            <span><time>00:00:15</time><b>{recorderLive ? "Acquisition gate active" : "Recorder safely paused"}</b></span>
-          </div>
-          <span className="consoleAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
-        </div>
+        <span className="consoleAwait"><i />{recorderLive ? "Surveillance continues" : "Waiting for recorder start"}</span>
       </section>
 
       <div className="boardStage">
