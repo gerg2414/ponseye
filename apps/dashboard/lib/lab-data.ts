@@ -8,6 +8,7 @@ export type LabToken = {
   image_url: string | null;
   launched_at: string;
   signal_at: string;
+  signal_age_seconds: number | null;
   status: string;
   actual_state: string;
   actual_acquired: boolean;
@@ -66,6 +67,7 @@ async function loadPonsEyeLabData(): Promise<LabToken[]> {
 
   return result.data.map((token) => ({
     ...token,
+    signal_age_seconds: numberOrNull(token.signal_age_seconds),
     trade_count: Number(token.trade_count ?? 0),
     buys: Number(token.buys ?? 0),
     sells: Number(token.sells ?? 0),
