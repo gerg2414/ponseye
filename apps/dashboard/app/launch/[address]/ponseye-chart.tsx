@@ -91,7 +91,7 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, bondPriceUsd, acquiredAt, closedAt, entryMarketCap }: {
+export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, graduatedAt, acquiredAt, closedAt, entryMarketCap }: {
   trades: MarketTrade[];
   candles: ChartCandle[];
   tokenAddress: string;
@@ -104,9 +104,9 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
   const containerRef = useRef<HTMLDivElement>(null);
   const entryMarkerRef = useRef<HTMLDivElement>(null);
   const exitMarkerRef = useRef<HTMLDivElement>(null);
+  const bondMarkerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const bondLineRef = useRef<IPriceLine | null>(null);
   const entryLineRef = useRef<IPriceLine | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
   const latestTradeAtRef = useRef<string | null>(trades.at(-1)?.block_time ?? null);
@@ -121,18 +121,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
   };
   const entryCandle = useMemo(() => nearestCandle(acquiredAt), [acquiredAt, candles]);
   const exitCandle = useMemo(() => nearestCandle(closedAt), [candles, closedAt]);
-  const bondMarketCap = useMemo(() => {
-    if (bondPriceUsd && bondPriceUsd > 0) return bondPriceUsd * 1_000_000_000;
-    if (!graduatedAt) return null;
-    const graduationTime = new Date(graduatedAt).getTime();
-    for (let index = liveTrades.length - 1; index >= 0; index -= 1) {
-      const trade = liveTrades[index];
-      if (trade.protocol === "pons_v2" && new Date(trade.block_time).getTime() <= graduationTime + 5_000 && trade.price_usd && trade.price_usd > 0) {
-        return trade.price_usd * 1_000_000_000;
-      }
-    }
-    return null;
-  }, [bondPriceUsd, graduatedAt, liveTrades]);
+  const bondCandle = useMemo(() => nearestCandle(graduatedAt), [candles, graduatedAt]);
 
   useEffect(() => {
     setLiveTrades((current) => mergeTrades(current, trades));
@@ -273,9 +262,11 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
     const container = containerRef.current;
     const entryMarker = entryMarkerRef.current;
     const exitMarker = exitMarkerRef.current;
+    const bondMarker = bondMarkerRef.current;
     if (!chart || !series || !container) {
       if (entryMarker) entryMarker.hidden = true;
       if (exitMarker) exitMarker.hidden = true;
+      if (bondMarker) bondMarker.hidden = true;
       return;
     }
 
@@ -297,6 +288,17 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
       };
       position(entryMarker, entryCandle, "low");
       position(exitMarker, exitCandle, "high");
+      if (bondMarker && bondCandle) {
+        const x = chart.timeScale().timeToCoordinate(bondCandle.time);
+        bondMarker.hidden = x == null;
+        if (x != null) {
+          bondMarker.style.left = `${x}px`;
+          bondMarker.style.top = `${container.offsetTop}px`;
+          bondMarker.style.height = `${container.clientHeight}px`;
+        }
+      } else if (bondMarker) {
+        bondMarker.hidden = true;
+      }
     };
 
     const frame = window.requestAnimationFrame(updateMarker);
@@ -308,26 +310,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
       resizeObserver.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateMarker);
     };
-  }, [entryCandle, exitCandle]);
-
-  useEffect(() => {
-    const series = seriesRef.current;
-    if (!series) return;
-    if (bondLineRef.current) {
-      series.removePriceLine(bondLineRef.current);
-      bondLineRef.current = null;
-    }
-    if (bondMarketCap) {
-      bondLineRef.current = series.createPriceLine({
-        price: bondMarketCap,
-        color: "#ff9f43",
-        lineWidth: 2,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: "BOND",
-      });
-    }
-  }, [bondMarketCap]);
+  }, [bondCandle, entryCandle, exitCandle]);
 
   useEffect(() => {
     const series = seriesRef.current;
@@ -369,6 +352,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
         <b><i /> LIVE</b>
       </div>
       <div ref={containerRef} className="priceChart tradingViewCanvas" aria-label="TradingView Lightweight Chart showing PonsEye dollar market cap" />
+      <div ref={bondMarkerRef} className="chartBondMarker" hidden><span>Bonded</span></div>
       <div ref={entryMarkerRef} className="chartEntryMarker" hidden>
         <span className="chartEntryChevron">⌃</span>
         <div className="chartEntryBadge">
