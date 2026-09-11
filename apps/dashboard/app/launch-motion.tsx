@@ -94,6 +94,19 @@ function removeAndSlideUp(element: HTMLElement) {
   });
 }
 
+function prependAndSlideDown(lane: HTMLElement, element: HTMLElement) {
+  const existing = [...lane.children].filter((item): item is HTMLElement => item instanceof HTMLElement);
+  const before = new Map(existing.map((item) => [item, item.getBoundingClientRect().top]));
+  lane.prepend(element);
+  existing.forEach((item) => {
+    const delta = (before.get(item) ?? 0) - item.getBoundingClientRect().top;
+    if (Math.abs(delta) > 1) item.animate([
+      { transform: `translateY(${delta}px)` },
+      { transform: "translateY(0)" },
+    ], { duration: 520, easing: "cubic-bezier(.2,.76,.24,1)" });
+  });
+}
+
 function flyDemoCard(element: HTMLElement, destination: HTMLElement, tone: "purple" | "green", onArrival: () => void) {
   const start = element.getBoundingClientRect();
   const targetLane = destination.getBoundingClientRect();
@@ -143,6 +156,13 @@ export function LaunchMotionController() {
 
       current.forEach((next, token) => {
         const prior = previous.current.get(token);
+        if (prior && prior.state === next.state) {
+          const delta = prior.rect.top - next.rect.top;
+          if (Math.abs(delta) > 1) next.element.animate([
+            { transform: `translateY(${delta}px)` },
+            { transform: "translateY(0)" },
+          ], { duration: 520, easing: "cubic-bezier(.2,.76,.24,1)" });
+        }
         if (prior?.state === "sighted" && next.state === "under_watch") {
           flySnapshot(prior, next, "purple");
         }
@@ -187,12 +207,12 @@ export function LaunchMotionController() {
       window.setTimeout(() => {
         flyDemoCard(promotedDemo, watchedLane, "purple", () => {
           const watchedDemo = createDemoCard("Fast flow", "FLOW", 91);
-          watchedLane.prepend(watchedDemo);
+          prependAndSlideDown(watchedLane, watchedDemo);
           animate(watchedDemo, "motionFromSighted", 760);
           window.setTimeout(() => {
             flyDemoCard(watchedDemo, acquiredLane, "green", () => {
               const acquiredDemo = createDemoCard("Fast flow", "FLOW", 100, true);
-              acquiredLane.prepend(acquiredDemo);
+              prependAndSlideDown(acquiredLane, acquiredDemo);
               animate(acquiredDemo, "motionAcquired", 1_050);
             });
           }, 1_250);
