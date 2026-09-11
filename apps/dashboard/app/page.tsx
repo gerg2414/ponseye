@@ -130,7 +130,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
             </div>
             <div className="lockFooter">
               <span>{launch.research_state === "target_locked" ? "Awaiting execution" : "Ponseye monitoring"}</span>
-              <span className="signalPrivate">Surveillance active</span>
+              <span className="signalPrivate">{mode === "sighted" ? "Awaiting surveillance" : "Surveillance active"}</span>
             </div>
           </div>
         )}
