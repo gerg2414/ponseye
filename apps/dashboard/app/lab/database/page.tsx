@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getTokenDatabase, type DatabaseSort } from "../../../lib/database";
 import { TokenImage } from "../../token-image";
+import { DatabaseCopyAddress } from "./database-copy-address";
 
 export const dynamic = "force-dynamic";
 
@@ -151,7 +152,7 @@ export default async function DatabasePage({
                   <td>{token.peak_multiple ? `${token.peak_multiple.toFixed(2)}x` : "Pending"}</td>
                   <td><span>{token.trade_count.toLocaleString("en-GB")}</span><small>{token.buys} buys · {token.sells} sells</small></td>
                   <td>{money(token.volume_usd)}</td>
-                  <td><div className="databaseActions"><Link href={`/launch/${token.token_address}`}>Chart</Link><a href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer">GMGN</a></div></td>
+                  <td><div className="databaseActions"><DatabaseCopyAddress address={token.token_address} /><Link href={`/launch/${token.token_address}`}>Chart</Link><a href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer">GMGN</a></div></td>
                 </tr>
               ))}
               {!tokens.length ? <tr><td className="databaseEmpty" colSpan={9}>No tokens match that search.</td></tr> : null}
