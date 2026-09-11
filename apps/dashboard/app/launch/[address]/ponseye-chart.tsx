@@ -219,7 +219,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, gradu
       downColor: "#ff5f7f",
       wickUpColor: "#9aff4f",
       wickDownColor: "#ff5f7f",
-      wickVisible: false,
+      wickVisible: true,
       borderVisible: false,
       priceLineColor: "#a56cff",
       priceLineWidth: 1,
