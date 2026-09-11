@@ -1661,6 +1661,31 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .databasePagination a:last-child { grid-column: 3; }
 .databasePagination a:hover { color: #0a0d10; border-color: var(--green); background: var(--green); }
 
+.databaseSkeletonStats article i,
+.databaseSkeletonStats article b,
+.databaseSkeletonFilters i,
+.databaseSkeletonLedger > div i {
+  display: block;
+  background: linear-gradient(90deg,#171c22 0%,#252b33 48%,#171c22 100%);
+  background-size: 220% 100%;
+  animation: databaseLoading 1.2s linear infinite;
+}
+.databaseSkeletonStats article i { width: 74px; height: 7px; }
+.databaseSkeletonStats article b { width: 110px; max-width: 70%; height: 22px; }
+.databaseSkeletonFilters {
+  margin: 10px 0;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(260px,1fr) minmax(190px,260px) 72px;
+  gap: 8px;
+  border: 1px solid #282d35;
+  background: #0d1014;
+}
+.databaseSkeletonFilters i { height: 38px; }
+.databaseSkeletonLedger > div { padding: 0 12px; }
+.databaseSkeletonLedger > div i { height: 57px; border-bottom: 1px solid #20252d; background-color: #0b0e12; }
+@keyframes databaseLoading { to { background-position: -220% 0; } }
+
 @media (max-width: 760px) {
   .databasePage { width: min(100% - 20px,1680px); }
   .databaseIntro { min-height: 136px; align-items: flex-start; flex-direction: column; gap: 20px; }
@@ -1670,4 +1695,6 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   .databaseStats article:nth-child(-n+2) { border-bottom: 1px solid #282d35; }
   .databaseFilters { grid-template-columns: 1fr 1fr; }
   .databaseFilters label:first-child { grid-column: 1 / -1; }
+  .databaseSkeletonFilters { grid-template-columns: 1fr 1fr; }
+  .databaseSkeletonFilters i:first-child { grid-column: 1 / -1; }
 }
