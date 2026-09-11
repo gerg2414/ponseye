@@ -196,6 +196,7 @@ export async function saveMarketTrade(row: MarketTradeRow) {
 
   const side = row.Side.toLowerCase() === "buy" ? "buy" : "sell";
   const transactionHash = row.TransactionHeader.Hash.toLowerCase();
+  const protocol = row.Pair.Market?.Protocol?.toLowerCase() ?? null;
   const traderAddress = row.Trader?.Address?.toLowerCase() ?? null;
   const marketEventId = eventId([
     transactionHash,
@@ -224,10 +225,19 @@ export async function saveMarketTrade(row: MarketTradeRow) {
     quote_amount_usd: row.AmountsInUsd?.Quote ?? null,
     quote_token_address: row.Pair.QuoteToken?.Address?.toLowerCase() ?? null,
     quote_symbol: row.Pair.QuoteToken?.Symbol ?? null,
-    protocol: row.Pair.Market?.Protocol ?? null,
+    protocol,
     raw_trade: row,
   }, { onConflict: "market_event_id", ignoreDuplicates: true });
   assertOk(error, "save market trade");
+
+  if (protocol === "uniswap_v4") {
+    const { error: migrationError } = await db.from("launches").update({
+      status: "graduated",
+      graduated_at: row.Block.Time,
+      graduation_transaction_hash: transactionHash,
+    }).eq("token_address", tokenAddress).is("graduated_at", null);
+    assertOk(migrationError, "confirm migration from pool trade");
+  }
 }
 
 export async function warmTokenCache() {
