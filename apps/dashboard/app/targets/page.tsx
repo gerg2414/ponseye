@@ -83,9 +83,9 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
           {targets.map((target, index) => (
             <Link
               className="targetHistoryRow"
-              href={\`/launch/preview-acquired-\${index % 2 === 0 ? "one" : "two"}\`}
+              href={`/launch/preview-acquired-${index % 2 === 0 ? "one" : "two"}`}
               role="row"
-              aria-label={\`View \${target.name} chart\`}
+              aria-label={`View ${target.name} chart`}
               key={target.symbol}
             >
               <div className="targetHistoryToken" role="cell">
