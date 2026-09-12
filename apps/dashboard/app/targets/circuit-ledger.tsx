@@ -58,8 +58,8 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
       <div className="circuitRows">
         {visible.length ? visible.map(({ token, outcome, pnlUsd }) => {
           const resultMultiple = outcome.closed ? outcome.exitMultiple : token.final_multiple;
-          const exitMarketCap = outcome.closed && token.signal_market_cap_usd
-            ? token.signal_market_cap_usd * outcome.exitMultiple
+          const exitMarketCap = outcome.closed
+            ? token.exit_market_cap_usd ?? (token.signal_market_cap_usd ? token.signal_market_cap_usd * outcome.exitMultiple : null)
             : null;
           const href = `/launch/${token.token_address}?from=targets&entry=${encodeURIComponent(token.signal_at)}&entryMc=${token.signal_market_cap_usd ?? ""}`;
           return (
