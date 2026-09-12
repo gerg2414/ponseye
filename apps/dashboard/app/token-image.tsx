@@ -33,7 +33,7 @@ export function TokenImage({
     fallbackTimer.current = setTimeout(() => {
       setLoaded(false);
       setCandidateIndex((index) => index + 1);
-    }, 2_500);
+    }, 900);
 
     return () => {
       if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
