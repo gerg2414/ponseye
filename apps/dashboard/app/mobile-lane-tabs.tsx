@@ -10,7 +10,8 @@ const lanes = [
 type LaneId = (typeof lanes)[number]["id"];
 
 export function MobileLaneTabs({ counts }: { counts: Record<LaneId, number> }) {
-  const [active, setActive] = useState<LaneId>("sighted");
+  const initialLane: LaneId = counts.sighted > 0 ? "sighted" : counts.surveillance > 0 ? "surveillance" : "acquired";
+  const [active, setActive] = useState<LaneId>(initialLane);
 
   useEffect(() => {
     const board = document.querySelector<HTMLElement>(".launchBoard");
@@ -35,9 +36,14 @@ export function MobileLaneTabs({ counts }: { counts: Record<LaneId, number> }) {
     };
 
     board.addEventListener("scroll", updateActive, { passive: true });
+    const initial = document.getElementById(`lane-${initialLane}`);
+    if (initial) {
+      const left = initial.getBoundingClientRect().left - board.getBoundingClientRect().left + board.scrollLeft - 8;
+      board.scrollTo({ left, behavior: "auto" });
+    }
     updateActive();
     return () => board.removeEventListener("scroll", updateActive);
-  }, []);
+  }, [initialLane]);
 
   const selectLane = (id: LaneId) => {
     const board = document.querySelector<HTMLElement>(".launchBoard");
