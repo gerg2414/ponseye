@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { LabToken } from "../../lib/lab-data";
 import { getCapitalCircuitData } from "../../lib/lab-data";
+import { AutoRefresh } from "../auto-refresh";
 import { CircuitLedger } from "./circuit-ledger";
 
 export const metadata: Metadata = {
@@ -171,13 +172,14 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
   const capitalDeployed = tokens.length * positionSize;
   const pnl = balance - startingEquity;
   const roi = capitalDeployed ? (pnl / capitalDeployed) * 100 : 0;
-  const winners = outcomes.filter((item) => item.outcome.exitMultiple > 1).length;
+  const winners = outcomes.filter((item) => item.outcome.closed && item.outcome.exitMultiple > 1).length;
   const runners = outcomes.filter((item) => (item.token.future_peak_multiple ?? 0) >= 2);
   const closed = outcomes.filter((item) => item.outcome.closed);
   const open = outcomes.filter((item) => !item.outcome.closed);
   const bestRunner = Math.max(0, ...tokens.map((token) => token.future_peak_multiple ?? 0));
   return (
     <main className="targetsPage circuitPage">
+      <AutoRefresh intervalMs={5_000} />
       <header className="targetsNav">
         <Link href="/" aria-label="PonsEye dashboard">
           <Image src="/ponseye-wordmark-white.png" alt="PonsEye" width={1272} height={266} priority />
