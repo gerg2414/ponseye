@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { getGmgnShadowTokens, verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
+import { backfillGraduatedToken, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_ACTIVITY } from "./queries.js";
 import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveGmgnShadowTokens, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
@@ -211,11 +212,20 @@ async function recordingCycle() {
       return;
     }
     traffic.factoryRows += 1;
-    await saveFactoryEvent(row);
+    const tokenAddress = await saveFactoryEvent(row);
     const event = row as { Log?: { Signature?: { Name?: string } } };
-    if (event.Log?.Signature?.Name === "PoolGraduated") await poolFeeds.refresh();
+    if (event.Log?.Signature?.Name === "PoolGraduated") {
+      await poolFeeds.refresh();
+      if (tokenAddress) {
+        void delayOrAbort(5_000, collectorAbort.signal)
+          .then(() => backfillGraduatedToken(auth.access_token, tokenAddress, collectorAbort.signal))
+          .catch((error) => console.error(`Graduation backfill failed for ${tokenAddress}`, error));
+      }
+    }
   }, collectorAbort.signal);
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
+  const marketHistoryRepair = runMarketHistoryRepair(auth.access_token, collectorAbort.signal)
+    .catch((error) => console.error("Market history repair failed", error));
 
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
   const pauseMonitor = (async () => {
@@ -237,6 +247,7 @@ async function recordingCycle() {
   collectorAbort.abort();
   await holderCollector;
   await gmgnCollector;
+  await marketHistoryRepair;
   await poolFeeds.stop();
   await client.dispose();
   if (cycleResult === "paused") {
