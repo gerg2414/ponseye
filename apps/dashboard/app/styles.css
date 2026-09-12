@@ -940,9 +940,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .panelFoot span:last-child { display: none; }
   .boardHead { min-height: 82px; padding: 19px 17px; }
   .boardHead h2 { font-size: 19px; }
-  .launchBoard { margin-right: -1px; padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow-x: hidden; overflow-y: auto; scroll-snap-type: y proximity; }
-  .launchLane { width: 100%; height: auto; min-height: 240px; flex: 0 0 auto; scroll-snap-align: start; }
-  .launchLaneBody { overflow: visible; }
+  .launchBoard { margin-right: -1px; padding: 8px; display: flex; flex-direction: row; gap: 8px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 8px; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; }
+  .launchLane { width: calc(100vw - 42px); height: 100%; min-height: 0; flex: 0 0 calc(100vw - 42px); scroll-snap-align: start; scroll-snap-stop: always; }
+  .launchLaneBody { overflow-y: auto; overscroll-behavior-y: contain; }
   .boardUtility { gap: 9px; }
   .boardUtility .chainLabel { font-size: 8px; white-space: nowrap; }
   .boardUtility .chainLabel img { width: 22px; height: 22px; }
