@@ -16,51 +16,84 @@ export function TokenImage({
   priority?: boolean;
 }) {
   const candidates = useMemo(() => imageCandidates(src), [src]);
-  const [candidateIndex, setCandidateIndex] = useState(0);
+  const host = useRef<HTMLSpanElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(priority);
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const current = candidates[candidateIndex];
 
   useEffect(() => {
-    setCandidateIndex(0);
+    if (priority) {
+      setShouldLoad(true);
+      return;
+    }
+
+    const element = host.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setShouldLoad(true);
+      observer.disconnect();
+    }, { rootMargin: "300px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [priority, src]);
+
+  useEffect(() => {
+    setResolvedSrc(null);
     setLoaded(false);
-  }, [src]);
+    if (!shouldLoad || !candidates.length) return;
 
-  useEffect(() => {
-    if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
-    if (!current || loaded || candidateIndex >= candidates.length - 1) return;
+    let active = true;
+    const timers: Array<ReturnType<typeof setTimeout>> = [];
+    const loaders: HTMLImageElement[] = [];
+    const start = (candidate: string) => {
+      if (!active) return;
+      const loader = new window.Image();
+      loader.decoding = "async";
+      loader.onload = () => {
+        if (active && loader.naturalWidth > 0) setResolvedSrc((current) => current ?? candidate);
+      };
+      loader.src = candidate;
+      loaders.push(loader);
+    };
 
-    fallbackTimer.current = setTimeout(() => {
-      setLoaded(false);
-      setCandidateIndex((index) => index + 1);
-    }, 900);
+    const delays = [0, 300, 900, 1_800, 3_000];
+    candidates.forEach((candidate, index) => {
+      if (index === 0) start(candidate);
+      else timers.push(setTimeout(() => start(candidate), delays[index] ?? index * 900));
+    });
 
     return () => {
-      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+      active = false;
+      timers.forEach(clearTimeout);
+      loaders.forEach((loader) => {
+        loader.onload = null;
+        loader.onerror = null;
+      });
     };
-  }, [candidateIndex, candidates.length, current, loaded]);
-
-  if (!current) return <span aria-hidden="true">?</span>;
+  }, [candidates, shouldLoad]);
 
   return (
-    <Image
-      key={current}
-      src={current}
-      alt={alt}
-      width={size}
-      height={size}
-      priority={priority}
-      unoptimized={current.includes("/ipfs/")}
-      sizes={`${size}px`}
-      style={{ opacity: loaded ? 1 : 0, transition: "opacity 120ms ease-out" }}
-      onLoad={() => {
-        if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
-        setLoaded(true);
-      }}
-      onError={() => {
-        setLoaded(false);
-        setCandidateIndex((index) => index + 1);
-      }}
-    />
+    <span ref={host} className="tokenImageLoader">
+      <span aria-hidden="true" className="tokenImageInitial">{alt.trim().charAt(0).toUpperCase() || "?"}</span>
+      {resolvedSrc ? (
+        <Image
+          key={resolvedSrc}
+          src={resolvedSrc}
+          alt={alt}
+          width={size}
+          height={size}
+          priority={priority}
+          unoptimized
+          sizes={`${size}px`}
+          style={{ opacity: loaded ? 1 : 0, transition: "opacity 120ms ease-out" }}
+          onLoad={() => setLoaded(true)}
+        />
+      ) : null}
+    </span>
   );
 }
