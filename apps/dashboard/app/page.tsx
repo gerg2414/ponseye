@@ -39,7 +39,7 @@ function targetLockScore(launch: Launch) {
   const creatorBalance = launch.creator_balance_pct == null || launch.creator_balance_pct <= 5 ? 5 : 0;
   const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
 
-  return Math.round(launch.research_state === "under_watch" ? Math.max(48, score) : Math.min(47, score));
+  return Math.round(score);
 }
 
 function lockLabel(launch: Launch, score: number) {
