@@ -18,6 +18,11 @@ const imageHosts = new Set([
   "gateway.lighthouse.storage",
   "edge.uxento.io",
   "cdn.corenexis.com",
+  "46-225-60-163.sslip.io",
+  "char.autos",
+  "en.wikipedia.org",
+  "fast-ipfs.com",
+  "ipfs.launchblitz.ai",
   "pons-avatar-cdn.carlitolhargraveslra.chatgpt.site",
   "uplift.cash",
 ]);
