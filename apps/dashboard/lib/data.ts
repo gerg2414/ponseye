@@ -368,38 +368,6 @@ export async function getLaunchDetail(tokenAddress: string) {
       closed_at: position.closed_at,
     } : {}),
   } as LaunchRecord;
-  const lastQuoteAmount = Number(launch.last_quote_amount_raw);
-  const lastTokenAmount = Number(launch.last_token_amount_raw);
-  const lastRawPrice = lastTokenAmount > 0 ? lastQuoteAmount / lastTokenAmount : 0;
-  const curveUsdFactor = launch.price_usd && lastRawPrice > 0 ? Number(launch.price_usd) / lastRawPrice : null;
-  const curveCandleBuckets = new Map<number, ChartCandle>();
-
-  if (curveUsdFactor) {
-    for (const trade of payload.trades ?? []) {
-      const quoteAmount = Number(trade.quote_amount_raw);
-      const tokenAmount = Number(trade.token_amount_raw);
-      const timestamp = Date.parse(trade.block_time);
-      if (tokenAmount <= 0 || !Number.isFinite(timestamp)) continue;
-      const price = (quoteAmount / tokenAmount) * curveUsdFactor;
-      if (!Number.isFinite(price) || price <= 0) continue;
-      const bucket = Math.floor(timestamp / 60_000) * 60_000;
-      const existing = curveCandleBuckets.get(bucket);
-      if (existing) {
-        existing.high = Math.max(existing.high, price);
-        existing.low = Math.min(existing.low, price);
-        existing.close = price;
-      } else {
-        curveCandleBuckets.set(bucket, {
-          time: new Date(bucket).toISOString(),
-          open: price,
-          high: price,
-          low: price,
-          close: price,
-        });
-      }
-    }
-  }
-
   return {
     launch: {
       ...launch,
@@ -423,7 +391,7 @@ export async function getLaunchDetail(tokenAddress: string) {
       base_amount_usd: trade.base_amount_usd == null ? null : Number(trade.base_amount_usd),
       quote_amount_usd: trade.quote_amount_usd == null ? null : Number(trade.quote_amount_usd),
     })) as MarketTrade[],
-    chartCandles: ([...curveCandleBuckets.values(), ...(payload.chartCandles ?? [])]).map((candle) => ({
+    chartCandles: (payload.chartCandles ?? []).map((candle) => ({
       ...candle,
       open: Number(candle.open),
       high: Number(candle.high),
