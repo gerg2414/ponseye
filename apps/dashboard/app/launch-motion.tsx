@@ -81,6 +81,7 @@ function morphToAcquired(
   const acquiredFace = nextElement.cloneNode(true) as HTMLElement;
   acquiredFace.removeAttribute("href");
   acquiredFace.className = "launchCardLink acquiredMorphFace acquiredMorphFull";
+  acquiredFace.style.removeProperty("visibility");
 
   ghost.append(compactFace, acquiredFace);
   nextElement.style.visibility = "hidden";
@@ -296,8 +297,8 @@ export function LaunchMotionController() {
     };
 
     const observer = new MutationObserver(() => {
-      window.clearTimeout(queued);
-      queued = window.setTimeout(compare, 90);
+      window.cancelAnimationFrame(queued);
+      queued = window.requestAnimationFrame(compare);
     });
     observer.observe(board, { childList: true, subtree: true });
 
@@ -345,7 +346,7 @@ export function LaunchMotionController() {
 
     window.addEventListener("ponseye:test-transitions", preview);
     return () => {
-      window.clearTimeout(queued);
+      window.cancelAnimationFrame(queued);
       observer.disconnect();
       window.removeEventListener("ponseye:test-transitions", preview);
     };
