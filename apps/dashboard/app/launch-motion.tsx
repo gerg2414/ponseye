@@ -56,8 +56,92 @@ function createBinnedGhost(snapshot: CardSnapshot) {
   window.setTimeout(() => ghost.remove(), binnedLength + 80);
 }
 
+function morphToAcquired(
+  priorElement: HTMLElement,
+  priorRect: DOMRect,
+  nextElement: HTMLElement,
+  nextRect: DOMRect,
+  onFinish?: () => void,
+) {
+  if (!priorRect.width || !nextRect.width) return;
+
+  const ghost = document.createElement("div");
+  ghost.className = "motionGhost acquiredMorphGhost";
+  Object.assign(ghost.style, {
+    left: `${priorRect.left}px`,
+    top: `${priorRect.top}px`,
+    width: `${priorRect.width}px`,
+    height: `${priorRect.height}px`,
+  });
+
+  const compactFace = priorElement.cloneNode(true) as HTMLElement;
+  compactFace.removeAttribute("href");
+  compactFace.className = "launchCardLink acquiredMorphFace acquiredMorphCompact";
+
+  const acquiredFace = nextElement.cloneNode(true) as HTMLElement;
+  acquiredFace.removeAttribute("href");
+  acquiredFace.className = "launchCardLink acquiredMorphFace acquiredMorphFull";
+
+  ghost.append(compactFace, acquiredFace);
+  nextElement.style.visibility = "hidden";
+  document.body.appendChild(ghost);
+
+  const dx = nextRect.left - priorRect.left;
+  const dy = nextRect.top - priorRect.top;
+  const widthMid = priorRect.width + (nextRect.width - priorRect.width) * .55;
+  const heightMid = priorRect.height + (nextRect.height - priorRect.height) * .38;
+
+  const movement = ghost.animate([
+    {
+      left: `${priorRect.left}px`, top: `${priorRect.top}px`,
+      width: `${priorRect.width}px`, height: `${priorRect.height}px`,
+      transform: "translate3d(0,0,0)",
+    },
+    {
+      left: `${priorRect.left + dx * .52}px`, top: `${priorRect.top + dy * .24}px`,
+      width: `${widthMid}px`, height: `${heightMid}px`,
+      transform: "translate3d(0,-10px,0)", offset: .48,
+    },
+    {
+      left: `${nextRect.left}px`, top: `${nextRect.top}px`,
+      width: `${nextRect.width}px`, height: `${nextRect.height}px`,
+      transform: "translate3d(0,0,0)",
+    },
+  ], { duration: 1_080, easing: "cubic-bezier(.2,.72,.18,1)", fill: "forwards" });
+
+  compactFace.animate([
+    { opacity: 1, transform: "scale(1)" },
+    { opacity: 1, transform: "scale(1)", offset: .38 },
+    { opacity: 0, transform: "scale(.985)", offset: .68 },
+    { opacity: 0, transform: "scale(.985)" },
+  ], { duration: 1_080, easing: "ease", fill: "forwards" });
+
+  acquiredFace.animate([
+    { opacity: 0, transform: "scale(.985)" },
+    { opacity: 0, transform: "scale(.985)", offset: .34 },
+    { opacity: 1, transform: "scale(1)", offset: .76 },
+    { opacity: 1, transform: "scale(1)" },
+  ], { duration: 1_080, easing: "ease", fill: "forwards" });
+
+  movement.finished.then(() => {
+    ghost.remove();
+    nextElement.style.removeProperty("visibility");
+    keepArrivalOnTop(nextElement, 1_050);
+    animate(nextElement, "motionAcquiredSettle", 1_050);
+    onFinish?.();
+  }).catch(() => {
+    ghost.remove();
+    nextElement.style.removeProperty("visibility");
+    onFinish?.();
+  });
+}
+
 function flySnapshot(prior: CardSnapshot, next: CardSnapshot, tone: "purple" | "green") {
   if (!prior.rect.width || !next.rect.width) return;
+  if (tone === "green") {
+    morphToAcquired(prior.element, prior.rect, next.element, next.rect);
+    return;
+  }
   const ghost = prior.element.cloneNode(true) as HTMLElement;
   ghost.removeAttribute("href");
   ghost.className = `launchCardLink motionGhost flightGhost ${tone}`;
@@ -76,7 +160,7 @@ function flySnapshot(prior: CardSnapshot, next: CardSnapshot, tone: "purple" | "
     ghost.remove();
     next.element.style.removeProperty("visibility");
     keepArrivalOnTop(next.element);
-    animate(next.element, tone === "green" ? "motionAcquired" : "motionFromSighted", tone === "green" ? 1_250 : 760);
+    animate(next.element, "motionFromSighted", 760);
   }).catch(() => {
     ghost.remove();
     next.element.style.removeProperty("visibility");
@@ -138,12 +222,35 @@ function flyDemoCard(element: HTMLElement, destination: HTMLElement, tone: "purp
 function createDemoCard(name: string, symbol: string, score: number, acquired = false) {
   const wrapper = document.createElement("div");
   wrapper.className = "launchCardLink launchAnimationDemo";
+  if (acquired) {
+    wrapper.innerHTML = `
+      <article class="launchCard isAcquired">
+        <div class="cardTop">
+          <div class="tokenImage"><div class="tokenFallback">${symbol.slice(0, 1)}</div></div>
+          <div class="cardContent"><div class="cardTitleRow"><div class="tokenIdentity"><strong>${name}</strong><span>$${symbol}</span></div><div class="cardMetaStack"><span class="positionBadge live">Open</span></div></div></div>
+        </div>
+        <div class="acquiredMetrics">
+          <div><span>Entry MC</span><strong>$31.4K</strong></div>
+          <div><span>Current MC</span><strong>$42.8K</strong></div>
+          <div class="gainMetric"><span>Gains</span><strong>1.36x</strong></div>
+        </div>
+        <div class="positionMonitor live profit">
+          <svg viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true">
+            <path class="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
+            <polyline class="positionLine" points="0,58 32,51 64,54 96,40 128,45 160,31 192,36 224,20 256,25 288,13 320,9" />
+            <circle class="positionEnd" cx="318" cy="9" r="4" />
+          </svg>
+          <div class="positionMonitorFooter"><span><i></i>Position open</span><span class="chartLink">View chart <b>↗</b></span></div>
+        </div>
+      </article>`;
+    return wrapper;
+  }
   wrapper.innerHTML = `
-    <article class="launchCard isCompact${acquired ? " isAcquired" : ""}">
+    <article class="launchCard isCompact">
       <div class="demoTokenImage">${symbol.slice(0, 1)}</div>
       <div class="demoIdentity"><strong>${name}</strong><span>$${symbol}</span></div>
-      <div class="demoMarket"><span>Market cap</span><strong>$${acquired ? "42.8K" : "18.6K"}</strong></div>
-      <div class="demoLock"><span>${acquired ? "Position open" : "Target lock"}</span><strong>${score}%</strong><i><b style="width:${score}%"></b></i></div>
+      <div class="demoMarket"><span>Market cap</span><strong>$18.6K</strong></div>
+      <div class="demoLock"><span>Target lock</span><strong>${score}%</strong><i><b style="width:${score}%"></b></i></div>
     </article>`;
   return wrapper;
 }
@@ -217,11 +324,16 @@ export function LaunchMotionController() {
           prependAndSlideDown(watchedLane, watchedDemo);
           animate(watchedDemo, "motionFromSighted", 760);
           window.setTimeout(() => {
-            flyDemoCard(watchedDemo, acquiredLane, "green", () => {
-              const acquiredDemo = createDemoCard("Fast flow", "FLOW", 100, true);
-              prependAndSlideDown(acquiredLane, acquiredDemo);
-              animate(acquiredDemo, "motionAcquired", 1_050);
-            });
+            const acquiredDemo = createDemoCard("Fast flow", "FLOW", 100, true);
+            acquiredDemo.style.visibility = "hidden";
+            prependAndSlideDown(acquiredLane, acquiredDemo);
+            morphToAcquired(
+              watchedDemo,
+              watchedDemo.getBoundingClientRect(),
+              acquiredDemo,
+              acquiredDemo.getBoundingClientRect(),
+              () => removeAndSlideUp(watchedDemo),
+            );
           }, 1_250);
         });
       }, 1_250);

@@ -191,6 +191,10 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .launchAnimationDemo .isAcquired .demoTokenImage,.launchAnimationDemo .isAcquired .demoLock > strong { color: var(--green); border-color: rgba(154,255,79,.5); }
 .motionGhost { position: fixed; z-index: 500; margin: 0; pointer-events: none; }
 .flightGhost { will-change: transform; filter: drop-shadow(0 18px 22px rgba(0,0,0,.55)); }
+.acquiredMorphGhost { overflow: hidden; border-radius: 9px; filter: drop-shadow(0 20px 26px rgba(0,0,0,.62)) drop-shadow(0 0 22px rgba(154,255,79,.15)); will-change: left,top,width,height,transform; }
+.acquiredMorphFace { position: absolute; inset: 0; width: 100%; height: 100%; will-change: opacity,transform; }
+.acquiredMorphFace .launchCard { width: 100%; height: 100%; }
+.acquiredMorphFull { opacity: 0; }
 .flightGhost.purple .launchCard { z-index: 501; border-color: rgba(165,108,255,.9); box-shadow: 0 0 24px rgba(165,108,255,.23); }
 .flightGhost.green .launchCard { z-index: 501; border-color: rgba(154,255,79,.88); box-shadow: 0 0 24px rgba(154,255,79,.2); }
 .motionBinned { pointer-events: none; animation: targetBinned .78s steps(7,end) both; }
@@ -201,6 +205,8 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .motionToAcquired { pointer-events: none; animation: targetToAcquired 1.05s cubic-bezier(.3,.7,.2,1) both; }
 .motionAcquired { animation: targetAcquired 1.25s cubic-bezier(.16,.9,.22,1) both; }
 .motionAcquired .launchCard { animation: acquiredLock 1.25s steps(8,end) both; }
+.motionAcquiredSettle { animation: targetAcquiredSettle 1.05s cubic-bezier(.16,.9,.22,1) both; }
+.motionAcquiredSettle .launchCard { animation: acquiredLock 1.05s steps(8,end) both; }
 @keyframes targetBinned {
   0% { opacity: 1; transform: translate(0); clip-path: inset(0); filter: none; }
   18% { transform: translate(-5px,0); filter: saturate(1.8); }
@@ -214,6 +220,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 @keyframes surveillanceScan { 0%,100% { border-color: #272b35; box-shadow: none; } 18%,48%,78% { border-color: rgba(165,108,255,.85); box-shadow: inset 18px 0 24px rgba(165,108,255,.1),0 0 18px rgba(165,108,255,.13); } }
 @keyframes targetToAcquired { 0% { opacity: 1; transform: translateX(0); } 45% { opacity: 1; transform: translateX(10px); filter: drop-shadow(0 0 12px rgba(154,255,79,.58)); } 100% { opacity: 0; transform: translateX(42px) scale(.97); } }
 @keyframes targetAcquired { 0% { opacity: 0; transform: translateX(-30px) scale(.93); } 50% { opacity: 1; transform: translateX(3px) scale(1.025); } 72% { transform: translateX(0) scale(.99); } 100% { transform: scale(1); } }
+@keyframes targetAcquiredSettle { 0% { transform: scale(1.012); } 46% { transform: scale(.995); } 100% { transform: scale(1); } }
 @keyframes acquiredLock { 0%,22% { border-color: rgba(154,255,79,.2); box-shadow: none; } 38%,64% { border-color: var(--green); box-shadow: inset 0 0 34px rgba(154,255,79,.15),0 0 22px rgba(154,255,79,.2); } 100% { border-color: rgba(154,255,79,.34); } }
 .launchCard { position: relative; height: 320px; overflow: hidden; padding: 17px; display: flex; flex-direction: column; border: 1px solid #272b35; border-radius: 9px; background: radial-gradient(circle at 100% 0,rgba(165,108,255,.07),transparent 13rem),#101218; }
 .launchCardLink:hover .launchCard,.launchCardLink:focus-visible .launchCard { border-color: #62468d; background-color: #13161c; outline: none; }
