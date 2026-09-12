@@ -309,10 +309,10 @@ export async function getLaunchDetail(tokenAddress: string) {
     db: { retry: false },
   });
   const result = await db.rpc("get_launch_detail", {
-      p_token_address: tokenAddress,
-      p_trade_limit: 100,
-      p_market_limit: 1000,
-    }).abortSignal(AbortSignal.timeout(12_000));
+    p_token_address: tokenAddress,
+    p_trade_limit: 1,
+    p_market_limit: 250,
+  }).abortSignal(AbortSignal.timeout(12_000));
 
   if (result.error || !result.data?.launch) {
     const dashboard = await getDashboardData();
