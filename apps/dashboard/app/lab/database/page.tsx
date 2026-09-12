@@ -124,7 +124,7 @@ export default async function DatabasePage({
                 <tr key={token.token_address}>
                   <td>
                     <div className="databaseToken">
-                      <TokenImage src={token.image_url} alt="" size={46} />
+                      <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={46} />
                       <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : shortAddress(token.token_address)}</small></span>
                     </div>
                   </td>

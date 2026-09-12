@@ -153,7 +153,7 @@ export function eventId(parts: unknown[]) {
 
 export function ipfsUrl(uri?: string) {
   if (!uri) return null;
-  return uri.startsWith("ipfs://")
-    ? `https://ipfs.io/ipfs/${uri.slice("ipfs://".length)}`
-    : uri;
+  if (uri.startsWith("ipfs://")) return `https://ipfs.io/ipfs/${uri.slice("ipfs://".length)}`;
+  if (/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/.test(uri)) return `https://ipfs.io/ipfs/${uri}`;
+  return uri;
 }

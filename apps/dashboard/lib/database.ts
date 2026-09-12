@@ -79,7 +79,10 @@ export async function getRecorderControlState(): Promise<RecorderControlState> {
   const db = databaseClient();
   const [controlResult, feedsResult] = await Promise.all([
     db.from("recorder_control").select("enabled,updated_at,updated_by").eq("id", 1).single(),
-    db.from("stream_status").select("feed,status,message,last_seen_at").order("feed"),
+    db.from("stream_status")
+      .select("feed,status,message,last_seen_at")
+      .in("feed", ["launch_activity", "curve_trades", "market_trades", "holder_snapshots"])
+      .order("feed"),
   ]);
 
   if (controlResult.error) throw new Error(controlResult.error.message);

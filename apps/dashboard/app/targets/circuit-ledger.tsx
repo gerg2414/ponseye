@@ -65,7 +65,7 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
           return (
             <Link className="circuitRow" href={href} key={token.token_address}>
               <div className="circuitToken">
-                <TokenImage src={token.image_url} alt="" size={48} />
+                <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={48} />
                 <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small></span>
               </div>
               <time>{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(token.signal_at))}</time>

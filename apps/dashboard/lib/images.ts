@@ -30,6 +30,9 @@ const imageHosts = new Set([
 
 export function safeImageUrl(value: string | null) {
   if (!value) return null;
+  if (/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})$/.test(value)) {
+    return `https://ipfs.io/ipfs/${value}`;
+  }
   try {
     const url = new URL(value);
     return url.protocol === "https:" && imageHosts.has(url.hostname) ? value : null;
@@ -45,7 +48,7 @@ export function imageCandidates(value: string | null) {
   try {
     const url = new URL(safe);
     const match = url.pathname.match(/^\/ipfs\/(.+)$/);
-    if (!match) return [safe];
+    if (!match) return [safe, `/api/token-image/source?url=${encodeURIComponent(safe)}`];
     const path = match[1];
     return [...new Set([
       `https://w3s.link/ipfs/${path}`,

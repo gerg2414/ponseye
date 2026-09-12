@@ -3,10 +3,10 @@ import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { runHolderCollector } from "./holders.js";
-import { recoverRecentLaunches } from "./launch-backfill.js";
-import { backfillGraduatedToken, runMarketHistoryRepair } from "./market-backfill.js";
+import { recoverMissingLaunchMetadata, recoverRecentLaunches } from "./launch-backfill.js";
+import { backfillGraduatedToken, runCompleteMarketHistoryRepair, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_CURVE_ACTIVITY, PONS_LAUNCH_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getRecorderEnabled, getStreamStatus, markRecorderPaused, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -251,6 +251,25 @@ async function main() {
 
   const trafficLog = setInterval(() => console.log("Recorder traffic", traffic), 60_000);
   trafficLog.unref();
+
+  // Metadata repair is safe while collection is paused and closes historical
+  // gaps where a factory event arrived without its matching launch call.
+  void getAccessToken()
+    .then(async (auth) => {
+      await recoverMissingLaunchMetadata(auth.access_token, AbortSignal.timeout(5 * 60_000));
+      const repairFeed = "complete_market_history_v1";
+      const prior = await getStreamStatus(repairFeed);
+      if (prior?.status === "completed") return;
+      await updateStreamStatus(repairFeed, "running", "Auditing all migrated tokens through the paused dataset cutoff");
+      const repairSignal = AbortSignal.timeout(45 * 60_000);
+      const stored = await runCompleteMarketHistoryRepair(auth.access_token, repairSignal);
+      if (repairSignal.aborted) throw new Error("Complete market history replay timed out before reaching the dataset cutoff");
+      await updateStreamStatus(repairFeed, "completed", `Replayed ${stored} historical market rows`);
+    })
+    .catch(async (error) => {
+      console.error("Paused dataset repair failed", error);
+      await updateStreamStatus("complete_market_history_v1", "error", error instanceof Error ? error.message : String(error));
+    });
 
   while (true) {
     try {

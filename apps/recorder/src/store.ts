@@ -48,6 +48,7 @@ export type MarketBackfillCandidate = {
   token_address: string;
   launched_at: string;
   graduated_at: string;
+  finish_at?: string;
 };
 
 export type HolderCandidate = {
@@ -82,6 +83,16 @@ export type HolderSnapshot = {
   positions: HolderPosition[];
   rawMetrics: unknown;
 };
+
+export async function getMissingLaunchMetadataTimes() {
+  const { data, error } = await db
+    .from("launches")
+    .select("launched_at")
+    .is("raw_launch_call", null)
+    .order("launched_at", { ascending: true });
+  assertOk(error, "load missing launch metadata times");
+  return (data ?? []).map((row) => row.launched_at as string);
+}
 
 function assertOk(error: { message: string } | null, context: string) {
   if (error) throw new Error(`${context}: ${error.message}`);
@@ -214,15 +225,20 @@ function marketTradePayload(row: MarketTradeRow) {
   const transactionHash = row.TransactionHeader.Hash.toLowerCase();
   const protocol = row.Pair.Market?.Protocol?.toLowerCase() ?? null;
   const traderAddress = row.Trader?.Address?.toLowerCase() ?? null;
+  const poolAddress = row.Pair.Pool?.Address?.toLowerCase() ?? null;
+  const canonicalAmount = (value: string | number | undefined) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toPrecision(7) : String(value ?? "");
+  };
   const marketEventId = eventId([
     transactionHash,
     tokenAddress,
-    row.Pair.Pool?.Address,
+    poolAddress,
     row.Pair.Market?.Protocol,
     side,
     traderAddress,
-    row.Amounts?.Base,
-    row.Amounts?.Quote,
+    canonicalAmount(row.Amounts?.Base),
+    canonicalAmount(row.Amounts?.Quote),
     row.Pair.QuoteToken?.Address,
   ]);
   const baseAmount = Number(row.Amounts?.Base);
@@ -259,6 +275,7 @@ function marketTradePayload(row: MarketTradeRow) {
     quote_token_address: row.Pair.QuoteToken?.Address?.toLowerCase() ?? null,
     quote_symbol: row.Pair.QuoteToken?.Symbol ?? null,
     protocol,
+    pool_address: poolAddress,
   };
 }
 
@@ -329,12 +346,11 @@ export async function getMarketBackfillCandidates(): Promise<MarketBackfillCandi
   const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db
     .from("launches")
-    .select("token_address,launched_at,graduated_at,launch_metrics!inner(research_state)")
+    .select("token_address,launched_at,graduated_at")
     .not("graduated_at", "is", null)
     .gte("graduated_at", since)
-    .in("launch_metrics.research_state", ["under_watch", "target_locked"])
     .order("graduated_at", { ascending: false })
-    .limit(100)
+    .limit(500)
     .abortSignal(AbortSignal.timeout(30_000));
   assertOk(error, "load market backfill candidates");
 
@@ -347,14 +363,52 @@ export async function getMarketBackfillCandidates(): Promise<MarketBackfillCandi
   return candidates;
 }
 
+export async function getCompleteMarketBackfillCandidates(): Promise<MarketBackfillCandidate[]> {
+  const [launchResult, controlResult] = await Promise.all([
+    db.from("launches")
+      .select("token_address,launched_at,graduated_at")
+      .not("graduated_at", "is", null)
+      .order("graduated_at", { ascending: true })
+      .limit(500)
+      .abortSignal(AbortSignal.timeout(30_000)),
+    db.from("recorder_control")
+      .select("enabled,updated_at")
+      .eq("id", 1)
+      .single(),
+  ]);
+  assertOk(launchResult.error, "load complete market backfill candidates");
+  assertOk(controlResult.error, "load dataset cutoff");
+  if (!controlResult.data) throw new Error("load dataset cutoff: control row missing");
+  const finishAt = controlResult.data.enabled
+    ? new Date().toISOString()
+    : String(controlResult.data.updated_at);
+  const candidates = (launchResult.data ?? []).map((row) => ({
+    token_address: String(row.token_address).toLowerCase(),
+    launched_at: String(row.launched_at),
+    graduated_at: String(row.graduated_at),
+    finish_at: finishAt,
+  }));
+  for (const candidate of candidates) knownTokens.add(candidate.token_address);
+  return candidates;
+}
+
+export async function getStreamStatus(feed: string) {
+  const { data, error } = await db.from("stream_status")
+    .select("status,message,last_seen_at")
+    .eq("feed", feed)
+    .maybeSingle();
+  assertOk(error, `load ${feed} status`);
+  return data;
+}
+
 export async function getActiveMarketTokens(): Promise<string[]> {
-  const activeSince = new Date(Date.now() - 60 * 60_000).toISOString();
+  const activeSince = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const activeResult = await db
-    .from("launch_metrics")
+    .from("launches")
     .select("token_address")
-    .in("research_state", ["under_watch", "target_locked"])
-    .or(`last_trade_at.gte.${activeSince},usd_price_at.gte.${activeSince}`)
-    .order("updated_at", { ascending: false })
+    .not("graduated_at", "is", null)
+    .gte("graduated_at", activeSince)
+    .order("graduated_at", { ascending: false })
     .limit(1000)
     .abortSignal(AbortSignal.timeout(30_000));
   assertOk(activeResult.error, "warm active token cache");

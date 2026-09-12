@@ -3,6 +3,7 @@ import { marketTradeHistory } from "./queries.js";
 import {
   getMarketBackfillCandidate,
   getMarketBackfillCandidates,
+  getCompleteMarketBackfillCandidates,
   saveMarketTrades,
   type MarketBackfillCandidate,
   type MarketTradeRow,
@@ -12,9 +13,33 @@ type MarketHistoryResponse = {
   data?: { Trading?: { Trades?: MarketTradeRow[] } };
 };
 
-const WINDOW_MS = 15 * 60_000;
+const WINDOW_MS = 60 * 60_000;
 const completed = new Set<string>();
 const running = new Map<string, Promise<number>>();
+
+async function storeWindow(
+  accessToken: string,
+  tokenAddress: string,
+  start: number,
+  finish: number,
+  signal: AbortSignal,
+): Promise<number> {
+  const response = await queryBitquery<MarketHistoryResponse>(
+    accessToken,
+    marketTradeHistory(tokenAddress, new Date(start).toISOString(), new Date(finish).toISOString()),
+    AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
+  );
+  const rows = response.data?.Trading?.Trades ?? [];
+  if (rows.length >= 5_000 && finish - start > 2_000) {
+    const midpoint = Math.floor((start + finish) / 2);
+    return await storeWindow(accessToken, tokenAddress, start, midpoint, signal)
+      + await storeWindow(accessToken, tokenAddress, midpoint + 1, finish, signal);
+  }
+  if (rows.length >= 5_000) {
+    console.warn(`Market history reached its limit inside a two second window for ${tokenAddress}`);
+  }
+  return saveMarketTrades(rows);
+}
 
 async function backfillCandidate(accessToken: string, candidate: MarketBackfillCandidate, signal: AbortSignal) {
   if (completed.has(candidate.token_address)) return 0;
@@ -24,21 +49,11 @@ async function backfillCandidate(accessToken: string, candidate: MarketBackfillC
   const task = (async () => {
     let stored = 0;
     let cursor = new Date(candidate.launched_at).getTime() - 5_000;
-    const finish = Date.now();
+    const finish = candidate.finish_at ? new Date(candidate.finish_at).getTime() : Date.now();
 
     while (!signal.aborted && cursor < finish) {
       const windowEnd = Math.min(finish, cursor + WINDOW_MS);
-      const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
-      const response = await queryBitquery<MarketHistoryResponse>(
-        accessToken,
-        marketTradeHistory(candidate.token_address, new Date(cursor).toISOString(), new Date(windowEnd).toISOString()),
-        requestSignal,
-      );
-      const rows = response.data?.Trading?.Trades ?? [];
-      if (rows.length >= 5_000) {
-        console.warn(`Market history window reached its limit for ${candidate.token_address}`);
-      }
-      stored += await saveMarketTrades(rows);
+      stored += await storeWindow(accessToken, candidate.token_address, cursor, windowEnd, signal);
       cursor = windowEnd + 1;
     }
 
@@ -49,6 +64,22 @@ async function backfillCandidate(accessToken: string, candidate: MarketBackfillC
 
   running.set(candidate.token_address, task);
   return task;
+}
+
+export async function runCompleteMarketHistoryRepair(accessToken: string, signal: AbortSignal) {
+  const candidates = await getCompleteMarketBackfillCandidates();
+  let stored = 0;
+  for (const candidate of candidates) {
+    if (signal.aborted) break;
+    try {
+      stored += await backfillCandidate(accessToken, candidate, signal);
+    } catch (error) {
+      if (!signal.aborted) console.error(`Complete market history failed for ${candidate.token_address}`, error);
+    }
+  }
+  if (signal.aborted) throw new Error("Complete market history replay did not reach the dataset cutoff");
+  console.log(`Complete market history replay stored ${stored} rows across ${candidates.length} migrated tokens`);
+  return stored;
 }
 
 export async function backfillGraduatedToken(accessToken: string, tokenAddress: string, signal: AbortSignal) {
