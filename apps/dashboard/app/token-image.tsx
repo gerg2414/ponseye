@@ -17,9 +17,13 @@ export function TokenImage({
 }) {
   const candidates = useMemo(() => imageCandidates(src), [src]);
   const [candidateIndex, setCandidateIndex] = useState(0);
+  const [loaded, setLoaded] = useState(false);
   const current = candidates[candidateIndex];
 
-  useEffect(() => setCandidateIndex(0), [src]);
+  useEffect(() => {
+    setCandidateIndex(0);
+    setLoaded(false);
+  }, [src]);
 
   if (!current) return <span aria-hidden="true">?</span>;
 
@@ -33,7 +37,12 @@ export function TokenImage({
       priority={priority}
       unoptimized={current.startsWith("/api/token-image/")}
       sizes={`${size}px`}
-      onError={() => setCandidateIndex((index) => index + 1)}
+      style={{ opacity: loaded ? 1 : 0, transition: "opacity 120ms ease-out" }}
+      onLoad={() => setLoaded(true)}
+      onError={() => {
+        setLoaded(false);
+        setCandidateIndex((index) => index + 1);
+      }}
     />
   );
 }

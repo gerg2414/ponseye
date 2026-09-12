@@ -270,6 +270,14 @@ export function LaunchMotionController() {
       queued = 0;
       const current = cardsOnBoard();
 
+      // On phones the lanes are independently scrollable. Comparing viewport
+      // coordinates after a refresh mistakes the user's scroll for a card
+      // reorder and visibly pulls cards towards their previous positions.
+      if (window.matchMedia("(max-width: 620px)").matches) {
+        previous.current = current;
+        return;
+      }
+
       current.forEach((next, token) => {
         const prior = previous.current.get(token);
         if (prior && prior.state === next.state) {

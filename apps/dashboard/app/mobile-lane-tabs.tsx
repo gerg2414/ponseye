@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const lanes = [
   { id: "sighted", label: "Sighted" },
@@ -10,7 +10,9 @@ const lanes = [
 type LaneId = (typeof lanes)[number]["id"];
 
 export function MobileLaneTabs({ counts }: { counts: Record<LaneId, number> }) {
-  const initialLane: LaneId = counts.sighted > 0 ? "sighted" : counts.surveillance > 0 ? "surveillance" : "acquired";
+  const initialLane = useRef<LaneId>(
+    counts.sighted > 0 ? "sighted" : counts.surveillance > 0 ? "surveillance" : "acquired",
+  ).current;
   const [active, setActive] = useState<LaneId>(initialLane);
 
   useEffect(() => {

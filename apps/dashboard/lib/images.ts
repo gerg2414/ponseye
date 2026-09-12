@@ -13,6 +13,11 @@ const imageHosts = new Set([
   "d.uguu.se",
   "cloudflare-ipfs.com",
   "dweb.link",
+  "nftstorage.link",
+  "w3s.link",
+  "gateway.lighthouse.storage",
+  "pons-avatar-cdn.carlitolhargraveslra.chatgpt.site",
+  "uplift.cash",
 ]);
 
 export function safeImageUrl(value: string | null) {
@@ -36,10 +41,11 @@ export function imageCandidates(value: string | null) {
     const path = match[1];
     return [
       `/api/token-image/${encodeURIComponent(path)}`,
-      `https://dweb.link/ipfs/${path}`,
+      `https://w3s.link/ipfs/${path}`,
+      `https://nftstorage.link/ipfs/${path}`,
       `https://gateway.pinata.cloud/ipfs/${path}`,
       `https://ipfs.io/ipfs/${path}`,
-      `https://cloudflare-ipfs.com/ipfs/${path}`,
+      `https://gateway.lighthouse.storage/ipfs/${path}`,
     ];
   } catch {
     return [];
