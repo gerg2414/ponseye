@@ -5,6 +5,7 @@ import { getDashboardData } from "../lib/data";
 import { quoteValue } from "../lib/market";
 import { AutoRefresh } from "./auto-refresh";
 import { LaunchMotionController, LaunchMotionPreview } from "./launch-motion";
+import { MobileLaneTabs } from "./mobile-lane-tabs";
 import { TokenImage } from "./token-image";
 
 export const dynamic = "force-dynamic";
@@ -181,7 +182,7 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
   empty: string;
 }) {
   return (
-    <section className={`launchLane ${tone}`}>
+    <section className={`launchLane ${tone}`} id={`lane-${mode}`}>
       <header className="laneHead">
         <div><Image src={icon} alt="" width={38} height={38} /><strong>{title}</strong></div>
         <span>{count}</span>
@@ -263,6 +264,7 @@ export default async function Home() {
           <span>Capital circuit</span>
         </Link>
         <section className="boardSection">
+          <MobileLaneTabs counts={{ sighted: sightings.length, surveillance: surveillance.length, acquired: acquired.length }} />
           <div className="launchBoard">
             <LaunchLane title="Sighted" count={sightings.length} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
             <LaunchLane title="Surveilling" count={surveillance.length} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
