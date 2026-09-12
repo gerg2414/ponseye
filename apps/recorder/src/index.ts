@@ -2,11 +2,11 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
-import { getGmgnShadowTokens, getGmgnTokenByAddress, verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
+import { recoverRecentLaunches } from "./launch-backfill.js";
 import { backfillGraduatedToken, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_CURVE_ACTIVITY, PONS_LAUNCH_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, getRecentGmgnShadowCandidates, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveGmgnShadowTokens, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -19,10 +19,6 @@ const traffic = {
   curveRowsStored: 0,
   marketRowsReceived: 0,
   marketRowsStored: 0,
-  gmgnPolls: 0,
-  gmgnRowsReceived: 0,
-  gmgnRowsStored: 0,
-  gmgnErrors: 0,
   subscriptionRestarts: 0,
 };
 
@@ -161,60 +157,6 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
   };
 }
 
-async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
-  let errorCount = 0;
-  let fallbackRateLimited = false;
-  const exactCheckedAt = new Map<string, number>();
-  await updateStreamStatus("gmgn_shadow", "connecting", "Starting read-only Pons shadow feed");
-
-  while (!signal.aborted) {
-    try {
-      const trenchesTokens = await getGmgnShadowTokens(apiKey);
-      const recentAddresses = await getRecentGmgnShadowCandidates();
-      const exactAddresses = recentAddresses
-        .map((address) => ({ address, checkedAt: exactCheckedAt.get(address) ?? 0 }))
-        .filter(({ checkedAt }) => Date.now() - checkedAt >= 5 * 60_000)
-        .sort((a, b) => a.checkedAt - b.checkedAt)
-        .slice(0, 4);
-      const exactTokens = [];
-      for (const { address } of exactAddresses) {
-        exactCheckedAt.set(address, Date.now());
-        try {
-          const token = await getGmgnTokenByAddress(apiKey, address);
-          if (token) exactTokens.push(token);
-        } catch (error) {
-          console.warn(`GMGN exact token lookup failed for ${address}`, error);
-        }
-      }
-      const tokens = [...trenchesTokens, ...exactTokens];
-      traffic.gmgnPolls += 1;
-      traffic.gmgnRowsReceived += tokens.length;
-      traffic.gmgnRowsStored += await saveGmgnShadowTokens(tokens);
-      errorCount = 0;
-      fallbackRateLimited = false;
-      await updateStreamStatus(
-        "gmgn_shadow",
-        "connected",
-        `Official GMGN shadow active; tracking ${trenchesTokens.length} ranked tokens`,
-      );
-    } catch (error) {
-      if (signal.aborted) break;
-      errorCount += 1;
-      traffic.gmgnErrors += 1;
-      const message = error instanceof Error ? error.message : String(error);
-      fallbackRateLimited = /RATE_LIMIT|HTTP 429/i.test(message);
-      console.error("GMGN shadow poll failed", error);
-      await updateStreamStatus("gmgn_shadow", "error", message);
-    }
-    const retryAfter = fallbackRateLimited
-      ? 5 * 60_000
-      : errorCount
-        ? Math.min(2 * 60_000, 15_000 * 2 ** Math.min(errorCount - 1, 3))
-        : 60_000;
-    await delayOrAbort(retryAfter, signal);
-  }
-}
-
 async function recordingCycle() {
   const auth = await getAccessToken();
   const collectorAbort = new AbortController();
@@ -225,9 +167,6 @@ async function recordingCycle() {
     console.log("Bitquery WebSocket connected");
   });
   const poolFeeds = createPoolFeedController(client, collectorAbort.signal);
-  const gmgnCollector = config.GMGN_API_KEY
-    ? runGmgnShadowCollector(config.GMGN_API_KEY, collectorAbort.signal)
-    : Promise.resolve();
 
   subscribe(client, "launch_activity", PONS_LAUNCH_ACTIVITY, async (row, collection) => {
     if (collection === "Calls") {
@@ -250,6 +189,8 @@ async function recordingCycle() {
     traffic.curveRowsReceived += 1;
     if (await saveTrade(row)) traffic.curveRowsStored += 1;
   }, collectorAbort.signal);
+  void recoverRecentLaunches(auth.access_token, collectorAbort.signal)
+    .catch((error) => console.error("Launch history recovery failed", error));
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
   const marketHistoryRepair = runMarketHistoryRepair(auth.access_token, collectorAbort.signal)
     .catch((error) => console.error("Market history repair failed", error));
@@ -273,7 +214,6 @@ async function recordingCycle() {
   ]);
   collectorAbort.abort();
   await holderCollector;
-  await gmgnCollector;
   await marketHistoryRepair;
   await poolFeeds.stop();
   await client.dispose();
@@ -299,22 +239,6 @@ async function main() {
 
   const trafficLog = setInterval(() => console.log("Recorder traffic", traffic), 60_000);
   trafficLog.unref();
-
-  if (!config.GMGN_API_KEY) {
-    await updateStreamStatus("gmgn_shadow", "stopped", "GMGN_API_KEY is not configured");
-  } else {
-    await updateStreamStatus("gmgn_shadow", "connecting", "Checking read-only Robinhood access");
-    try {
-      const sampleSymbol = await verifyGmgnReadAccess(config.GMGN_API_KEY);
-      const suffix = sampleSymbol ? `; sample ${sampleSymbol}` : "";
-      await updateStreamStatus("gmgn_shadow", "connected", `Read-only Robinhood query verified${suffix}`);
-      console.log("GMGN read-only Robinhood query verified");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await updateStreamStatus("gmgn_shadow", "error", message);
-      console.error("GMGN read-only verification failed", error);
-    }
-  }
 
   while (true) {
     try {
