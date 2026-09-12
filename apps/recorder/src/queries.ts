@@ -34,6 +34,34 @@ export const PONS_LAUNCH_ACTIVITY = `
   }
 `;
 
+export function ponsLaunchHistory(since: string, till: string) {
+  return `
+    query PonsLaunchHistory {
+      EVM(network: robinhood) {
+        Calls(
+          limit: {count: 10000}
+          orderBy: {ascending: Block_Time}
+          where: {
+            Block: {Time: {since: "${since}", till: "${till}"}}
+            Call: {
+              To: {in: [
+                "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+                "0xe33e9e479df8802cb0866d5d05258bec4cf62948"
+              ]}
+              Input: {startsWith: ["0xf35abbcf", "0xa72101af", "0xf85f8e41"]}
+              Success: true
+            }
+          }
+        ) {
+          Block { Time Number }
+          Transaction { Hash From }
+          Call { To Value Input Output }
+        }
+      }
+    }
+  `;
+}
+
 // Curve events are deliberately kept on their own subscription. Robinhood can
 // produce enough curve traffic to build a processing queue, and launch discovery
 // must never wait behind trade writes.
