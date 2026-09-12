@@ -27,7 +27,7 @@ type EventRow = {
   Arguments: Array<{ Name: string; Value: { address?: string; bigInteger?: string; integer?: number } }>;
 };
 
-type MarketTradeRow = {
+export type MarketTradeRow = {
   Block: { Time: string };
   Side: string;
   Price?: string | number;
@@ -42,6 +42,12 @@ type MarketTradeRow = {
     QuoteToken?: { Address?: string; Symbol?: string };
     Market?: { Protocol?: string };
   };
+};
+
+export type MarketBackfillCandidate = {
+  token_address: string;
+  launched_at: string;
+  graduated_at: string;
 };
 
 export type HolderCandidate = {
@@ -121,7 +127,7 @@ export async function saveFactoryEvent(row: EventRow) {
   const args = argumentMap(row.Arguments);
   const name = row.Log.Signature.Name;
   const token = String(args.token ?? "").toLowerCase();
-  if (!token) return;
+  if (!token) return null;
 
   if (name === "TokenLaunched") {
     const { error } = await db.from("launches").upsert({
@@ -139,7 +145,7 @@ export async function saveFactoryEvent(row: EventRow) {
     assertOk(error, "save TokenLaunched");
     tokenByCurve.set(String(args.curve).toLowerCase(), token);
     knownTokens.add(token);
-    return;
+    return token;
   }
 
   const update = name === "PoolGraduated"
@@ -147,6 +153,7 @@ export async function saveFactoryEvent(row: EventRow) {
     : { status: "swept", swept_at: row.Block.Time };
   const { error } = await db.from("launches").update(update).eq("token_address", token);
   assertOk(error, `save ${name}`);
+  return token;
 }
 
 export async function saveTrade(row: EventRow) {
@@ -274,6 +281,41 @@ export async function saveGmgnShadowTokens(tokens: GmgnShadowToken[]) {
 export async function warmTokenCache() {
   const tokens = await getActiveMarketTokens();
   console.log(`Loaded ${tokens.length} active tokens (${knownTokens.size} total tracked) into memory`);
+}
+
+export async function getMarketBackfillCandidate(tokenAddress: string): Promise<MarketBackfillCandidate | null> {
+  const token = tokenAddress.toLowerCase();
+  const { data, error } = await db
+    .from("launches")
+    .select("token_address,launched_at,graduated_at")
+    .eq("token_address", token)
+    .maybeSingle();
+  assertOk(error, "load market backfill token");
+  if (!data?.graduated_at) return null;
+  knownTokens.add(token);
+  return data as MarketBackfillCandidate;
+}
+
+export async function getMarketBackfillCandidates(): Promise<MarketBackfillCandidate[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { data, error } = await db
+    .from("launches")
+    .select("token_address,launched_at,graduated_at,launch_metrics!inner(research_state)")
+    .not("graduated_at", "is", null)
+    .gte("graduated_at", since)
+    .in("launch_metrics.research_state", ["under_watch", "target_locked"])
+    .order("graduated_at", { ascending: false })
+    .limit(100)
+    .abortSignal(AbortSignal.timeout(30_000));
+  assertOk(error, "load market backfill candidates");
+
+  const candidates = (data ?? []).map((row) => ({
+    token_address: String(row.token_address).toLowerCase(),
+    launched_at: String(row.launched_at),
+    graduated_at: String(row.graduated_at),
+  }));
+  for (const candidate of candidates) knownTokens.add(candidate.token_address);
+  return candidates;
 }
 
 export async function getActiveMarketTokens(): Promise<string[]> {
