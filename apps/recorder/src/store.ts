@@ -9,6 +9,7 @@ const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
 });
 
 const tokenByCurve = new Map<string, string>();
+const unknownCurves = new Set<string>();
 const knownTokens = new Set<string>();
 const lastStatusWrite = new Map<string, { status: string; at: number }>();
 const recorderFeeds = ["launch_activity", "curve_trades", "market_trades", "holder_snapshots", "gmgn_shadow"];
@@ -120,6 +121,7 @@ export async function saveLaunchCall(row: LaunchCall) {
   const { error } = await db.from("launches").upsert(payload, { onConflict: "token_address" });
   assertOk(error, "save launch");
   tokenByCurve.set(addresses.curveAddress, addresses.tokenAddress);
+  unknownCurves.delete(addresses.curveAddress);
   knownTokens.add(addresses.tokenAddress);
 }
 
@@ -144,6 +146,7 @@ export async function saveFactoryEvent(row: EventRow) {
     }, { onConflict: "token_address", ignoreDuplicates: false });
     assertOk(error, "save TokenLaunched");
     tokenByCurve.set(String(args.curve).toLowerCase(), token);
+    unknownCurves.delete(String(args.curve).toLowerCase());
     knownTokens.add(token);
     return token;
   }
@@ -163,6 +166,7 @@ export async function saveTrade(row: EventRow) {
   const trader = String(args.buyer ?? args.seller ?? row.Transaction.From ?? "").toLowerCase();
   const id = eventId([row.Transaction.Hash, curve, side, row.Arguments]);
   let tokenAddress = tokenByCurve.get(curve);
+  if (!tokenAddress && unknownCurves.has(curve)) return false;
   if (!tokenAddress) {
     const { data: launch } = await db
       .from("launches")
@@ -173,6 +177,11 @@ export async function saveTrade(row: EventRow) {
     if (tokenAddress) {
       tokenByCurve.set(curve, tokenAddress);
       knownTokens.add(tokenAddress);
+    } else {
+      // Most CurveBuy/CurveSell events on Robinhood are unrelated to Pons.
+      // Remember misses for this recorder cycle instead of querying Supabase on
+      // every subsequent trade from the same unrelated curve.
+      unknownCurves.add(curve);
     }
   }
 
