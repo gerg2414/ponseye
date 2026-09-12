@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import type { LabToken } from "../../lib/lab-data";
-import { getPonsEyeLabData } from "../../lib/lab-data";
+import { getCapitalCircuitData } from "../../lib/lab-data";
 import { CircuitLedger } from "./circuit-ledger";
 
 export const metadata: Metadata = {
@@ -54,6 +54,25 @@ function smoothPath(points: Array<{ x: number; y: number }>) {
 }
 
 function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number; label: string; tone: "loss" | "win" | "open" } {
+  if (token.position_status === "closed") {
+    const exitMultiple = token.entry_market_cap_usd && token.exit_market_cap_usd
+      ? token.exit_market_cap_usd / token.entry_market_cap_usd
+      : token.final_multiple ?? (token.exit_reason === "stop" ? stopMultiple : targetMultiple);
+    return {
+      closed: true,
+      exitMultiple,
+      label: token.exit_reason === "stop" ? "Stopped" : "Target hit",
+      tone: exitMultiple >= 1 ? "win" : "loss",
+    };
+  }
+  if (token.position_status === "open") {
+    return {
+      closed: false,
+      exitMultiple: Math.max(0, token.final_multiple ?? 1),
+      label: "Live",
+      tone: "open",
+    };
+  }
   const lowBeforeTarget = token.pre_target_low_multiples[String(targetMultiple)];
   if (lowBeforeTarget != null && lowBeforeTarget <= stopMultiple) {
     return { closed: true, exitMultiple: stopMultiple, label: "Stopped", tone: "loss" };
@@ -130,7 +149,7 @@ const periodLabels: Array<[Period, string]> = [["1d", "24H"], ["7d", "7D"], ["30
 export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const query = await searchParams;
   const period: Period = query.period === "1d" || query.period === "7d" || query.period === "30d" ? query.period : "all";
-  const allTokens = (await getPonsEyeLabData()).filter((token) => token.actual_acquired);
+  const allTokens = (await getCapitalCircuitData()).filter((token) => token.actual_acquired);
   const cutoff = period === "all" ? 0 : Date.now() - Number.parseInt(period, 10) * 86_400_000;
   const tokens = allTokens
     .filter((token) => new Date(token.signal_at).getTime() >= cutoff)
