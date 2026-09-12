@@ -256,12 +256,15 @@ async function main() {
   // slow historical launch-call queries cannot hold up peak and rule repairs.
   void getAccessToken()
     .then(async (auth) => {
-      const repairFeed = "complete_market_history_v8";
+      const repairFeed = "complete_market_history_v9";
       const prior = await getStreamStatus(repairFeed);
       if (!(prior?.status === "connected" && prior.message?.startsWith("Complete:"))) {
         await updateStreamStatus(repairFeed, "connecting", "Auditing all migrated tokens through the paused dataset cutoff");
         const repairSignal = AbortSignal.timeout(90 * 60_000);
-        const stored = await runCompleteMarketHistoryRepair(auth.access_token, repairSignal);
+        const stored = await runCompleteMarketHistoryRepair(auth.access_token, repairSignal, [
+          "0x4275e8d0d66f699f1b6b99312fb90fae2aafc86a",
+          "0x4e63ec6a9c3501ce77f66334c6e61fdc99bf27ff",
+        ]);
         if (repairSignal.aborted) throw new Error("Complete market history replay timed out before reaching the dataset cutoff");
         await updateStreamStatus(repairFeed, "connected", `Complete: replayed ${stored} historical market rows`);
       }
@@ -269,7 +272,7 @@ async function main() {
     })
     .catch(async (error) => {
       console.error("Paused dataset repair failed", error);
-      await updateStreamStatus("complete_market_history_v8", "error", error instanceof Error ? error.message : String(error));
+      await updateStreamStatus("complete_market_history_v9", "error", error instanceof Error ? error.message : String(error));
     });
 
   while (true) {
