@@ -336,9 +336,9 @@ export async function saveMarketHistoryRepair(rows: MarketTradeRow[]) {
   });
   if (!payloads.length) return 0;
 
-  for (let index = 0; index < payloads.length; index += 2_000) {
+  for (let index = 0; index < payloads.length; index += 5_000) {
     const { error } = await db.rpc("ingest_market_history_repair", {
-      rows: payloads.slice(index, index + 2_000),
+      rows: payloads.slice(index, index + 5_000),
     });
     assertOk(error, "bulk save market history repair");
   }
