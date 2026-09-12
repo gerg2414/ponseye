@@ -5,7 +5,7 @@ import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { getGmgnShadowTokens, getGmgnTokenByAddress, verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
 import { backfillGraduatedToken, runMarketHistoryRepair } from "./market-backfill.js";
-import { marketTrades, PONS_ACTIVITY } from "./queries.js";
+import { marketTrades, PONS_CURVE_ACTIVITY, PONS_LAUNCH_ACTIVITY } from "./queries.js";
 import { getActiveMarketTokens, getRecentGmgnShadowCandidates, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveGmgnShadowTokens, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
@@ -229,15 +229,10 @@ async function recordingCycle() {
     ? runGmgnShadowCollector(config.GMGN_API_KEY, collectorAbort.signal)
     : Promise.resolve();
 
-  subscribe(client, ["launch_activity", "curve_trades"], PONS_ACTIVITY, async (row, collection) => {
+  subscribe(client, "launch_activity", PONS_LAUNCH_ACTIVITY, async (row, collection) => {
     if (collection === "Calls") {
       traffic.launchRows += 1;
       return saveLaunchCall(row);
-    }
-    if (collection === "CurveEvents") {
-      traffic.curveRowsReceived += 1;
-      if (await saveTrade(row)) traffic.curveRowsStored += 1;
-      return;
     }
     traffic.factoryRows += 1;
     const tokenAddress = await saveFactoryEvent(row);
@@ -250,6 +245,10 @@ async function recordingCycle() {
           .catch((error) => console.error(`Graduation backfill failed for ${tokenAddress}`, error));
       }
     }
+  }, collectorAbort.signal);
+  subscribe(client, "curve_trades", PONS_CURVE_ACTIVITY, async (row) => {
+    traffic.curveRowsReceived += 1;
+    if (await saveTrade(row)) traffic.curveRowsStored += 1;
   }, collectorAbort.signal);
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
   const marketHistoryRepair = runMarketHistoryRepair(auth.access_token, collectorAbort.signal)
