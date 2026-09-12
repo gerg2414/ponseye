@@ -475,7 +475,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [modelName, setModelName] = useState("");
   const [exitProfileName, setExitProfileName] = useState("");
   const [storageReady, setStorageReady] = useState(false);
-  const [resultView, setResultView] = useState<"signals" | "misses" | "all">("signals");
+  const [resultView, setResultView] = useState<"signals" | "misses" | "all">("all");
 
   useEffect(() => {
     try {
@@ -892,9 +892,9 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         <section className="labResults">
           <header>
             <div className="labResultTabs">
+              <button type="button" className={resultView === "all" ? "active" : ""} onClick={() => setResultView("all")}>View all <span>{tokens.length}</span></button>
               <button type="button" className={resultView === "signals" ? "active" : ""} onClick={() => setResultView("signals")}>Would reach Acquired <span>{analysis.selected.length}</span></button>
               <button type="button" className={resultView === "misses" ? "active" : ""} onClick={() => setResultView("misses")}>Rejected runners <span>{analysis.misses.length}</span></button>
-              <button type="button" className={resultView === "all" ? "active" : ""} onClick={() => setResultView("all")}>View all <span>{tokens.length}</span></button>
             </div>
             <small>{resultView === "all" ? "Newest signals first" : "Sorted by peak performance"}</small>
           </header>
