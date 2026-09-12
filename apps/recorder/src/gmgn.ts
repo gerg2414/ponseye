@@ -35,14 +35,13 @@ export type GmgnShadowToken = {
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const GMGN_SITE = "https://gmgn.ai";
 const GMGN_TRENCHES_WS = "wss://ws.gmgn.ai/trs_ws";
-const PONSEYE_GMGN_BOOTSTRAP = "https://www.ponseye.io/api/gmgn-trenches-bootstrap";
 const GMGN_WEB_VERSION = "20260912-4388-7792ac2";
 const ROBINHOOD_QUOTE_TYPES = [11, 20, 24, 12, 0];
 const ROBINHOOD_PONS_FILTER_HASH = "395575f86a0b53c3";
 const ROBINHOOD_PONS_FALLBACK_SECTIONS: WebsiteTrenchesMeta["sections"] = [
-  { category: "new_creation", filterId: `robinhood_nc_${ROBINHOOD_PONS_FILTER_HASH}`, version: "C6A488928FBEF728" },
-  { category: "near_completion", filterId: `robinhood_ncp_${ROBINHOOD_PONS_FILTER_HASH}`, version: "C6A4887C86231610" },
-  { category: "completed", filterId: `robinhood_cp_${ROBINHOOD_PONS_FILTER_HASH}`, version: "C6A4889D4A407C38" },
+  { category: "new_creation", filterId: `robinhood_nc_${ROBINHOOD_PONS_FILTER_HASH}`, version: "" },
+  { category: "near_completion", filterId: `robinhood_ncp_${ROBINHOOD_PONS_FILTER_HASH}`, version: "" },
+  { category: "completed", filterId: `robinhood_cp_${ROBINHOOD_PONS_FILTER_HASH}`, version: "" },
 ];
 
 async function runGmgn(apiKey: string, args: string[]) {
@@ -390,37 +389,7 @@ async function bootstrapGmgnLiveTrenches(connection: { connId: string; rg: strin
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.includes("HTTP 403")) throw error;
-    console.warn("GMGN website bootstrap is blocked on Railway; trying the PonsEye metadata relay");
-    try {
-      const response = await fetch(PONSEYE_GMGN_BOOTSTRAP, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(connection),
-        signal: AbortSignal.timeout(25_000),
-      });
-      if (!response.ok) throw new Error(`PonsEye GMGN metadata relay HTTP ${response.status}`);
-      const meta = object(await response.json());
-      const sections = Array.isArray(meta?.sections)
-        ? meta.sections.map(object).flatMap((section) => {
-          const category = normalizeCategory(text(section?.category) ?? "");
-          const filterId = text(section?.filterId);
-          const version = text(section?.version);
-          return category && filterId && version ? [{ category, filterId, version }] : [];
-        })
-        : [];
-      if (sections.length !== 3) throw new Error("PonsEye GMGN metadata relay returned incomplete data");
-      console.log("GMGN live Trenches received regional subscription metadata");
-      return {
-        tokens: [] as GmgnShadowToken[],
-        meta: {
-          chain: text(meta?.chain) ?? "robinhood",
-          rg: text(meta?.rg) ?? connection.rg,
-          sections,
-        } satisfies WebsiteTrenchesMeta,
-      };
-    } catch (relayError) {
-      console.warn("PonsEye GMGN metadata relay unavailable; using the last known Pons filter versions", relayError);
-    }
+    console.warn("GMGN website bootstrap is blocked; subscribing from the current live head");
     return {
       tokens: [] as GmgnShadowToken[],
       meta: {
@@ -527,7 +496,7 @@ export async function connectGmgnLiveTrenches(
               })),
             },
           }));
-          console.log(`GMGN live Trenches subscribed to ${bootstrap.meta.sections.length} Pons sections`);
+          console.log(`GMGN live Trenches subscribed to ${bootstrap.meta.sections.length} Pons sections in ${bootstrap.meta.rg || rg}`);
           return;
         }
         if (text(envelope?.channel) === "heartbeat") {
