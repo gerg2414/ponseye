@@ -29,6 +29,20 @@ function age(value: string) {
 function targetLockScore(launch: Launch, mode: "sighted" | "surveillance" | "acquired") {
   if (launch.research_state === "target_locked") return 100;
 
+  if (mode === "sighted") {
+    // Sighted represents progress towards the first surveillance gate. Avoid
+    // awarding near-complete scores for a single buy simply because pressure,
+    // peak hold and creator safety all look perfect on a one-trade sample.
+    const tradeProgress = Math.min(1, launch.trade_count / 12) * 14;
+    const traderProgress = Math.min(1, launch.unique_traders / 6) * 14;
+    const earlyProgress = Math.min(1, launch.first_minute_buyers / 3) * 8;
+    const pressureProgress = launch.trade_count >= 3
+      ? Math.min(1, Math.max(0, ((launch.buy_pressure_pct ?? 0) - 40) / 12)) * 8
+      : 0;
+    const creatorProgress = launch.trade_count >= 3 && launch.creator_sells === 0 ? 5 : 0;
+    return Math.min(49, Math.round(tradeProgress + traderProgress + earlyProgress + pressureProgress + creatorProgress));
+  }
+
   const tradeDepth = Math.min(1, launch.trade_count / 30) * 15;
   const traderDepth = Math.min(1, launch.unique_traders / 15) * 15;
   const pressure = Math.min(1, Math.max(0, (launch.buy_pressure_pct ?? 0) / 60)) * 15;
@@ -41,7 +55,6 @@ function targetLockScore(launch: Launch, mode: "sighted" | "surveillance" | "acq
   const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
 
   const rawScore = Math.min(99, Math.round(score));
-  if (mode === "sighted") return Math.min(49, rawScore);
   if (mode === "surveillance") return Math.max(50, rawScore);
   return rawScore;
 }
