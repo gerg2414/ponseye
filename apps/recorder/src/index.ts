@@ -2,10 +2,10 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
-import { verifyGmgnReadAccess } from "./gmgn.js";
+import { getGmgnShadowTokens, verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
 import { marketTrades, PONS_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveGmgnShadowTokens, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -18,6 +18,10 @@ const traffic = {
   curveRowsStored: 0,
   marketRowsReceived: 0,
   marketRowsStored: 0,
+  gmgnPolls: 0,
+  gmgnRowsReceived: 0,
+  gmgnRowsStored: 0,
+  gmgnErrors: 0,
   subscriptionRestarts: 0,
 };
 
@@ -156,6 +160,32 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
   };
 }
 
+async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
+  let errorCount = 0;
+  await updateStreamStatus("gmgn_shadow", "connecting", "Starting read-only Pons shadow feed");
+  while (!signal.aborted) {
+    try {
+      const tokens = await getGmgnShadowTokens(apiKey);
+      traffic.gmgnPolls += 1;
+      traffic.gmgnRowsReceived += tokens.length;
+      traffic.gmgnRowsStored += await saveGmgnShadowTokens(tokens);
+      errorCount = 0;
+      await updateStreamStatus("gmgn_shadow", "connected", `Tracking ${tokens.length} Pons tokens from GMGN`);
+    } catch (error) {
+      if (signal.aborted) break;
+      errorCount += 1;
+      traffic.gmgnErrors += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("GMGN shadow poll failed", error);
+      await updateStreamStatus("gmgn_shadow", "error", message);
+    }
+    const retryAfter = errorCount
+      ? Math.min(60_000, 5_000 * 2 ** Math.min(errorCount - 1, 4))
+      : 10_000;
+    await delayOrAbort(retryAfter, signal);
+  }
+}
+
 async function recordingCycle() {
   const auth = await getAccessToken();
   const collectorAbort = new AbortController();
@@ -166,6 +196,9 @@ async function recordingCycle() {
     console.log("Bitquery WebSocket connected");
   });
   const poolFeeds = createPoolFeedController(client, collectorAbort.signal);
+  const gmgnCollector = config.GMGN_API_KEY
+    ? runGmgnShadowCollector(config.GMGN_API_KEY, collectorAbort.signal)
+    : Promise.resolve();
 
   subscribe(client, ["launch_activity", "curve_trades"], PONS_ACTIVITY, async (row, collection) => {
     if (collection === "Calls") {
@@ -203,6 +236,7 @@ async function recordingCycle() {
   ]);
   collectorAbort.abort();
   await holderCollector;
+  await gmgnCollector;
   await poolFeeds.stop();
   await client.dispose();
   if (cycleResult === "paused") {

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
+import type { GmgnShadowToken } from "./gmgn.js";
 import { argumentMap, decodeLaunchMetadata, eventId, ipfsUrl, launchAddresses } from "./parser.js";
 
 const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
@@ -10,7 +11,7 @@ const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
 const tokenByCurve = new Map<string, string>();
 const knownTokens = new Set<string>();
 const lastStatusWrite = new Map<string, { status: string; at: number }>();
-const recorderFeeds = ["launch_activity", "curve_trades", "market_trades", "holder_snapshots"];
+const recorderFeeds = ["launch_activity", "curve_trades", "market_trades", "holder_snapshots", "gmgn_shadow"];
 
 type LaunchCall = {
   Block: { Time: string; Number?: string };
@@ -241,6 +242,33 @@ export async function saveMarketTrade(row: MarketTradeRow) {
     assertOk(migrationError, "confirm migration from pool trade");
   }
   return true;
+}
+
+export async function saveGmgnShadowTokens(tokens: GmgnShadowToken[]) {
+  if (!tokens.length) return 0;
+  const observedAt = new Date().toISOString();
+  const rows = tokens.map((token) => ({
+    token_address: token.tokenAddress,
+    category: token.category,
+    launchpad_platform: token.launchpadPlatform,
+    launched_at: token.launchedAt,
+    last_seen_at: observedAt,
+    name: token.name,
+    symbol: token.symbol,
+    image_url: token.imageUrl,
+    creator_address: token.creatorAddress,
+    price_usd: token.priceUsd,
+    market_cap_usd: token.marketCapUsd,
+    liquidity_usd: token.liquidityUsd,
+    progress: token.progress,
+    holder_count: token.holderCount,
+    raw_token: token.rawToken,
+  }));
+  const { error } = await db
+    .from("gmgn_shadow_launches")
+    .upsert(rows, { onConflict: "token_address" });
+  assertOk(error, "save GMGN shadow tokens");
+  return rows.length;
 }
 
 export async function warmTokenCache() {

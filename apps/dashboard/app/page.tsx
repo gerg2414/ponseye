@@ -9,7 +9,7 @@ import { TokenImage } from "./token-image";
 
 export const dynamic = "force-dynamic";
 
-const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
+const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots", "gmgn_shadow"]);
 const targetMeterColours = [
   "#552a94", "#6230a8", "#7036bc", "#7e3ccf",
   "#8c43e1", "#9a49ef", "#aa4ff1", "#ba54e8",
