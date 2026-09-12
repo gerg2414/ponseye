@@ -51,11 +51,31 @@
   text-transform: uppercase;
 }
 
-.reasonPopup strong {
+.reasonList {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  list-style: none;
+}
+
+.reasonList li {
+  position: relative;
+  padding-left: 13px;
   color: #e7e9ed;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.55;
+}
+
+.reasonList li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: .6em;
+  width: 5px;
+  height: 5px;
+  background: #ff718c;
 }
 
 .reasonPopup.above {

@@ -385,9 +385,22 @@ function valueFor(token: LabToken, key: RuleKey) {
   return token[key];
 }
 
+function ruleFailure(rule: Rule, value: number) {
+  if (rule.key === "trade_count") return `Only ${Math.round(value)} trades. Needs ${rule.threshold} or more.`;
+  if (rule.key === "unique_traders") return `Only ${Math.round(value)} unique traders. Needs ${rule.threshold} or more.`;
+  if (rule.key === "buy_pressure_pct") return `Buy pressure was ${value.toFixed(1)}%. Needs at least ${rule.threshold}%.`;
+  if (rule.key === "first_minute_buyers") return `Only ${Math.round(value)} first minute buyers. Needs ${rule.threshold} or more.`;
+  if (rule.key === "momentum_multiple") return `Momentum was ${value.toFixed(2)}x. Needs at least ${rule.threshold.toFixed(2)}x.`;
+  if (rule.key === "peak_hold_pct") return `Price held ${value.toFixed(1)}% of its peak. Needs at least ${rule.threshold}%.`;
+  if (rule.key === "top_10_holder_pct") return `Top 10 holders owned ${value.toFixed(1)}%. Must be ${rule.threshold}% or less.`;
+  if (rule.key === "signal_market_cap_usd") return `Signal market cap was ${formatMarketCap(value)}. Needs at least ${formatMarketCap(rule.threshold)}.`;
+  if (rule.key === "early_buyer_share_pct") return `First minute buyers were ${value.toFixed(1)}% of unique traders. Needs at least ${rule.threshold}%.`;
+  return `${rule.label} was ${formatMetric(value, rule.suffix)}. Needs ${rule.direction === "min" ? "at least" : "no more than"} ${formatMetric(rule.threshold, rule.suffix)}.`;
+}
+
 function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
   const blockedBy: string[] = [];
-  if (settings.creatorGate && token.creator_sells > 0) blockedBy.push("creator sold");
+  if (settings.creatorGate && token.creator_sells > 0) blockedBy.push(`Creator sold ${token.creator_sells} time${token.creator_sells === 1 ? "" : "s"} before the signal.`);
 
   const concentrationRule = settings.rules.find((rule) => rule.key === "top_10_holder_pct");
   if (
@@ -395,7 +408,7 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
     concentrationRule &&
     token.top_10_holder_pct != null &&
     token.top_10_holder_pct > concentrationRule.threshold
-  ) blockedBy.push("holder concentration");
+  ) blockedBy.push(`Top 10 holders owned ${token.top_10_holder_pct.toFixed(1)}%. Must be ${concentrationRule.threshold}% or less.`);
 
   let availableWeight = 0;
   let passedWeight = 0;
@@ -413,7 +426,7 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
       passedWeight += rule.weight;
       passedRules += 1;
     } else if (rule.weight > 0) {
-      failedRules.push({ label: rule.short, weight: rule.weight });
+      failedRules.push({ label: ruleFailure(rule, value), weight: rule.weight });
     }
   }
 
@@ -434,10 +447,10 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
     labScore,
     selected: blockedBy.length === 0 && (labScore >= settings.scoreThreshold || fastConviction),
     blockedBy,
-    rejectedOn: [
+    rejectedOn: [...new Set([
       ...blockedBy,
       ...failedRules.sort((a, b) => b.weight - a.weight).map((rule) => rule.label),
-    ],
+    ])],
     passedRules,
     availableRules,
   };
@@ -492,7 +505,7 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
   const [reasonPopup, setReasonPopup] = useState<{ left: number; top: number; above: boolean } | null>(null);
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
   const recordedState = token.actual_acquired ? "Acquired" : token.actual_binned ? "Binned" : "Surveillance";
-  const rejectionReasons = token.rejectedOn.join(", ") || "insufficient score";
+  const rejectionReasons = token.rejectedOn.join(" ") || "Insufficient score.";
   const modelStatus = token.selected ? "Would acquire" : "Rejected";
   const entryQuery = new URLSearchParams({ entry: token.signal_at });
   if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
@@ -545,7 +558,9 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
           role="tooltip"
         >
           <small>Model rejection</small>
-          <strong>{rejectionReasons}</strong>
+          <ul className={resultStyles.reasonList}>
+            {(token.rejectedOn.length ? token.rejectedOn : ["Insufficient score."]).map((reason) => <li key={reason}>{reason}</li>)}
+          </ul>
         </div>,
         document.body,
       )}
