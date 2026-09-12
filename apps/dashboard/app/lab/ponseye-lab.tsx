@@ -36,13 +36,14 @@ type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "qua
 type ControlTab = "models" | "rules" | "gates";
 type ResultSort = "newest" | "score" | "peak" | "market-cap";
 type ExitModel = "fixed" | "breakeven" | "initials" | "staggered";
+type TakeProfitLevel = { target: number; sellPct: number };
 type ExitProfile = {
   exitModel: ExitModel;
   runnerTarget: number;
   stopLossPct: number;
   stopEnabled: boolean;
   positionSizeUsd: number;
-  takeProfitLevels: number[];
+  takeProfitLevels: TakeProfitLevel[];
 };
 type SavedModel = { name: string; settings: LabSettings };
 type SavedExitProfile = { name: string; settings: ExitProfile };
@@ -305,7 +306,11 @@ const currentExitProfileKey = "ponseye-lab-current-exit-v1";
 
 const runnerOptions = [1.5, 2, 3, 5, 10, 20, 50, 100];
 const runnerLadderTargets = [2, 5, 10, 20, 50, 100];
-const defaultTakeProfitLevels = [2, 3, 5];
+const defaultTakeProfitLevels: TakeProfitLevel[] = [
+  { target: 2, sellPct: 50 },
+  { target: 5, sellPct: 25 },
+  { target: 10, sellPct: 25 },
+];
 
 function normaliseExitProfile(value: unknown): ExitProfile | null {
   if (!value || typeof value !== "object") return null;
@@ -313,16 +318,26 @@ function normaliseExitProfile(value: unknown): ExitProfile | null {
   if (![candidate.runnerTarget, candidate.stopLossPct, candidate.positionSizeUsd].every((number) => typeof number === "number")) return null;
   const storedModel = String(candidate.exitModel);
   const exitModel: ExitModel = storedModel === "nostop" ? "fixed" : ["fixed", "breakeven", "initials", "staggered"].includes(storedModel) ? storedModel as ExitModel : "fixed";
-  const levels = Array.isArray(candidate.takeProfitLevels)
-    ? candidate.takeProfitLevels.filter((level): level is number => typeof level === "number" && runnerOptions.includes(level)).slice(0, 3)
-    : [];
+  const storedLevels = Array.isArray(candidate.takeProfitLevels) ? candidate.takeProfitLevels.slice(0, 3) : [];
+  const levels = storedLevels.flatMap((level) => {
+    if (typeof level === "number" && runnerOptions.includes(level)) {
+      return [{ target: level, sellPct: 100 / Math.max(1, storedLevels.length) }];
+    }
+    if (level && typeof level === "object") {
+      const item = level as Partial<TakeProfitLevel>;
+      if (typeof item.target === "number" && runnerOptions.includes(item.target) && typeof item.sellPct === "number") {
+        return [{ target: item.target, sellPct: Math.max(0, Math.min(100, item.sellPct)) }];
+      }
+    }
+    return [];
+  });
   return {
     exitModel,
     runnerTarget: candidate.runnerTarget as number,
     stopLossPct: candidate.stopLossPct as number,
     stopEnabled: storedModel === "nostop" ? false : candidate.stopEnabled !== false,
     positionSizeUsd: candidate.positionSizeUsd as number,
-    takeProfitLevels: levels.length === 3 ? levels : [...defaultTakeProfitLevels],
+    takeProfitLevels: levels.length === 3 ? levels : defaultTakeProfitLevels.map((level) => ({ ...level })),
   };
 }
 
@@ -456,6 +471,10 @@ function formatUsd(value: number) {
   }).format(value);
 }
 
+function formatTakeProfitLevels(levels: TakeProfitLevel[]) {
+  return levels.map((level) => `${level.sellPct}% at ${level.target}x`).join(" · ");
+}
+
 function formatSignalTime(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -543,7 +562,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     stopLossPct: 10,
     stopEnabled: true,
     positionSizeUsd: 25,
-    takeProfitLevels: [...defaultTakeProfitLevels],
+    takeProfitLevels: defaultTakeProfitLevels.map((level) => ({ ...level })),
   });
   const exitModel = exitSettings.exitModel;
   const [savedModels, setSavedModels] = useState<SavedModel[]>([]);
@@ -620,21 +639,21 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         && lowBeforeTarget <= stopMultiple;
 
       if (exitModel === "staggered") {
-        const levels = [...exitSettings.takeProfitLevels].sort((a, b) => a - b);
-        const portion = 1 / levels.length;
+        const levels = [...exitSettings.takeProfitLevels].sort((a, b) => a.target - b.target);
         let remaining = 1;
         let exitMultiple = 0;
         let levelsHit = 0;
         let stopped = false;
 
         for (const level of levels) {
-          const lowBeforeLevel = token.pre_target_low_multiples[String(level)];
-          const reached = (token.future_peak_multiple ?? 0) >= level
+          const lowBeforeLevel = token.pre_target_low_multiples[String(level.target)];
+          const reached = (token.future_peak_multiple ?? 0) >= level.target
             && (!exitSettings.stopEnabled || lowBeforeLevel == null || lowBeforeLevel > stopMultiple);
           if (reached) {
-            const sold = Math.min(portion, remaining);
-            exitMultiple += sold * level;
+            const sold = Math.min(level.sellPct / 100, remaining);
+            exitMultiple += sold * level.target;
             remaining -= sold;
+            if (remaining < 0.000001) remaining = 0;
             levelsHit += 1;
             continue;
           }
@@ -734,14 +753,25 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     setExitSettings((current) => ({
       ...current,
       exitModel: model,
-      runnerTarget: model === "staggered" ? Math.max(...current.takeProfitLevels) : current.runnerTarget,
+      runnerTarget: model === "staggered" ? Math.max(...current.takeProfitLevels.map((level) => level.target)) : current.runnerTarget,
     }));
   }
 
-  function updateTakeProfitLevel(index: number, target: number) {
+  function updateTakeProfitTarget(index: number, target: number) {
     setExitSettings((current) => {
-      const takeProfitLevels = current.takeProfitLevels.map((level, levelIndex) => levelIndex === index ? target : level);
-      return { ...current, takeProfitLevels, runnerTarget: Math.max(...takeProfitLevels) };
+      const takeProfitLevels = current.takeProfitLevels.map((level, levelIndex) => levelIndex === index ? { ...level, target } : level);
+      return { ...current, takeProfitLevels, runnerTarget: Math.max(...takeProfitLevels.map((level) => level.target)) };
+    });
+  }
+
+  function updateTakeProfitPercentage(index: number, sellPct: number) {
+    setExitSettings((current) => {
+      const allocatedElsewhere = current.takeProfitLevels.reduce((total, level, levelIndex) => total + (levelIndex === index ? 0 : level.sellPct), 0);
+      const available = Math.max(0, 100 - allocatedElsewhere);
+      const takeProfitLevels = current.takeProfitLevels.map((level, levelIndex) => levelIndex === index
+        ? { ...level, sellPct: Math.max(0, Math.min(available, sellPct || 0)) }
+        : level);
+      return { ...current, takeProfitLevels };
     });
   }
 
@@ -902,7 +932,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
 
         <details className="labDrawer exit">
           <summary>
-            <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitModel === "staggered" ? `${exitSettings.takeProfitLevels.join("x · ")}x` : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></div>
+            <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitModel === "staggered" ? formatTakeProfitLevels(exitSettings.takeProfitLevels) : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></div>
             <b>Tune exit</b>
           </summary>
           <section className="labStrategyPanel">
@@ -927,7 +957,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
                   <article key={profile.name}>
                     <button type="button" onClick={() => loadExitProfile(profile)}>
                       <strong>{profile.name}</strong>
-                      <small>{profile.settings.exitModel === "staggered" ? `${profile.settings.takeProfitLevels.join("x · ")}x` : `${profile.settings.runnerTarget}x target`} · {profile.settings.stopEnabled ? `${profile.settings.stopLossPct}% stop` : "no stop"}</small>
+                      <small>{profile.settings.exitModel === "staggered" ? formatTakeProfitLevels(profile.settings.takeProfitLevels) : `${profile.settings.runnerTarget}x target`} · {profile.settings.stopEnabled ? `${profile.settings.stopLossPct}% stop` : "no stop"}</small>
                     </button>
                     <button type="button" aria-label={`Delete ${profile.name}`} onClick={() => deleteExitProfile(profile.name)}>×</button>
                   </article>
@@ -940,14 +970,16 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
             {exitModel === "staggered" ? (
               <div className={`target ${resultStyles.staggeredLevels}`}>
                 <label>Take profit levels</label>
-                <strong>One third at each</strong>
+                <strong>{exitSettings.takeProfitLevels.reduce((total, level) => total + level.sellPct, 0)}% allocated</strong>
                 <div>
                   {exitSettings.takeProfitLevels.map((level, index) => (
                     <label key={index}>
                       <span>TP{index + 1}</span>
-                      <select aria-label={`Take profit level ${index + 1}`} value={level} onChange={(event) => updateTakeProfitLevel(index, Number(event.target.value))}>
+                      <select aria-label={`Take profit level ${index + 1}`} value={level.target} onChange={(event) => updateTakeProfitTarget(index, Number(event.target.value))}>
                         {runnerOptions.map((target) => <option key={target} value={target}>{target}x</option>)}
                       </select>
+                      <span>Sell %</span>
+                      <input aria-label={`Sell percentage at take profit ${index + 1}`} type="number" min="0" max="100" step="5" value={level.sellPct} onChange={(event) => updateTakeProfitPercentage(index, Number(event.target.value))} />
                     </label>
                   ))}
                 </div>
@@ -1010,13 +1042,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         </section>
 
         <section className="labMoneyPanel">
-          <header><div><small>Strategy result</small><h2>{formatUsd(exitSettings.positionSizeUsd)} per acquired token</h2></div><span>{exitModel === "staggered" ? `Staggered at ${exitSettings.takeProfitLevels.join("x, ")}x` : exitModel === "initials" ? "Initials at 2x · runner held" : exitModel === "breakeven" ? `${exitSettings.runnerTarget}x target · break even after 2x` : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></header>
+          <header><div><small>Strategy result</small><h2>{formatUsd(exitSettings.positionSizeUsd)} per acquired token</h2></div><span>{exitModel === "staggered" ? formatTakeProfitLevels(exitSettings.takeProfitLevels) : exitModel === "initials" ? "Initials at 2x · runner held" : exitModel === "breakeven" ? `${exitSettings.runnerTarget}x target · break even after 2x` : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></header>
           <div className="labMoneyGrid">
             <article><small>Capital tested</small><strong>{formatUsd(analysis.capitalTested)}</strong><span>{analysis.replayable.length} replayed positions</span></article>
             <article><small>End value</small><strong>{formatUsd(analysis.simulatedEndValue)}</strong><span>Targets, stops and open positions</span></article>
             <article className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}><small>Strategy P&amp;L</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% return</span></article>
           </div>
-          <p>{exitModel === "staggered" ? "One third is sold at each selected take profit level. Any unsold amount is valued at its stop or final recorded price." : exitModel === "initials" ? "Half the tokens are sold at 2x to recover the initial stake. The remaining half is valued at the final recorded price." : exitModel === "breakeven" ? "After price reaches 2x, an enabled stop moves to the entry price while the selected target remains active." : "Each position exits when the selected target or enabled stop is reached first. Positions hitting neither are valued at their final recorded price."} Figures exclude fees and slippage.</p>
+          <p>{exitModel === "staggered" ? "Each sell percentage is taken from the original position at its selected take profit level. Any unallocated amount is valued at its stop or final recorded price." : exitModel === "initials" ? "Half the tokens are sold at 2x to recover the initial stake. The remaining half is valued at the final recorded price." : exitModel === "breakeven" ? "After price reaches 2x, an enabled stop moves to the entry price while the selected target remains active." : "Each position exits when the selected target or enabled stop is reached first. Positions hitting neither are valued at their final recorded price."} Figures exclude fees and slippage.</p>
         </section>
 
         <section className="labBreakdown">
