@@ -170,10 +170,12 @@ async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
       const trenchesTokens = await getGmgnShadowTokens(apiKey);
       const recentAddresses = await getRecentGmgnShadowCandidates();
       const exactAddresses = recentAddresses
-        .filter((address) => Date.now() - (exactCheckedAt.get(address) ?? 0) >= 5 * 60_000)
+        .map((address) => ({ address, checkedAt: exactCheckedAt.get(address) ?? 0 }))
+        .filter(({ checkedAt }) => Date.now() - checkedAt >= 5 * 60_000)
+        .sort((a, b) => a.checkedAt - b.checkedAt)
         .slice(0, 4);
       const exactTokens = [];
-      for (const address of exactAddresses) {
+      for (const { address } of exactAddresses) {
         exactCheckedAt.set(address, Date.now());
         try {
           const token = await getGmgnTokenByAddress(apiKey, address);

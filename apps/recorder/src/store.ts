@@ -312,13 +312,13 @@ export async function saveGmgnShadowTokens(tokens: GmgnShadowToken[]) {
 }
 
 export async function getRecentGmgnShadowCandidates() {
-  const since = new Date(Date.now() - 20 * 60_000).toISOString();
+  const since = new Date(Date.now() - 2 * 60 * 60_000).toISOString();
   const { data, error } = await db
     .from("launches")
     .select("token_address")
     .gte("launched_at", since)
     .order("launched_at", { ascending: false })
-    .limit(150);
+    .limit(500);
   assertOk(error, "load recent GMGN shadow candidates");
   return (data ?? []).map((row) => row.token_address as string);
 }
