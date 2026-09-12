@@ -191,6 +191,17 @@ async function recordingCycle() {
   }, collectorAbort.signal);
   void recoverRecentLaunches(auth.access_token, collectorAbort.signal)
     .catch((error) => console.error("Launch history recovery failed", error));
+  const launchHistoryRepair = (async () => {
+    while (!collectorAbort.signal.aborted) {
+      await delayOrAbort(10 * 60_000, collectorAbort.signal);
+      if (collectorAbort.signal.aborted) break;
+      try {
+        await recoverRecentLaunches(auth.access_token, collectorAbort.signal);
+      } catch (error) {
+        console.error("Launch history recovery failed", error);
+      }
+    }
+  })();
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
   const marketHistoryRepair = runMarketHistoryRepair(auth.access_token, collectorAbort.signal)
     .catch((error) => console.error("Market history repair failed", error));
@@ -214,6 +225,7 @@ async function recordingCycle() {
   ]);
   collectorAbort.abort();
   await holderCollector;
+  await launchHistoryRepair;
   await marketHistoryRepair;
   await poolFeeds.stop();
   await client.dispose();
