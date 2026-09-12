@@ -348,6 +348,27 @@ export async function saveMarketHistoryRepair(rows: MarketTradeRow[]) {
   return uniquePayloads.length;
 }
 
+export async function rebuildAllPeakMetrics() {
+  let afterToken = "";
+  let processed = 0;
+
+  while (true) {
+    const { data, error } = await db.rpc("rebuild_peak_metrics_batch", {
+      p_after_token: afterToken,
+      p_limit: 100,
+    });
+    assertOk(error, "rebuild peak metric batch");
+    const result = Array.isArray(data) ? data[0] : data;
+    const batchCount = Number(result?.processed ?? 0);
+    const lastToken = typeof result?.last_token === "string" ? result.last_token : null;
+    processed += batchCount;
+    if (!batchCount || !lastToken) break;
+    afterToken = lastToken;
+  }
+
+  return processed;
+}
+
 export async function warmTokenCache() {
   const tokens = await getActiveMarketTokens();
   console.log(`Loaded ${tokens.length} active tokens (${knownTokens.size} total tracked) into memory`);
