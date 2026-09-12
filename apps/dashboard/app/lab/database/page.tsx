@@ -72,7 +72,7 @@ export default async function DatabasePage({
     : "newest";
   const requestedPage = Number(first(query.page) ?? 1);
   const currentPage = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
-  const [{ tokens, filteredCount, stats }, recorder] = await Promise.all([
+  const [{ tokens, filteredCount }, recorder] = await Promise.all([
     getTokenDatabase({ page: currentPage, pageSize, search, sort }),
     getRecorderControlState(),
   ]);
@@ -89,13 +89,6 @@ export default async function DatabasePage({
       <LabHeader current="database" />
 
       <RecorderControl enabled={recorder.enabled} feeds={recorder.feeds} />
-
-      <section className="databaseStats">
-        <article><small>Collected</small><strong>{stats.total.toLocaleString("en-GB")}</strong></article>
-        <article><small>USD priced</small><strong>{stats.priced.toLocaleString("en-GB")}</strong></article>
-        <article><small>Peaked above $100k</small><strong>{stats.over100k.toLocaleString("en-GB")}</strong></article>
-        <article><small>Highest peak</small><strong>{money(stats.highestPeak)}</strong></article>
-      </section>
 
       <form className="databaseFilters" action="/lab/database">
         <label><span>Search</span><input name="q" defaultValue={search} placeholder="Name, ticker or contract address" /></label>
@@ -138,9 +131,6 @@ export default async function DatabasePage({
                   <td>
                     <div className="databaseActions">
                       <DatabaseCopyAddress address={token.token_address} />
-                      <a href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer" aria-label={`Open ${token.name ?? token.symbol ?? "token"} on GMGN`} title="Open on GMGN">
-                        <svg viewBox="0 0 16 16" shapeRendering="crispEdges" aria-hidden="true"><path d="M2 2h12v3H5v6h6V9H8V6h6v8H2z" /></svg>
-                      </a>
                     </div>
                   </td>
                 </tr>

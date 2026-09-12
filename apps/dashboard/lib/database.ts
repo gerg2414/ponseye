@@ -25,12 +25,6 @@ export type DatabaseToken = {
 export type DatabaseResult = {
   tokens: DatabaseToken[];
   filteredCount: number;
-  stats: {
-    total: number;
-    priced: number;
-    over100k: number;
-    highestPeak: number | null;
-  };
 };
 
 export type RecorderFeed = {
@@ -125,19 +119,9 @@ export async function getTokenDatabase({
     );
   }
 
-  const [tokenResult, totalResult, pricedResult, over100kResult, highestResult] = await Promise.all([
-    tokenQuery,
-    db.from("launch_board").select("token_address", { count: "exact", head: true }),
-    db.from("launch_board").select("token_address", { count: "exact", head: true }).not("market_cap_usd", "is", null),
-    db.from("launch_board").select("token_address", { count: "exact", head: true }).gte("ath_market_cap_usd", 100_000),
-    db.from("launch_board").select("ath_market_cap_usd").not("ath_market_cap_usd", "is", null).order("ath_market_cap_usd", { ascending: false }).limit(1).maybeSingle(),
-  ]);
+  const tokenResult = await tokenQuery;
 
   if (tokenResult.error) throw new Error(tokenResult.error.message);
-  if (totalResult.error) throw new Error(totalResult.error.message);
-  if (pricedResult.error) throw new Error(pricedResult.error.message);
-  if (over100kResult.error) throw new Error(over100kResult.error.message);
-  if (highestResult.error) throw new Error(highestResult.error.message);
 
   const tokens = (tokenResult.data ?? []).map((token) => ({
     ...token,
@@ -156,11 +140,5 @@ export async function getTokenDatabase({
   return {
     tokens,
     filteredCount: tokenResult.count ?? 0,
-    stats: {
-      total: totalResult.count ?? 0,
-      priced: pricedResult.count ?? 0,
-      over100k: over100kResult.count ?? 0,
-      highestPeak: numberOrNull(highestResult.data?.ath_market_cap_usd),
-    },
   };
 }

@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description: "Follow PonsEye's autonomous position from entry to exit.",
 };
 
-type PositionLinkKind = "gmgn" | "website" | "x" | "telegram" | "discord";
+type PositionLinkKind = "website" | "x" | "telegram" | "discord";
 type TradeMetricKind = "size" | "entry" | "value" | "pnl" | "roi" | "peak" | "time";
 
 function TradeMetricIcon({ kind }: { kind: TradeMetricKind }) {
@@ -40,7 +40,6 @@ function safeExternalUrl(value: string | null) {
 }
 
 function PixelLinkIcon({ kind }: { kind: PositionLinkKind }) {
-  if (kind === "gmgn") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M2 2h12v3H5v6h6V9H8V6h6v8H2z" /></svg>;
   if (kind === "website") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M3 1h10v2h2v10h-2v2H3v-2H1V3h2zm2 2v2h6V3zm-2 4v2h10V7zm2 4v2h6v-2z" /></svg>;
   if (kind === "x") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M2 2h3l3 4 3-4h3L9.5 8 14 14h-3l-3-4-3 4H2l4.5-6z" /></svg>;
   if (kind === "telegram") return <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path d="M1 7l14-6-3 14-4-4-3 3V10zm4 2l3 1 4-5z" /></svg>;
@@ -178,7 +177,6 @@ export default async function LaunchPage({ params, searchParams }: {
   const telegramUrl = safeExternalUrl(launch.telegram_url);
   const discordUrl = safeExternalUrl(launch.discord_url);
   const positionLinks: Array<{ kind: PositionLinkKind; label: string; href: string }> = [
-    { kind: "gmgn", label: "Open on GMGN", href: `https://gmgn.ai/robinhood/token/${launch.token_address}` },
     ...(websiteUrl ? [{ kind: "website" as const, label: "Website", href: websiteUrl }] : []),
     ...(xUrl ? [{ kind: "x" as const, label: "X", href: xUrl }] : []),
     ...(telegramUrl ? [{ kind: "telegram" as const, label: "Telegram", href: telegramUrl }] : []),
