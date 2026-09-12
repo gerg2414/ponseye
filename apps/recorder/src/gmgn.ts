@@ -37,6 +37,12 @@ const GMGN_SITE = "https://gmgn.ai";
 const GMGN_TRENCHES_WS = "wss://ws.gmgn.ai/trs_ws";
 const GMGN_WEB_VERSION = "20260912-4388-7792ac2";
 const ROBINHOOD_QUOTE_TYPES = [11, 20, 24, 12, 0];
+const ROBINHOOD_PONS_FILTER_HASH = "395575f86a0b53c3";
+const ROBINHOOD_PONS_FALLBACK_SECTIONS: WebsiteTrenchesMeta["sections"] = [
+  { category: "new_creation", filterId: `robinhood_nc_${ROBINHOOD_PONS_FILTER_HASH}`, version: "C6A488928FBEF728" },
+  { category: "near_completion", filterId: `robinhood_ncp_${ROBINHOOD_PONS_FILTER_HASH}`, version: "C6A4887C86231610" },
+  { category: "completed", filterId: `robinhood_cp_${ROBINHOOD_PONS_FILTER_HASH}`, version: "C6A4889D4A407C38" },
+];
 
 async function runGmgn(apiKey: string, args: string[]) {
   const { stdout } = await execFileAsync(process.execPath, [cliPath, ...args], {
@@ -375,6 +381,24 @@ async function getGmgnWebsiteTrenches(connection?: { connId: string; rg: string 
   return parseGmgnWebsiteTrenches(await response.json());
 }
 
+async function bootstrapGmgnLiveTrenches(connection: { connId: string; rg: string }) {
+  try {
+    return await getGmgnWebsiteTrenches(connection);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("HTTP 403")) throw error;
+    console.warn("GMGN website bootstrap is blocked; subscribing with the last known Pons filter versions");
+    return {
+      tokens: [] as GmgnShadowToken[],
+      meta: {
+        chain: "robinhood",
+        rg: connection.rg,
+        sections: ROBINHOOD_PONS_FALLBACK_SECTIONS,
+      } satisfies WebsiteTrenchesMeta,
+    };
+  }
+}
+
 function gmgnWebSocketUrl() {
   const uuid = randomUUID();
   const params = new URLSearchParams({
@@ -452,7 +476,7 @@ export async function connectGmgnLiveTrenches(
           const rg = text(envelope?.rg);
           if (!connId || !rg) throw new Error("GMGN live Trenches did not provide connection metadata");
           bootstrapStarted = true;
-          const bootstrap = await getGmgnWebsiteTrenches({ connId, rg });
+          const bootstrap = await bootstrapGmgnLiveTrenches({ connId, rg });
           for (const token of bootstrap.tokens) cache.set(token.tokenAddress, token);
           if (bootstrap.tokens.length) await onEvent({ source: "snapshot", tokens: bootstrap.tokens });
           if (!bootstrap.meta.sections.length) throw new Error("GMGN live Trenches bootstrap returned no subscriptions");
@@ -469,6 +493,7 @@ export async function connectGmgnLiveTrenches(
               })),
             },
           }));
+          console.log(`GMGN live Trenches subscribed to ${bootstrap.meta.sections.length} Pons sections`);
           return;
         }
         if (text(envelope?.channel) === "heartbeat") {
