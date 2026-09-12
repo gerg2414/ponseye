@@ -31,7 +31,7 @@ async function reserveQuerySlot(signal?: AbortSignal) {
   const slot = queryGate.then(async () => {
     const wait = Math.max(0, nextQueryAt - Date.now());
     if (wait) await delayOrAbort(wait, signal);
-    nextQueryAt = Date.now() + 500;
+    nextQueryAt = Date.now() + 1_000;
   });
   queryGate = slot.catch(() => undefined);
   await slot;
