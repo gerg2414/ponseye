@@ -94,3 +94,33 @@ export function marketTrades(tokenAddresses: string[]) {
     }
   `;
 }
+
+export function marketTradeHistory(tokenAddress: string, since: string, till: string) {
+  const token = tokenAddress.toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(token)) throw new Error(`Invalid market history token ${tokenAddress}`);
+  const start = new Date(since);
+  const end = new Date(till);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
+    throw new Error("Invalid market history window");
+  }
+
+  return `
+    query PonsMarketHistory {
+      Trading {
+        Trades(
+          limit: {count: 5000}
+          orderBy: {ascending: Block_Time}
+          where: {
+            Pair: {
+              Market: {Network: {is: "Robinhood"}}
+              Token: {Address: {is: "${token}"}}
+            }
+            Block: {Time: {since: "${start.toISOString()}", till: "${end.toISOString()}"}}
+          }
+        ) {
+          ${MARKET_TRADE_FIELDS}
+        }
+      }
+    }
+  `;
+}
