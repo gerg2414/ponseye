@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { LabToken } from "../../lib/lab-data";
 import { TokenImage } from "../token-image";
 import resultStyles from "./lab-results.module.css";
@@ -33,8 +34,16 @@ type LabSettings = {
 
 type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
 type ControlTab = "models" | "rules" | "gates";
-type ExitModel = "fixed" | "nostop" | "breakeven" | "initials";
-type ExitProfile = { exitModel: ExitModel; runnerTarget: number; stopLossPct: number; positionSizeUsd: number };
+type ResultSort = "newest" | "score" | "peak" | "market-cap";
+type ExitModel = "fixed" | "breakeven" | "initials" | "staggered";
+type ExitProfile = {
+  exitModel: ExitModel;
+  runnerTarget: number;
+  stopLossPct: number;
+  stopEnabled: boolean;
+  positionSizeUsd: number;
+  takeProfitLevels: number[];
+};
 type SavedModel = { name: string; settings: LabSettings };
 type SavedExitProfile = { name: string; settings: ExitProfile };
 
@@ -282,6 +291,13 @@ const presetDetails: Array<{ name: PresetName; label: string; description: strin
 
 ];
 
+const exitModelDetails: Array<{ name: ExitModel; label: string; description: string }> = [
+  { name: "fixed", label: "Fixed target", description: "Stop first, then sell everything at target" },
+  { name: "breakeven", label: "Break even at 2x", description: "Move the stop to entry after price reaches 2x" },
+  { name: "initials", label: "Initials at 2x", description: "Sell half at 2x and leave the rest running" },
+  { name: "staggered", label: "Staggered take profit", description: "Sell one third at each of three selected profit levels" },
+];
+
 const savedModelsKey = "ponseye-lab-saved-models-v1";
 const currentModelKey = "ponseye-lab-current-model-v1";
 const savedExitProfilesKey = "ponseye-lab-saved-exits-v1";
@@ -289,6 +305,26 @@ const currentExitProfileKey = "ponseye-lab-current-exit-v1";
 
 const runnerOptions = [1.5, 2, 3, 5, 10, 20, 50, 100];
 const runnerLadderTargets = [2, 5, 10, 20, 50, 100];
+const defaultTakeProfitLevels = [2, 3, 5];
+
+function normaliseExitProfile(value: unknown): ExitProfile | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Omit<Partial<ExitProfile>, "exitModel"> & { exitModel?: ExitModel | "nostop" };
+  if (![candidate.runnerTarget, candidate.stopLossPct, candidate.positionSizeUsd].every((number) => typeof number === "number")) return null;
+  const storedModel = String(candidate.exitModel);
+  const exitModel: ExitModel = storedModel === "nostop" ? "fixed" : ["fixed", "breakeven", "initials", "staggered"].includes(storedModel) ? storedModel as ExitModel : "fixed";
+  const levels = Array.isArray(candidate.takeProfitLevels)
+    ? candidate.takeProfitLevels.filter((level): level is number => typeof level === "number" && runnerOptions.includes(level)).slice(0, 3)
+    : [];
+  return {
+    exitModel,
+    runnerTarget: candidate.runnerTarget as number,
+    stopLossPct: candidate.stopLossPct as number,
+    stopEnabled: storedModel === "nostop" ? false : candidate.stopEnabled !== false,
+    positionSizeUsd: candidate.positionSizeUsd as number,
+    takeProfitLevels: levels.length === 3 ? levels : [...defaultTakeProfitLevels],
+  };
+}
 
 function cloneSettings(settings: LabSettings): LabSettings {
   return { ...settings, rules: settings.rules.map((rule) => ({ ...rule })) };
@@ -433,35 +469,67 @@ function formatSignalTime(value: string) {
 }
 
 function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget: number }) {
+  const [reasonPopup, setReasonPopup] = useState<{ left: number; top: number; above: boolean } | null>(null);
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
   const recordedState = token.actual_acquired ? "Acquired" : token.actual_binned ? "Binned" : "Surveillance";
   const rejectionReasons = token.rejectedOn.join(", ") || "insufficient score";
   const modelStatus = token.selected ? "Would acquire" : "Rejected";
   const entryQuery = new URLSearchParams({ entry: token.signal_at });
   if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
+
+  function showReasonPopup(element: HTMLSpanElement) {
+    const rect = element.getBoundingClientRect();
+    const popupWidth = Math.min(300, window.innerWidth - 24);
+    setReasonPopup({
+      left: Math.max(12, Math.min(window.innerWidth - popupWidth - 12, rect.left + rect.width / 2 - popupWidth / 2)),
+      top: rect.top > 150 ? rect.top - 10 : rect.bottom + 10,
+      above: rect.top > 150,
+    });
+  }
+
   return (
-    <Link className="labResultRow" href={`/launch/${token.token_address}?${entryQuery.toString()}`}>
-      <div className="labResultIdentity">
-        <TokenImage src={token.image_url} alt={token.name ?? "Token image"} size={48} />
-        <span>
-          <strong>{token.name ?? "Unknown token"}</strong>
-          <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "No ticker"}</small>
-          <time className={resultStyles.signalTime} dateTime={token.signal_at}>{formatSignalTime(token.signal_at)} UTC</time>
-        </span>
-      </div>
-      <div><small>Lab score</small><strong>{token.labScore.toFixed(0)}%</strong></div>
-      <div><small>Signal market cap</small><strong>{formatMarketCap(token.signal_market_cap_usd)}</strong></div>
-      <div><small>Peak after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
-      <div className={token.selected ? resultStyles.accepted : resultStyles.rejected} title={token.selected ? "Passed the current Lab model" : `Rejected on: ${rejectionReasons}`}>
-        <small>Model status</small>
-        <strong>
-          {modelStatus}
-          {!token.selected && <span className={resultStyles.reasonHint} title={`Rejected on: ${rejectionReasons}`} aria-label={`Rejected on: ${rejectionReasons}`}>?</span>}
-        </strong>
-        <em className={resultStyles.recorded}>Recorded: {recordedState}</em>
-      </div>
-      <b>→</b>
-    </Link>
+    <>
+      <Link className="labResultRow" href={`/launch/${token.token_address}?${entryQuery.toString()}`}>
+        <div className="labResultIdentity">
+          <TokenImage src={token.image_url} alt={token.name ?? "Token image"} size={48} />
+          <span>
+            <strong>{token.name ?? "Unknown token"}</strong>
+            <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "No ticker"}</small>
+            <time className={resultStyles.signalTime} dateTime={token.signal_at}>{formatSignalTime(token.signal_at)} UTC</time>
+          </span>
+        </div>
+        <div><small>Lab score</small><strong>{token.labScore.toFixed(0)}%</strong></div>
+        <div><small>Signal market cap</small><strong>{formatMarketCap(token.signal_market_cap_usd)}</strong></div>
+        <div><small>Peak after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
+        <div className={token.selected ? resultStyles.accepted : resultStyles.rejected}>
+          <small>Model status</small>
+          <strong>
+            {modelStatus}
+            {!token.selected && (
+              <span
+                className={resultStyles.reasonHint}
+                aria-label={`Rejected on: ${rejectionReasons}`}
+                onMouseEnter={(event) => showReasonPopup(event.currentTarget)}
+                onMouseLeave={() => setReasonPopup(null)}
+              >?</span>
+            )}
+          </strong>
+          <em className={resultStyles.recorded}>Recorded: {recordedState}</em>
+        </div>
+        <b>→</b>
+      </Link>
+      {reasonPopup && createPortal(
+        <div
+          className={`${resultStyles.reasonPopup} ${reasonPopup.above ? resultStyles.above : resultStyles.below}`}
+          style={{ left: reasonPopup.left, top: reasonPopup.top }}
+          role="tooltip"
+        >
+          <small>Model rejection</small>
+          <strong>{rejectionReasons}</strong>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 
@@ -469,7 +537,14 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.market3x));
   const [activePreset, setActivePreset] = useState<PresetName | "custom">("market3x");
   const [controlTab, setControlTab] = useState<ControlTab>("models");
-  const [exitSettings, setExitSettings] = useState<ExitProfile>({ exitModel: "fixed", runnerTarget: 3, stopLossPct: 10, positionSizeUsd: 25 });
+  const [exitSettings, setExitSettings] = useState<ExitProfile>({
+    exitModel: "fixed",
+    runnerTarget: 3,
+    stopLossPct: 10,
+    stopEnabled: true,
+    positionSizeUsd: 25,
+    takeProfitLevels: [...defaultTakeProfitLevels],
+  });
   const exitModel = exitSettings.exitModel;
   const [savedModels, setSavedModels] = useState<SavedModel[]>([]);
   const [savedExitProfiles, setSavedExitProfiles] = useState<SavedExitProfile[]>([]);
@@ -477,6 +552,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [exitProfileName, setExitProfileName] = useState("");
   const [storageReady, setStorageReady] = useState(false);
   const [resultView, setResultView] = useState<"signals" | "misses" | "all">("all");
+  const [resultSort, setResultSort] = useState<ResultSort>("newest");
 
   useEffect(() => {
     try {
@@ -496,21 +572,14 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           return restoredSettings ? [{ name: (item as SavedModel).name, settings: restoredSettings }] : [];
         }));
       }
-      if (
-        currentExit &&
-        ["fixed", "nostop", "breakeven", "initials"].includes(String(currentExit.exitModel)) &&
-        typeof currentExit.runnerTarget === "number" &&
-        typeof currentExit.stopLossPct === "number" &&
-        typeof currentExit.positionSizeUsd === "number"
-      ) setExitSettings(currentExit as ExitProfile);
+      const restoredExit = normaliseExitProfile(currentExit);
+      if (restoredExit) setExitSettings(restoredExit);
       if (Array.isArray(savedExits)) {
         setSavedExitProfiles(savedExits.flatMap((item) => {
           const profile = item as SavedExitProfile;
           if (!profile || typeof profile.name !== "string" || !profile.settings) return [];
-          const value = profile.settings;
-          if (!["fixed", "nostop", "breakeven", "initials"].includes(String(value.exitModel))) return [];
-          if (![value.runnerTarget, value.stopLossPct, value.positionSizeUsd].every((number) => typeof number === "number")) return [];
-          return [{ name: profile.name, settings: value }];
+          const value = normaliseExitProfile(profile.settings);
+          return value ? [{ name: profile.name, settings: value }] : [];
         }));
       }
     } catch {
@@ -545,10 +614,41 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       const lowBeforeTwo = token.pre_target_low_multiples["2"];
       const targetReachedRaw = (token.future_peak_multiple ?? 0) >= target;
       const twoReachedBeforeStop = (token.future_peak_multiple ?? 0) >= 2
-        && (exitModel === "nostop" || lowBeforeTwo == null || lowBeforeTwo > stopMultiple);
-      const stoppedBeforeTarget = exitModel !== "nostop"
+        && (!exitSettings.stopEnabled || lowBeforeTwo == null || lowBeforeTwo > stopMultiple);
+      const stoppedBeforeTarget = exitSettings.stopEnabled
         && lowBeforeTarget != null
         && lowBeforeTarget <= stopMultiple;
+
+      if (exitModel === "staggered") {
+        const levels = [...exitSettings.takeProfitLevels].sort((a, b) => a - b);
+        const portion = 1 / levels.length;
+        let remaining = 1;
+        let exitMultiple = 0;
+        let levelsHit = 0;
+        let stopped = false;
+
+        for (const level of levels) {
+          const lowBeforeLevel = token.pre_target_low_multiples[String(level)];
+          const reached = (token.future_peak_multiple ?? 0) >= level
+            && (!exitSettings.stopEnabled || lowBeforeLevel == null || lowBeforeLevel > stopMultiple);
+          if (reached) {
+            const sold = Math.min(portion, remaining);
+            exitMultiple += sold * level;
+            remaining -= sold;
+            levelsHit += 1;
+            continue;
+          }
+          if (exitSettings.stopEnabled && lowBeforeLevel != null && lowBeforeLevel <= stopMultiple) {
+            exitMultiple += remaining * stopMultiple;
+            remaining = 0;
+            stopped = true;
+          }
+          break;
+        }
+
+        if (remaining > 0) exitMultiple += remaining * Math.max(0, token.final_multiple ?? 0);
+        return { token, stopped, targetReached: levelsHit > 0, openAtEnd: remaining > 0, exitMultiple, levelsHit };
+      }
 
       if (exitModel === "initials" && twoReachedBeforeStop) {
         const runnerValue = Math.max(0, token.final_multiple ?? 0);
@@ -561,7 +661,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         };
       }
 
-      if (exitModel === "breakeven" && twoReachedBeforeStop && target > 2) {
+      if (exitModel === "breakeven" && exitSettings.stopEnabled && twoReachedBeforeStop && target > 2) {
         const lowAfterTwoBeforeTarget = token.post_2x_pre_target_low_multiples[String(target)];
         const breakevenHit = lowAfterTwoBeforeTarget != null && lowAfterTwoBeforeTarget <= 1;
         if (breakevenHit) {
@@ -631,7 +731,18 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   }
 
   function chooseExitModel(model: ExitModel) {
-    setExitSettings((current) => ({ ...current, exitModel: model }));
+    setExitSettings((current) => ({
+      ...current,
+      exitModel: model,
+      runnerTarget: model === "staggered" ? Math.max(...current.takeProfitLevels) : current.runnerTarget,
+    }));
+  }
+
+  function updateTakeProfitLevel(index: number, target: number) {
+    setExitSettings((current) => {
+      const takeProfitLevels = current.takeProfitLevels.map((level, levelIndex) => levelIndex === index ? target : level);
+      return { ...current, takeProfitLevels, runnerTarget: Math.max(...takeProfitLevels) };
+    });
   }
 
   function saveExitProfile() {
@@ -664,17 +775,23 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   }
 
   const hitRate = analysis.selected.length ? analysis.hits.length * 100 / analysis.selected.length : 0;
-  const visibleResults = resultView === "signals"
+  const resultPool = resultView === "signals"
     ? analysis.orderedSignals
     : resultView === "misses"
       ? analysis.orderedMisses
       : analysis.orderedAll;
+  const visibleResults = [...resultPool].sort((a, b) => {
+    if (resultSort === "score") return b.labScore - a.labScore;
+    if (resultSort === "peak") return (b.future_peak_multiple ?? -1) - (a.future_peak_multiple ?? -1);
+    if (resultSort === "market-cap") return (b.signal_market_cap_usd ?? -1) - (a.signal_market_cap_usd ?? -1);
+    return Date.parse(b.signal_at) - Date.parse(a.signal_at);
+  });
   const entryLabel = activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label;
   const exitLabel = {
     fixed: "Fixed target",
-    nostop: "No initial stop",
     breakeven: "Break even at 2x",
     initials: "Initials at 2x",
+    staggered: "Staggered take profit",
   }[exitModel];
 
   return (
@@ -682,7 +799,10 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       <section className="labModelDock">
         <header className="labBenchHeader">
           <div><small>PonsEye test bench</small><strong>One entry. One exit. One result.</strong></div>
-          <span>Recorded launches · recalculates instantly</span>
+          <label className={resultStyles.positionSize}>
+            <span>Position size</span>
+            <strong><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={exitSettings.positionSizeUsd} onChange={(event) => setExitSettings({ ...exitSettings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) })} /></strong>
+          </label>
         </header>
         <details className="labDrawer entry">
           <summary>
@@ -703,14 +823,18 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
 
         {controlTab === "models" && (
           <section className="labModelsPanel">
-            <div className="labPresetGrid" aria-label="Model presets">
-              {presetDetails.map((preset) => (
-                <button key={preset.name} type="button" className={activePreset === preset.name ? "active" : ""} onClick={() => choosePreset(preset.name)}>
-                  <strong>{preset.label}</strong>
-                  <small>{preset.description}</small>
-                </button>
-              ))}
-            </div>
+            <label className={resultStyles.modelSelect}>
+              <span>Entry model</span>
+              <select
+                aria-label="Entry model"
+                value={activePreset}
+                onChange={(event) => event.target.value !== "custom" && choosePreset(event.target.value as PresetName)}
+              >
+                {activePreset === "custom" && <option value="custom">Custom setup</option>}
+                {presetDetails.map((preset) => <option key={preset.name} value={preset.name}>{preset.label}</option>)}
+              </select>
+              <small>{activePreset === "custom" ? "Your adjusted entry rules" : presetDetails.find((preset) => preset.name === activePreset)?.description}</small>
+            </label>
 
             <div className="labSavedModels">
               <header><div><small>Saved setups</small><strong>This browser</strong></div></header>
@@ -778,17 +902,18 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
 
         <details className="labDrawer exit">
           <summary>
-            <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitSettings.runnerTarget}x target · {exitModel === "nostop" ? "no stop" : `${exitSettings.stopLossPct}% stop`}</span></div>
+            <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitModel === "staggered" ? `${exitSettings.takeProfitLevels.join("x · ")}x` : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></div>
             <b>Tune exit</b>
           </summary>
           <section className="labStrategyPanel">
-          <header><div><small>Trade replay</small><h2>Test the exit</h2></div><span>Using the selected Entry Model</span></header>
-          <nav className="labPresetGrid labExitModels" aria-label="Exit model">
-            <button type="button" className={exitModel === "fixed" ? "active" : ""} onClick={() => chooseExitModel("fixed")}><strong>Fixed target</strong><small>Stop first, then sell everything at target</small></button>
-            <button type="button" className={exitModel === "nostop" ? "active" : ""} onClick={() => chooseExitModel("nostop")}><strong>No initial stop</strong><small>Hold until target or the recorded end price</small></button>
-            <button type="button" className={exitModel === "breakeven" ? "active" : ""} onClick={() => chooseExitModel("breakeven")}><strong>Break even at 2x</strong><small>Move the stop to entry after price reaches 2x</small></button>
-            <button type="button" className={exitModel === "initials" ? "active" : ""} onClick={() => chooseExitModel("initials")}><strong>Initials at 2x</strong><small>Sell half at 2x and leave the rest running</small></button>
-          </nav>
+          <header><div><small>Exit model</small><h2>Choose an exit model</h2></div><span>Applied to the selected entry model</span></header>
+          <label className={`${resultStyles.modelSelect} ${resultStyles.exitSelect}`}>
+            <span>Exit model</span>
+            <select aria-label="Exit model" value={exitModel} onChange={(event) => chooseExitModel(event.target.value as ExitModel)}>
+              {exitModelDetails.map((model) => <option key={model.name} value={model.name}>{model.label}</option>)}
+            </select>
+            <small>{exitModelDetails.find((model) => model.name === exitModel)?.description}</small>
+          </label>
 
           <div className="labSavedModels labExitSavedModels">
             <header><div><small>Saved exit profiles</small><strong>This browser</strong></div></header>
@@ -802,7 +927,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
                   <article key={profile.name}>
                     <button type="button" onClick={() => loadExitProfile(profile)}>
                       <strong>{profile.name}</strong>
-                      <small>{profile.settings.runnerTarget}x target · {profile.settings.exitModel === "nostop" ? "no stop" : `${profile.settings.stopLossPct}% stop`}</small>
+                      <small>{profile.settings.exitModel === "staggered" ? `${profile.settings.takeProfitLevels.join("x · ")}x` : `${profile.settings.runnerTarget}x target`} · {profile.settings.stopEnabled ? `${profile.settings.stopLossPct}% stop` : "no stop"}</small>
                     </button>
                     <button type="button" aria-label={`Delete ${profile.name}`} onClick={() => deleteExitProfile(profile.name)}>×</button>
                   </article>
@@ -812,25 +937,41 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </div>
 
           <div className="labStrategyControls">
-            <div className="target">
-              <label>Take profit</label>
-              <strong>{exitSettings.runnerTarget}x</strong>
-              <div>{runnerOptions.map((target) => <button type="button" className={exitSettings.runnerTarget === target ? "active" : ""} key={target} onClick={() => setExitSettings({ ...exitSettings, runnerTarget: target })}>{target}x</button>)}</div>
-            </div>
+            {exitModel === "staggered" ? (
+              <div className={`target ${resultStyles.staggeredLevels}`}>
+                <label>Take profit levels</label>
+                <strong>One third at each</strong>
+                <div>
+                  {exitSettings.takeProfitLevels.map((level, index) => (
+                    <label key={index}>
+                      <span>TP{index + 1}</span>
+                      <select aria-label={`Take profit level ${index + 1}`} value={level} onChange={(event) => updateTakeProfitLevel(index, Number(event.target.value))}>
+                        {runnerOptions.map((target) => <option key={target} value={target}>{target}x</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="target">
+                <label>Take profit</label>
+                <strong>{exitSettings.runnerTarget}x</strong>
+                <div>{runnerOptions.map((target) => <button type="button" className={exitSettings.runnerTarget === target ? "active" : ""} key={target} onClick={() => setExitSettings({ ...exitSettings, runnerTarget: target })}>{target}x</button>)}</div>
+              </div>
+            )}
             <div className="stop">
               <label htmlFor="stopLoss">Initial stop loss</label>
-              <strong>{exitModel === "nostop" ? "OFF" : `−${exitSettings.stopLossPct}%`}</strong>
-              <input id="stopLoss" aria-label="Stop loss percentage" type="range" min="10" max="90" step="5" value={exitSettings.stopLossPct} disabled={exitModel === "nostop"} onChange={(event) => setExitSettings({ ...exitSettings, stopLossPct: Number(event.target.value) })} />
+              <strong>{exitSettings.stopEnabled ? `−${exitSettings.stopLossPct}%` : "OFF"}</strong>
+              <input id="stopLoss" aria-label="Stop loss percentage" type="range" min="10" max="90" step="5" value={exitSettings.stopLossPct} disabled={!exitSettings.stopEnabled} onChange={(event) => setExitSettings({ ...exitSettings, stopLossPct: Number(event.target.value) })} />
+              <label className={resultStyles.noStopToggle}>
+                <input type="checkbox" checked={!exitSettings.stopEnabled} onChange={(event) => setExitSettings({ ...exitSettings, stopEnabled: !event.target.checked })} />
+                <span>No stop loss</span>
+              </label>
             </div>
-            <label className="stake">
-              <span>Position size</span>
-              <strong><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={exitSettings.positionSizeUsd} onChange={(event) => setExitSettings({ ...exitSettings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) })} /></strong>
-              <small>Placed on every token that reaches Acquired</small>
-            </label>
           </div>
           <div className="labReplayCounts">
             <article className="stopped"><small>Stop hit first</small><strong>{analysis.stopHits}</strong><span>sold at −{exitSettings.stopLossPct}%</span></article>
-            <article className="target"><small>{exitSettings.runnerTarget}x hit first</small><strong>{analysis.targetExits}</strong><span>sold at target</span></article>
+            <article className="target"><small>{exitModel === "staggered" ? "Profit taken" : `${exitSettings.runnerTarget}x hit first`}</small><strong>{analysis.targetExits}</strong><span>{exitModel === "staggered" ? "hit at least one TP level" : "sold at target"}</span></article>
             <article className="open"><small>Neither hit</small><strong>{analysis.openAtEnd}</strong><span>valued at final recorded price</span></article>
             <article className="unknown"><small>No replay data</small><strong>{analysis.selected.length - analysis.replayable.length}</strong><span>excluded from money result</span></article>
           </div>
@@ -869,13 +1010,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         </section>
 
         <section className="labMoneyPanel">
-          <header><div><small>Strategy result</small><h2>{formatUsd(exitSettings.positionSizeUsd)} per acquired token</h2></div><span>{exitModel === "initials" ? "Initials at 2x · runner held" : exitModel === "breakeven" ? `${exitSettings.runnerTarget}x target · break even after 2x` : exitModel === "nostop" ? `${exitSettings.runnerTarget}x target · no stop` : `${exitSettings.runnerTarget}x target · ${exitSettings.stopLossPct}% stop`}</span></header>
+          <header><div><small>Strategy result</small><h2>{formatUsd(exitSettings.positionSizeUsd)} per acquired token</h2></div><span>{exitModel === "staggered" ? `Staggered at ${exitSettings.takeProfitLevels.join("x, ")}x` : exitModel === "initials" ? "Initials at 2x · runner held" : exitModel === "breakeven" ? `${exitSettings.runnerTarget}x target · break even after 2x` : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></header>
           <div className="labMoneyGrid">
             <article><small>Capital tested</small><strong>{formatUsd(analysis.capitalTested)}</strong><span>{analysis.replayable.length} replayed positions</span></article>
             <article><small>End value</small><strong>{formatUsd(analysis.simulatedEndValue)}</strong><span>Targets, stops and open positions</span></article>
             <article className={analysis.simulatedPnl >= 0 ? "positive" : "negative"}><small>Strategy P&amp;L</small><strong>{analysis.simulatedPnl >= 0 ? "+" : ""}{formatUsd(analysis.simulatedPnl)}</strong><span>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}% return</span></article>
           </div>
-          <p>{exitModel === "initials" ? "Half the tokens are sold at 2x to recover the initial stake. The remaining half is valued at the final recorded price." : exitModel === "breakeven" ? "The initial stop applies until 2x. After 2x, the stop moves to the entry price while the selected target remains active." : exitModel === "nostop" ? "Positions are held until the selected target or valued at the final recorded price when the target is not reached." : "Each position exits when the stop or take profit is reached first. Positions hitting neither are valued at their final recorded price."} Figures exclude fees and slippage.</p>
+          <p>{exitModel === "staggered" ? "One third is sold at each selected take profit level. Any unsold amount is valued at its stop or final recorded price." : exitModel === "initials" ? "Half the tokens are sold at 2x to recover the initial stake. The remaining half is valued at the final recorded price." : exitModel === "breakeven" ? "After price reaches 2x, an enabled stop moves to the entry price while the selected target remains active." : "Each position exits when the selected target or enabled stop is reached first. Positions hitting neither are valued at their final recorded price."} Figures exclude fees and slippage.</p>
         </section>
 
         <section className="labBreakdown">
@@ -897,7 +1038,15 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               <button type="button" className={resultView === "signals" ? "active" : ""} onClick={() => setResultView("signals")}>Would reach Acquired <span>{analysis.selected.length}</span></button>
               <button type="button" className={resultView === "misses" ? "active" : ""} onClick={() => setResultView("misses")}>Rejected runners <span>{analysis.misses.length}</span></button>
             </div>
-            <small>{resultView === "all" ? "Newest signals first" : "Sorted by peak performance"}</small>
+            <label className={resultStyles.resultSort}>
+              <span>Sort by</span>
+              <select aria-label="Sort Lab results" value={resultSort} onChange={(event) => setResultSort(event.target.value as ResultSort)}>
+                <option value="newest">Newest signals</option>
+                <option value="score">Highest Lab score</option>
+                <option value="peak">Highest peak after signal</option>
+                <option value="market-cap">Highest signal market cap</option>
+              </select>
+            </label>
           </header>
           <div className="labResultList">
             {visibleResults.length ? (resultView === "all" ? visibleResults : visibleResults.slice(0, 40)).map((token) => <ResultToken key={token.token_address} token={token} runnerTarget={exitSettings.runnerTarget} />) : (
