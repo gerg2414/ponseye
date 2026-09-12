@@ -199,10 +199,9 @@ export async function saveTrade(row: EventRow) {
   return true;
 }
 
-export async function saveMarketTrade(row: MarketTradeRow) {
+function marketTradePayload(row: MarketTradeRow) {
   const tokenAddress = row.Pair.Token.Address?.toLowerCase();
-  if (!tokenAddress) return false;
-  if (!knownTokens.has(tokenAddress)) return false;
+  if (!tokenAddress || !knownTokens.has(tokenAddress)) return null;
 
   const side = row.Side.toLowerCase() === "buy" ? "buy" : "sell";
   const transactionHash = row.TransactionHeader.Hash.toLowerCase();
@@ -220,7 +219,7 @@ export async function saveMarketTrade(row: MarketTradeRow) {
     row.Pair.QuoteToken?.Address,
   ]);
 
-  const { error } = await db.from("trade_market_data").upsert({
+  return {
     market_event_id: marketEventId,
     token_address: tokenAddress,
     transaction_hash: transactionHash,
@@ -237,18 +236,52 @@ export async function saveMarketTrade(row: MarketTradeRow) {
     quote_symbol: row.Pair.QuoteToken?.Symbol ?? null,
     protocol,
     raw_trade: row,
-  }, { onConflict: "market_event_id", ignoreDuplicates: true });
+  };
+}
+
+export async function saveMarketTrade(row: MarketTradeRow) {
+  const payload = marketTradePayload(row);
+  if (!payload) return false;
+  const { error } = await db.from("trade_market_data").upsert(payload, { onConflict: "market_event_id", ignoreDuplicates: true });
   assertOk(error, "save market trade");
 
-  if (protocol === "uniswap_v4") {
+  if (payload.protocol === "uniswap_v4") {
     const { error: migrationError } = await db.from("launches").update({
       status: "graduated",
-      graduated_at: row.Block.Time,
-      graduation_transaction_hash: transactionHash,
-    }).eq("token_address", tokenAddress).is("graduated_at", null);
+      graduated_at: payload.block_time,
+      graduation_transaction_hash: payload.transaction_hash,
+    }).eq("token_address", payload.token_address).is("graduated_at", null);
     assertOk(migrationError, "confirm migration from pool trade");
   }
   return true;
+}
+
+export async function saveMarketTrades(rows: MarketTradeRow[]) {
+  const payloads = rows.flatMap((row) => {
+    const payload = marketTradePayload(row);
+    return payload ? [payload] : [];
+  });
+  if (!payloads.length) return 0;
+
+  const { error } = await db.from("trade_market_data")
+    .upsert(payloads, { onConflict: "market_event_id", ignoreDuplicates: true });
+  assertOk(error, "save market trade batch");
+
+  const firstPoolByToken = new Map<string, (typeof payloads)[number]>();
+  for (const payload of payloads) {
+    if (payload.protocol !== "uniswap_v4") continue;
+    const current = firstPoolByToken.get(payload.token_address);
+    if (!current || payload.block_time < current.block_time) firstPoolByToken.set(payload.token_address, payload);
+  }
+  for (const payload of firstPoolByToken.values()) {
+    const { error: migrationError } = await db.from("launches").update({
+      status: "graduated",
+      graduated_at: payload.block_time,
+      graduation_transaction_hash: payload.transaction_hash,
+    }).eq("token_address", payload.token_address).is("graduated_at", null);
+    assertOk(migrationError, "confirm migration from market trade batch");
+  }
+  return payloads.length;
 }
 
 export async function saveGmgnShadowTokens(tokens: GmgnShadowToken[]) {
