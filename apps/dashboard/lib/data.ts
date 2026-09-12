@@ -146,6 +146,12 @@ type PositionRecord = {
   closed_at: string | null;
 };
 
+type ResearchStateRecord = {
+  research_state: "sighted" | "under_watch" | "target_locked";
+  research_state_at: string;
+  research_rule_version: string;
+};
+
 const emptyData = {
   launches: [] as Launch[],
   streams: [] as StreamStatus[],
@@ -302,7 +308,7 @@ export async function getLaunchDetail(tokenAddress: string) {
     auth: { persistSession: false },
     db: { retry: false },
   });
-  const [result, dashboard, migrationPriceResult, positionResult] = await Promise.all([
+  const [result, dashboard, migrationPriceResult, positionResult, researchStateResult] = await Promise.all([
     db.rpc("get_launch_detail", {
       p_token_address: tokenAddress,
       p_trade_limit: 100,
@@ -314,6 +320,10 @@ export async function getLaunchDetail(tokenAddress: string) {
     }).abortSignal(AbortSignal.timeout(20_000)),
     db.from("acquired_positions")
       .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at")
+      .eq("token_address", tokenAddress)
+      .maybeSingle(),
+    db.from("launch_metrics")
+      .select("research_state,research_state_at,research_rule_version")
       .eq("token_address", tokenAddress)
       .maybeSingle(),
   ]);
@@ -337,9 +347,16 @@ export async function getLaunchDetail(tokenAddress: string) {
     poolStartedAt: string | null;
   };
   if (positionResult.error) console.error("[launch] position request failed", positionResult.error.message);
+  if (researchStateResult.error) console.error("[launch] research state request failed", researchStateResult.error.message);
   const position = positionResult.data as PositionRecord | null;
+  const researchState = researchStateResult.data as ResearchStateRecord | null;
   const launch = {
     ...payload.launch,
+    ...(researchState ? {
+      research_state: researchState.research_state,
+      research_state_at: researchState.research_state_at,
+      research_rule_version: researchState.research_rule_version,
+    } : {}),
     ...(position ? {
       acquired_at: position.acquired_at,
       entry_market_cap_usd: position.entry_market_cap_usd == null ? null : Number(position.entry_market_cap_usd),
