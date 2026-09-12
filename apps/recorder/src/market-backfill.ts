@@ -4,6 +4,7 @@ import {
   getMarketBackfillCandidate,
   getMarketBackfillCandidates,
   getCompleteMarketBackfillCandidates,
+  saveMarketHistoryRepair,
   saveMarketTrades,
   type MarketBackfillCandidate,
   type MarketTradeRow,
@@ -23,6 +24,7 @@ async function storeWindow(
   start: number,
   finish: number,
   signal: AbortSignal,
+  repairMode = false,
 ): Promise<number> {
   const response = await queryBitquery<MarketHistoryResponse>(
     accessToken,
@@ -32,16 +34,21 @@ async function storeWindow(
   const rows = response.data?.Trading?.Trades ?? [];
   if (rows.length >= 5_000 && finish - start > 2_000) {
     const midpoint = Math.floor((start + finish) / 2);
-    return await storeWindow(accessToken, tokenAddress, start, midpoint, signal)
-      + await storeWindow(accessToken, tokenAddress, midpoint + 1, finish, signal);
+    return await storeWindow(accessToken, tokenAddress, start, midpoint, signal, repairMode)
+      + await storeWindow(accessToken, tokenAddress, midpoint + 1, finish, signal, repairMode);
   }
   if (rows.length >= 5_000) {
     console.warn(`Market history reached its limit inside a two second window for ${tokenAddress}`);
   }
-  return saveMarketTrades(rows);
+  return repairMode ? saveMarketHistoryRepair(rows) : saveMarketTrades(rows);
 }
 
-async function backfillCandidate(accessToken: string, candidate: MarketBackfillCandidate, signal: AbortSignal) {
+async function backfillCandidate(
+  accessToken: string,
+  candidate: MarketBackfillCandidate,
+  signal: AbortSignal,
+  repairMode = false,
+) {
   if (completed.has(candidate.token_address)) return 0;
   const existing = running.get(candidate.token_address);
   if (existing) return existing;
@@ -53,7 +60,7 @@ async function backfillCandidate(accessToken: string, candidate: MarketBackfillC
 
     while (!signal.aborted && cursor < finish) {
       const windowEnd = Math.min(finish, cursor + WINDOW_MS);
-      stored += await storeWindow(accessToken, candidate.token_address, cursor, windowEnd, signal);
+      stored += await storeWindow(accessToken, candidate.token_address, cursor, windowEnd, signal, repairMode);
       cursor = windowEnd + 1;
     }
 
@@ -73,7 +80,7 @@ export async function runCompleteMarketHistoryRepair(accessToken: string, signal
   for (const candidate of candidates) {
     if (signal.aborted) break;
     try {
-      stored += await backfillCandidate(accessToken, candidate, signal);
+      stored += await backfillCandidate(accessToken, candidate, signal, true);
     } catch (error) {
       if (!signal.aborted) {
         failures.push(candidate.token_address);
