@@ -71,6 +71,48 @@ function normalizeCategory(key: string): GmgnShadowToken["category"] | null {
   return null;
 }
 
+function categoryFromToken(row: Record<string, unknown>): GmgnShadowToken["category"] {
+  const progress = number(row.progress);
+  const completeTimestamp = number(row.complete_timestamp);
+  const launchpadStatus = number(row.launchpad_status);
+  if ((completeTimestamp ?? 0) > 0 || launchpadStatus === 1 || (progress ?? 0) >= 1) return "completed";
+  if ((progress ?? 0) >= 0.8) return "near_completion";
+  return "new_creation";
+}
+
+function parseSearchToken(response: unknown, tokenAddress: string): GmgnShadowToken | null {
+  const envelope = object(response);
+  if (number(envelope?.code) !== 0) {
+    throw new Error(text(envelope?.message) ?? "GMGN search returned an unsuccessful response");
+  }
+  const coins = object(envelope?.data)?.coins;
+  if (!Array.isArray(coins)) return null;
+
+  const address = tokenAddress.toLowerCase();
+  const row = coins
+    .map(object)
+    .find((coin) => text(coin?.chain)?.toLowerCase() === "robinhood"
+      && text(coin?.address)?.toLowerCase() === address);
+  if (!row) return null;
+
+  return {
+    tokenAddress: address,
+    category: categoryFromToken(row),
+    launchpadPlatform: text(row.launchpad_platform ?? row.launchpad),
+    launchedAt: timestamp(row.created_timestamp ?? row.created_at),
+    name: text(row.name),
+    symbol: text(row.symbol),
+    imageUrl: text(row.logo),
+    creatorAddress: text(row.creator)?.toLowerCase() ?? null,
+    priceUsd: number(row.price),
+    marketCapUsd: number(row.mcp ?? row.usd_market_cap ?? row.market_cap),
+    liquidityUsd: number(row.liquidity),
+    progress: number(row.progress),
+    holderCount: number(row.holder_count),
+    rawToken: row,
+  };
+}
+
 export function parseGmgnTrenches(response: unknown): GmgnShadowToken[] {
   const envelope = object(response);
   const root = object(envelope?.data) ?? envelope;
@@ -146,4 +188,18 @@ export async function getGmgnShadowTokens(apiKey: string) {
     "--raw",
   ]);
   return parseGmgnTrenches(response);
+}
+
+export async function getGmgnTokenByAddress(apiKey: string, tokenAddress: string) {
+  if (!ADDRESS.test(tokenAddress)) throw new Error("Invalid GMGN search token address");
+  const response = await runGmgn(apiKey, [
+    "market",
+    "search",
+    "--query",
+    tokenAddress,
+    "--chain",
+    "robinhood",
+    "--raw",
+  ]);
+  return parseSearchToken(response, tokenAddress);
 }

@@ -2,11 +2,11 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
-import { getGmgnShadowTokens, verifyGmgnReadAccess } from "./gmgn.js";
+import { getGmgnShadowTokens, getGmgnTokenByAddress, verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
 import { backfillGraduatedToken, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveGmgnShadowTokens, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getRecentGmgnShadowCandidates, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveGmgnShadowTokens, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -163,15 +163,35 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
 
 async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
   let errorCount = 0;
+  const exactCheckedAt = new Map<string, number>();
   await updateStreamStatus("gmgn_shadow", "connecting", "Starting read-only Pons shadow feed");
   while (!signal.aborted) {
     try {
-      const tokens = await getGmgnShadowTokens(apiKey);
+      const trenchesTokens = await getGmgnShadowTokens(apiKey);
+      const recentAddresses = await getRecentGmgnShadowCandidates();
+      const exactAddresses = recentAddresses
+        .filter((address) => Date.now() - (exactCheckedAt.get(address) ?? 0) >= 5 * 60_000)
+        .slice(0, 4);
+      const exactTokens = [];
+      for (const address of exactAddresses) {
+        exactCheckedAt.set(address, Date.now());
+        try {
+          const token = await getGmgnTokenByAddress(apiKey, address);
+          if (token) exactTokens.push(token);
+        } catch (error) {
+          console.warn(`GMGN exact token lookup failed for ${address}`, error);
+        }
+      }
+      const tokens = [...trenchesTokens, ...exactTokens];
       traffic.gmgnPolls += 1;
       traffic.gmgnRowsReceived += tokens.length;
       traffic.gmgnRowsStored += await saveGmgnShadowTokens(tokens);
       errorCount = 0;
-      await updateStreamStatus("gmgn_shadow", "connected", `Tracking ${tokens.length} Pons tokens from GMGN`);
+      await updateStreamStatus(
+        "gmgn_shadow",
+        "connected",
+        `Tracking ${trenchesTokens.length} GMGN Trenches tokens; ${exactTokens.length}/${exactAddresses.length} current Pons addresses matched`,
+      );
     } catch (error) {
       if (signal.aborted) break;
       errorCount += 1;
