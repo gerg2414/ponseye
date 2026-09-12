@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
-import { connectGmgnLiveTrenches, getGmgnShadowTokens, getGmgnTokenByAddress, verifyGmgnReadAccess } from "./gmgn.js";
+import { getGmgnShadowTokens, getGmgnTokenByAddress, verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
 import { backfillGraduatedToken, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_ACTIVITY } from "./queries.js";
@@ -163,40 +163,9 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
 
 async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
   let errorCount = 0;
-  let liveConnected = false;
-  let liveDeltaRows = 0;
   let fallbackRateLimited = false;
   const exactCheckedAt = new Map<string, number>();
   await updateStreamStatus("gmgn_shadow", "connecting", "Starting read-only Pons shadow feed");
-  const liveCollector = (async () => {
-    let reconnectAttempt = 0;
-    while (!signal.aborted) {
-      try {
-        await connectGmgnLiveTrenches(signal, async ({ source, tokens }) => {
-          traffic.gmgnPolls += source === "snapshot" ? 1 : 0;
-          traffic.gmgnRowsReceived += tokens.length;
-          traffic.gmgnRowsStored += await saveGmgnShadowTokens(tokens);
-          liveConnected = true;
-          reconnectAttempt = 0;
-          if (source === "delta") liveDeltaRows += tokens.length;
-          await updateStreamStatus(
-            "gmgn_shadow",
-            "connected",
-            `GMGN live Trenches connected; ${liveDeltaRows} live updates recorded`,
-          );
-        });
-        if (signal.aborted) break;
-        liveConnected = false;
-      } catch (error) {
-        if (signal.aborted) break;
-        liveConnected = false;
-        traffic.gmgnErrors += 1;
-        console.warn("GMGN live Trenches disconnected; official API fallback remains active", error);
-      }
-      reconnectAttempt += 1;
-      await delayOrAbort(Math.min(60_000, 5_000 * 2 ** Math.min(reconnectAttempt - 1, 4)), signal);
-    }
-  })();
 
   while (!signal.aborted) {
     try {
@@ -223,13 +192,11 @@ async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
       traffic.gmgnRowsStored += await saveGmgnShadowTokens(tokens);
       errorCount = 0;
       fallbackRateLimited = false;
-      if (!liveConnected) {
-        await updateStreamStatus(
-          "gmgn_shadow",
-          "connected",
-          `Official GMGN fallback active; tracking ${trenchesTokens.length} ranked tokens`,
-        );
-      }
+      await updateStreamStatus(
+        "gmgn_shadow",
+        "connected",
+        `Official GMGN shadow active; tracking ${trenchesTokens.length} ranked tokens`,
+      );
     } catch (error) {
       if (signal.aborted) break;
       errorCount += 1;
@@ -246,7 +213,6 @@ async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
         : 60_000;
     await delayOrAbort(retryAfter, signal);
   }
-  await liveCollector;
 }
 
 async function recordingCycle() {
