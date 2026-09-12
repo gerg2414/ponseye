@@ -35,6 +35,7 @@ export function TokenImage({
       return;
     }
 
+    // Avoid starting several remote image requests for cards outside the viewport.
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
       setShouldLoad(true);
