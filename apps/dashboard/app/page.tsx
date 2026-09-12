@@ -26,7 +26,7 @@ function age(value: string) {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function targetLockScore(launch: Launch) {
+function targetLockScore(launch: Launch, mode: "sighted" | "surveillance" | "acquired") {
   if (launch.research_state === "target_locked") return 100;
 
   const tradeDepth = Math.min(1, launch.trade_count / 30) * 15;
@@ -40,11 +40,15 @@ function targetLockScore(launch: Launch) {
   const creatorBalance = launch.creator_balance_pct != null && launch.creator_balance_pct <= 5 ? 5 : 0;
   const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
 
-  return Math.min(99, Math.round(score));
+  const rawScore = Math.min(99, Math.round(score));
+  if (mode === "sighted") return Math.min(49, rawScore);
+  if (mode === "surveillance") return Math.max(50, rawScore);
+  return rawScore;
 }
 
-function lockLabel(launch: Launch, score: number) {
+function lockLabel(launch: Launch, score: number, mode: "sighted" | "surveillance" | "acquired") {
   if (launch.research_state === "target_locked") return "Target locked";
+  if (mode === "sighted") return score >= 35 ? "Qualifying" : "Scanning";
   if (score >= 80) return "Final checks";
   if (score >= 48) return "Tracking";
   return "Scanning";
@@ -69,8 +73,8 @@ function sparklineGeometry(prices: number[]) {
   return { line, area, endY: coordinates.at(-1)?.y ?? 36 };
 }
 
-function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired" }) {
-  const lockScore = targetLockScore(launch);
+function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired"; imagePriority?: boolean }) {
+  const lockScore = targetLockScore(launch, mode);
   const acquired = mode === "acquired";
   const positionClosed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const valuationMarketCap = positionClosed ? launch.exit_market_cap_usd : launch.market_cap_usd;
@@ -88,7 +92,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
       <article className={`launchCard ${acquired ? "isAcquired" : "isCompact"}`}>
         <div className="cardTop">
           <div className="tokenImage">
-            <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} />
+            <TokenImage src={launch.image_url} alt={launch.name ?? "Token image"} size={64} priority={imagePriority} />
           </div>
           <div className="cardContent">
             <div className="cardTitleRow">
@@ -139,7 +143,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
         ) : (
           <div className="targetLock">
             <div className="targetLockHead">
-              <strong>{lockLabel(launch, lockScore)}</strong>
+              <strong>{lockLabel(launch, lockScore, mode)}</strong>
               <b>{lockScore}<small>%</small></b>
             </div>
             <div className="lockSegments" aria-label={`Target lock ${lockScore}%`}>
@@ -188,7 +192,7 @@ function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
         <span>{count}</span>
       </header>
       <div className="launchLaneBody">
-        {launches.length ? launches.map((launch) => <TokenCard key={launch.token_address} launch={launch} mode={mode} />) : (
+        {launches.length ? launches.map((launch, index) => <TokenCard key={launch.token_address} launch={launch} mode={mode} imagePriority={index < 2} />) : (
           <div className="laneEmpty">{empty}</div>
         )}
       </div>

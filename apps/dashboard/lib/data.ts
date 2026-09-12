@@ -308,16 +308,24 @@ export async function getLaunchDetail(tokenAddress: string) {
     auth: { persistSession: false },
     db: { retry: false },
   });
-  const [result, dashboard, migrationPriceResult, positionResult, researchStateResult] = await Promise.all([
-    db.rpc("get_launch_detail", {
+  const result = await db.rpc("get_launch_detail", {
       p_token_address: tokenAddress,
       p_trade_limit: 100,
       p_market_limit: 1000,
-    }).abortSignal(AbortSignal.timeout(20_000)),
-    getDashboardData(),
-    db.rpc("get_launch_migration_price_usd", {
-      p_token_address: tokenAddress,
-    }).abortSignal(AbortSignal.timeout(20_000)),
+    }).abortSignal(AbortSignal.timeout(12_000));
+
+  if (result.error || !result.data?.launch) {
+    const dashboard = await getDashboardData();
+    const fallback = dashboard.launches.find((launch) => launch.token_address === tokenAddress);
+    if (!fallback) {
+      console.error("[launch] detail request failed", result.error?.message ?? "Launch missing");
+      return null;
+    }
+    console.warn("[launch] using dashboard fallback", result.error?.message ?? "Detail response missing");
+    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[], chartCandles: [] as ChartCandle[], bondPriceUsd: null as number | null, poolStartedAt: null as string | null };
+  }
+
+  const [positionResult, researchStateResult] = await Promise.all([
     db.from("acquired_positions")
       .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at")
       .eq("token_address", tokenAddress)
@@ -327,16 +335,6 @@ export async function getLaunchDetail(tokenAddress: string) {
       .eq("token_address", tokenAddress)
       .maybeSingle(),
   ]);
-
-  if (result.error || !result.data?.launch) {
-    const fallback = dashboard.launches.find((launch) => launch.token_address === tokenAddress);
-    if (!fallback) {
-      console.error("[launch] detail request failed", result.error?.message ?? "Launch missing");
-      return null;
-    }
-    console.warn("[launch] using dashboard fallback", result.error?.message ?? "Detail response missing");
-    return { launch: fallback as LaunchRecord, trades: [] as Trade[], marketTrades: [] as MarketTrade[], chartCandles: [] as ChartCandle[], bondPriceUsd: null as number | null, poolStartedAt: null as string | null };
-  }
 
   const payload = result.data as {
     launch: LaunchRecord;
@@ -398,9 +396,7 @@ export async function getLaunchDetail(tokenAddress: string) {
       low: Number(candle.low),
       close: Number(candle.close),
     })) as ChartCandle[],
-    bondPriceUsd: payload.bondPriceUsd != null
-      ? Number(payload.bondPriceUsd)
-      : migrationPriceResult.data == null ? null : Number(migrationPriceResult.data),
+    bondPriceUsd: payload.bondPriceUsd == null ? null : Number(payload.bondPriceUsd),
     poolStartedAt: payload.poolStartedAt ?? null,
   };
 }

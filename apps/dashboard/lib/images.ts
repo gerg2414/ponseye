@@ -35,6 +35,7 @@ export function imageCandidates(value: string | null) {
     if (!match) return [safe];
     const path = match[1];
     return [
+      `/api/token-image/${encodeURIComponent(path)}`,
       `https://dweb.link/ipfs/${path}`,
       `https://gateway.pinata.cloud/ipfs/${path}`,
       `https://ipfs.io/ipfs/${path}`,

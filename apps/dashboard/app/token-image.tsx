@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { imageCandidates } from "../lib/images";
 
 export function TokenImage({
@@ -19,6 +19,8 @@ export function TokenImage({
   const [candidateIndex, setCandidateIndex] = useState(0);
   const current = candidates[candidateIndex];
 
+  useEffect(() => setCandidateIndex(0), [src]);
+
   if (!current) return <span aria-hidden="true">?</span>;
 
   return (
@@ -29,6 +31,7 @@ export function TokenImage({
       width={size}
       height={size}
       priority={priority}
+      unoptimized={current.startsWith("/api/token-image/")}
       sizes={`${size}px`}
       onError={() => setCandidateIndex((index) => index + 1)}
     />
