@@ -329,6 +329,22 @@ export async function saveMarketTrades(rows: MarketTradeRow[]) {
   return payloads.length;
 }
 
+export async function saveMarketHistoryRepair(rows: MarketTradeRow[]) {
+  const payloads = rows.flatMap((row) => {
+    const payload = marketTradePayload(row);
+    return payload ? [payload] : [];
+  });
+  if (!payloads.length) return 0;
+
+  for (let index = 0; index < payloads.length; index += 2_000) {
+    const { error } = await db.rpc("ingest_market_history_repair", {
+      rows: payloads.slice(index, index + 2_000),
+    });
+    assertOk(error, "bulk save market history repair");
+  }
+  return payloads.length;
+}
+
 export async function warmTokenCache() {
   const tokens = await getActiveMarketTokens();
   console.log(`Loaded ${tokens.length} active tokens (${knownTokens.size} total tracked) into memory`);
