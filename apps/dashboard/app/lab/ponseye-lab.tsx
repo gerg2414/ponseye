@@ -329,13 +329,16 @@ function normaliseExitProfile(value: unknown): ExitProfile | null {
     }
     return [];
   });
+  const wasTemporaryStaggeredDefault = levels.length === 3
+    && levels.map((level) => level.target).join(",") === "2,3,5"
+    && levels.every((level) => Math.abs(level.sellPct - 100 / 3) < 0.01);
   return {
     exitModel,
     runnerTarget: candidate.runnerTarget as number,
     stopLossPct: candidate.stopLossPct as number,
     stopEnabled: storedModel === "nostop" ? false : candidate.stopEnabled !== false,
     positionSizeUsd: candidate.positionSizeUsd as number,
-    takeProfitLevels: levels.length === 3 ? levels : defaultTakeProfitLevels.map((level) => ({ ...level })),
+    takeProfitLevels: levels.length === 3 && !wasTemporaryStaggeredDefault ? levels : defaultTakeProfitLevels.map((level) => ({ ...level })),
   };
 }
 
