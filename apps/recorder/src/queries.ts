@@ -1,5 +1,5 @@
-export const PONS_ACTIVITY = `
-  subscription PonsActivity {
+export const PONS_LAUNCH_ACTIVITY = `
+  subscription PonsLaunchActivity {
     EVM(network: robinhood) {
       Calls(where: {Call: {
         To: {in: [
@@ -30,6 +30,16 @@ export const PONS_ACTIVITY = `
           }
         }
       }
+    }
+  }
+`;
+
+// Curve events are deliberately kept on their own subscription. Robinhood can
+// produce enough curve traffic to build a processing queue, and launch discovery
+// must never wait behind trade writes.
+export const PONS_CURVE_ACTIVITY = `
+  subscription PonsCurveActivity {
+    EVM(network: robinhood) {
       CurveEvents: Events(where: {Log: {Signature: {Name: {in: ["CurveBuy", "CurveSell"]}}}}) {
         Block { Time Number }
         Transaction { Hash From }
