@@ -14,7 +14,7 @@
   --radius-control: 3px;
 }
 * { box-sizing: border-box; }
-html { background: var(--bg); overflow-x: clip; }
+html { width: 100%; max-width: 100%; background: var(--bg); overflow-x: hidden; }
 body {
   margin: 0;
   color: var(--text);
@@ -22,15 +22,17 @@ body {
   background-size: 34px 34px, 34px 34px, auto, auto;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   min-height: 0;
-  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: .055; background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, #fff 4px); }
-main { position: relative; isolation: isolate; width: 100%; margin: 0; padding: 0 22px; }
-.homePage { height: 100dvh; overflow: hidden; display: grid; grid-template-rows: 114px minmax(0,1fr); }
+main { position: relative; isolation: isolate; width: 100%; max-width: 100%; margin: 0; padding: 0 22px; }
+.homePage { min-width: 0; height: 100dvh; overflow: hidden; display: grid; grid-template-rows: 114px minmax(0,1fr); }
 main::before { content: ""; position: absolute; z-index: -1; top: 0; left: -22px; width: calc(100% + 44px); height: 455px; pointer-events: none; background-image: linear-gradient(180deg,rgba(19,10,33,.82) 0%,rgba(9,9,13,.34) 74%,transparent 100%), radial-gradient(ellipse at 72% 24%,rgba(119,55,216,.3) 0%,rgba(56,25,105,.13) 35%,transparent 66%), radial-gradient(circle,rgba(165,108,255,.2) 0 2px,transparent 2.5px), linear-gradient(rgba(165,108,255,.055) 1px,transparent 1px), linear-gradient(90deg,rgba(165,108,255,.055) 1px,transparent 1px); background-size: auto,auto,96px 96px,32px 32px,32px 32px; border-bottom: 1px solid rgba(165,108,255,.08); -webkit-mask-image: linear-gradient(#000 0%,#000 72%,transparent 100%); mask-image: linear-gradient(#000 0%,#000 72%,transparent 100%); }
 main::after { content: none; }
 main > * { position: relative; z-index: 1; }
-.header { height: 114px; padding-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.header { min-width: 0; max-width: 100%; height: 114px; padding-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .homePage .header { z-index: 100; }
 .headerBrand { display: flex; align-items: center; gap: 0; margin-left: -16px; transform: translateY(-6px); }
 .headerMark { display: block; width: 108px; height: 108px; margin-right: -16px; object-fit: contain; image-rendering: pixelated; }
@@ -148,19 +150,19 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
   .pixelMenu > summary i { transition: none; }
   .pixelMenu nav { animation: none; }
 }
-.boardStage { min-height: 0; height: 100%; position: relative; padding-top: 54px; }
+.boardStage { min-width: 0; width: 100%; max-width: 100%; min-height: 0; height: 100%; position: relative; padding-top: 54px; }
 .boardUtility { position: absolute; z-index: 5; top: 7px; left: 0; height: 40px; display: flex; align-items: flex-end; gap: 22px; padding-bottom: 1px; }
 .boardUtility .chainLabel { height: 23px; font-size: 10px; font-weight: 700; letter-spacing: .075em; text-transform: uppercase; }
 .boardUtility .consoleAwait { height: 23px; }
-.boardSection { height: 100%; position: relative; z-index: 2; overflow: hidden; display: flex; flex-direction: column; background: rgba(12,14,18,.98); border: 1px solid var(--line); border-top-color: rgba(170,108,255,.38); border-radius: 12px; box-shadow: 0 -18px 70px rgba(108,54,190,.16), 0 24px 80px rgba(0,0,0,.42); }
+.boardSection { min-width: 0; width: 100%; max-width: 100%; height: 100%; position: relative; z-index: 2; overflow: hidden; display: flex; flex-direction: column; background: rgba(12,14,18,.98); border: 1px solid var(--line); border-top-color: rgba(170,108,255,.38); border-radius: 12px; box-shadow: 0 -18px 70px rgba(108,54,190,.16), 0 24px 80px rgba(0,0,0,.42); }
 .boardHead { min-height: 90px; padding: 22px 24px; display: flex; justify-content: space-between; align-items: end; border-bottom: 1px solid var(--line); position: relative; }
 .boardHead::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 170px; background: var(--purple); box-shadow: 0 0 16px rgba(165,108,255,.42); }
 .boardHead h2 { margin: 0; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 22px; letter-spacing: -.03em; color: var(--white); }
 .boardHead .eyebrow { margin-bottom: 8px; }
 .panelStatus.offline { color: #8b91a0; }
 .panelStatus.offline i { background: #555a68; box-shadow: none; }
-.launchBoard { min-height: 0; flex: 1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: stretch; gap: 12px; padding: 12px; background: #090a0d; }
-.mobileLaneTabs { display: none; }
+.launchBoard { min-width: 0; width: 100%; max-width: 100%; min-height: 0; flex: 1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: stretch; gap: 12px; padding: 12px; background: #090a0d; }
+.mobileLaneTabs { min-width: 0; width: 100%; max-width: 100%; display: none; }
 .launchLane { min-width: 0; min-height: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #242833; border-radius: 10px; background: #0d0f13; }
 .laneHead { height: 72px; padding: 0 17px 0 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #242833; background: linear-gradient(90deg,rgba(165,108,255,.055),transparent 58%),#0a0c0f; }
 .laneHead > div { display: flex; align-items: center; gap: 10px; }
@@ -947,9 +949,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .mobileLaneTabs button b { color: #aab0bc; font-size: 9px; }
   .mobileLaneTabs button.active { border-color: rgba(165,108,255,.65); color: var(--white); background: rgba(165,108,255,.12); box-shadow: inset 0 -2px 0 var(--purple); }
   .mobileLaneTabs button.active b { color: var(--green); }
-  .launchBoard { margin-right: -1px; padding: 8px; display: flex; flex-direction: row; gap: 8px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 8px; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .launchBoard { margin-right: 0; padding: 8px; display: flex; flex-direction: row; gap: 8px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 8px; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .launchBoard::-webkit-scrollbar { display: none; }
-  .launchLane { width: calc(100vw - 42px); height: 100%; min-height: 0; flex: 0 0 calc(100vw - 42px); scroll-snap-align: start; scroll-snap-stop: always; }
+  .launchLane { width: calc(100% - 16px); max-width: calc(100% - 16px); height: 100%; min-height: 0; flex: 0 0 calc(100% - 16px); scroll-snap-align: start; scroll-snap-stop: always; }
   .launchLaneBody { overflow-y: auto; overscroll-behavior-y: contain; }
   .boardUtility { gap: 9px; }
   .boardUtility .chainLabel { font-size: 8px; white-space: nowrap; }
