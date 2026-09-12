@@ -436,6 +436,7 @@ export async function connectGmgnLiveTrenches(
     let settled = false;
     let processing = Promise.resolve();
     let bootstrapStarted = false;
+    let diagnosticFramesRemaining = 3;
     const socket = new WebSocket(gmgnWebSocketUrl(), {
       headers: {
         Origin: GMGN_SITE,
@@ -503,6 +504,10 @@ export async function connectGmgnLiveTrenches(
           return;
         }
         const tokens = parseGmgnTrenchesDelta(message, cache);
+        if (text(envelope?.channel) === "trenches_delta" && diagnosticFramesRemaining > 0) {
+          diagnosticFramesRemaining -= 1;
+          console.log("GMGN live Trenches frame", JSON.stringify(message).slice(0, 4_000));
+        }
         if (tokens.length) await onEvent({ source: "delta", tokens });
       }).catch((error) => {
         socket.terminate();
