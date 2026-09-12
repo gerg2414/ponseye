@@ -10,6 +10,7 @@ const imageHosts = new Set([
   "www.copybara.run",
   "i.postimg.cc",
   "axiomtrading-v2.axiom-cdn.io",
+  "axiom-rh-v2.axiom-cdn.io",
   "d.uguu.se",
   "cloudflare-ipfs.com",
   "dweb.link",
@@ -50,6 +51,9 @@ export function imageCandidates(value: string | null) {
       `https://w3s.link/ipfs/${path}`,
       `https://nftstorage.link/ipfs/${path}`,
       `https://gateway.pinata.cloud/ipfs/${path}`,
+      `https://dweb.link/ipfs/${path}`,
+      `https://ipfs.io/ipfs/${path}`,
+      `https://cloudflare-ipfs.com/ipfs/${path}`,
       `https://gateway.lighthouse.storage/ipfs/${path}`,
       safe,
     ])];
