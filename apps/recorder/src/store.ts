@@ -225,6 +225,19 @@ function marketTradePayload(row: MarketTradeRow) {
     row.Amounts?.Quote,
     row.Pair.QuoteToken?.Address,
   ]);
+  const baseAmount = Number(row.Amounts?.Base);
+  const tradeValueUsd = Number(row.AmountsInUsd?.Base ?? row.AmountsInUsd?.Quote);
+  const reliablePrice = !(
+    (Number.isFinite(baseAmount) && baseAmount > 0 && baseAmount < 1)
+    || (
+      Number.isFinite(baseAmount)
+      && baseAmount > 0
+      && baseAmount < 1_000
+      && Number.isFinite(tradeValueUsd)
+      && tradeValueUsd >= 0
+      && tradeValueUsd < 0.10
+    )
+  );
 
   return {
     market_event_id: marketEventId,
@@ -233,8 +246,12 @@ function marketTradePayload(row: MarketTradeRow) {
     block_time: row.Block.Time,
     side,
     trader_address: traderAddress,
-    price: row.Price ?? null,
-    price_usd: row.PriceInUsd ?? null,
+    // Bitquery occasionally emits microscopic secondary swap legs with a
+    // mathematically valid but economically meaningless unit price. Keep the
+    // trade and its volume, but do not let those dust legs paint charts, ATHs,
+    // or paper-position exits.
+    price: reliablePrice ? row.Price ?? null : null,
+    price_usd: reliablePrice ? row.PriceInUsd ?? null : null,
     base_amount: row.Amounts?.Base ?? null,
     quote_amount: row.Amounts?.Quote ?? null,
     base_amount_usd: row.AmountsInUsd?.Base ?? null,
