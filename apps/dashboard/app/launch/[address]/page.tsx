@@ -162,10 +162,10 @@ export default async function LaunchPage({ params, searchParams }: {
   const requestedEntryMarketCap = query.entryMc && Number(query.entryMc) > 0 ? Number(query.entryMc) : null;
   const entryMarketCap = requestedEntryMarketCap ?? launch.entry_market_cap_usd ?? null;
   const entryAt = requestedEntryAt ?? launch.acquired_at ?? (launch.research_state === "target_locked" ? launch.research_state_at : null);
-  const currentMarketCap = launch.market_cap_usd ?? null;
+  const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
+  const currentMarketCap = closed ? launch.exit_market_cap_usd ?? launch.market_cap_usd ?? null : launch.market_cap_usd ?? null;
   const gainMultiple = entryMarketCap && currentMarketCap ? currentMarketCap / entryMarketCap : null;
   const peakMultiple = entryMarketCap && launch.ath_market_cap_usd ? launch.ath_market_cap_usd / entryMarketCap : null;
-  const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const acquired = Boolean(entryAt && entryMarketCap && entryMarketCap > 0);
   const gainTone = gainMultiple != null && gainMultiple < 1 ? "negative" : "positive";
   const positionSizeUsd = 25;
@@ -264,7 +264,7 @@ export default async function LaunchPage({ params, searchParams }: {
             <article className={gainTone}><i><TradeMetricIcon kind="pnl" /></i><div><span>Net P&amp;L</span><strong>{pnlUsd != null && pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong></div></article>
             <article className={gainTone}><i><TradeMetricIcon kind="roi" /></i><div><span>ROI</span><strong>{roiPct == null ? "Pending" : `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(1)}%`}</strong></div></article>
             <article><i><TradeMetricIcon kind="peak" /></i><div><span>Peak market cap</span><strong>{usd(launch.ath_market_cap_usd)}</strong><small>{peakMultiple ? `${peakMultiple.toFixed(2)}x from entry` : "Peak pending"}</small></div></article>
-            <article className="tradeTime"><i><TradeMetricIcon kind="time" /></i><div><span>Entered</span><strong>{timestamp(entryAt)}</strong></div></article>
+            <article className="tradeTime"><i><TradeMetricIcon kind="time" /></i><div><span>{closed ? "Exited" : "Entered"}</span><strong>{timestamp(closed ? launch.closed_at ?? null : entryAt)}</strong></div></article>
           </div>
         </aside>
       </section>
