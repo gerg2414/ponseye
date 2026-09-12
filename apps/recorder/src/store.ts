@@ -303,9 +303,14 @@ export async function saveMarketTrades(rows: MarketTradeRow[]) {
   });
   if (!payloads.length) return 0;
 
-  const { error } = await db.from("trade_market_data")
-    .upsert(payloads, { onConflict: "market_event_id", ignoreDuplicates: true });
-  assertOk(error, "save market trade batch");
+  // Large historical windows can contain thousands of swaps. Keep each write
+  // below Supabase's statement timeout because insert triggers also maintain
+  // token metrics and exact distinct-trader counts.
+  for (let index = 0; index < payloads.length; index += 200) {
+    const { error } = await db.from("trade_market_data")
+      .upsert(payloads.slice(index, index + 200), { onConflict: "market_event_id", ignoreDuplicates: true });
+    assertOk(error, "save market trade batch");
+  }
 
   const firstPoolByToken = new Map<string, (typeof payloads)[number]>();
   for (const payload of payloads) {
