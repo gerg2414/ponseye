@@ -256,14 +256,14 @@ async function main() {
   // slow historical launch-call queries cannot hold up peak and rule repairs.
   void getAccessToken()
     .then(async (auth) => {
-      const repairFeed = "complete_market_history_v10";
+      const repairFeed = "source_price_history_v11";
       const prior = await getStreamStatus(repairFeed);
       if (prior?.status !== "completed") {
-        await updateStreamStatus(repairFeed, "running", "Finishing historical coverage and rebuilding every stored peak");
+        await updateStreamStatus(repairFeed, "running", "Restoring raw source prices previously removed by dust filtering");
         const repairSignal = AbortSignal.timeout(90 * 60_000);
         const stored = await runCompleteMarketHistoryRepair(auth.access_token, repairSignal, [
-          "0x4275e8d0d66f699f1b6b99312fb90fae2aafc86a",
-          "0x4e63ec6a9c3501ce77f66334c6e61fdc99bf27ff",
+          "0xd9bb2ea3eb72eafeac18456c6435ad612337d4cf",
+          "0x46b6995b02b1e3afa39033243999e00d739615f1",
         ]);
         if (repairSignal.aborted) throw new Error("Complete market history replay timed out before reaching the dataset cutoff");
         const rebuilt = await rebuildAllPeakMetrics();

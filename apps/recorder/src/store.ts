@@ -266,6 +266,8 @@ function marketTradePayload(row: MarketTradeRow) {
     // mathematically valid but economically meaningless unit price. Keep the
     // trade and its volume, but do not let those dust legs paint charts, ATHs,
     // or paper-position exits.
+    source_price: row.Price ?? null,
+    source_price_usd: row.PriceInUsd ?? null,
     price: reliablePrice ? row.Price ?? null : null,
     price_usd: reliablePrice ? row.PriceInUsd ?? null : null,
     base_amount: row.Amounts?.Base ?? null,
@@ -388,14 +390,12 @@ export async function getMarketBackfillCandidate(tokenAddress: string): Promise<
 }
 
 export async function getMarketBackfillCandidates(): Promise<MarketBackfillCandidate[]> {
-  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db
     .from("launches")
     .select("token_address,launched_at,graduated_at")
     .not("graduated_at", "is", null)
-    .gte("graduated_at", since)
     .order("graduated_at", { ascending: false })
-    .limit(500)
+    .limit(1_000)
     .abortSignal(AbortSignal.timeout(30_000));
   assertOk(error, "load market backfill candidates");
 
@@ -447,12 +447,10 @@ export async function getStreamStatus(feed: string) {
 }
 
 export async function getActiveMarketTokens(): Promise<string[]> {
-  const activeSince = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const activeResult = await db
     .from("launches")
     .select("token_address")
     .not("graduated_at", "is", null)
-    .gte("graduated_at", activeSince)
     .order("graduated_at", { ascending: false })
     .limit(1000)
     .abortSignal(AbortSignal.timeout(30_000));
