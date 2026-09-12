@@ -29,7 +29,7 @@ async function storeWindow(
   const response = await queryBitquery<MarketHistoryResponse>(
     accessToken,
     marketTradeHistory(tokenAddress, new Date(start).toISOString(), new Date(finish).toISOString()),
-    AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
+    signal,
   );
   const rows = response.data?.Trading?.Trades ?? [];
   if (rows.length >= 5_000 && finish - start > 2_000) {
