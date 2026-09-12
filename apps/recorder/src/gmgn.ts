@@ -199,11 +199,13 @@ export function parseGmgnTrenchesDelta(
     const filterId = text(message?.fid) ?? "";
     const category = categoryFromFilterId(filterId);
     if (!message || !category) continue;
-    const deltas = Array.isArray(message.t) ? message.t : [];
+    const additions = Array.isArray(message.a) ? message.a : [];
+    const updates = Array.isArray(message.t) ? message.t : [];
+    const deltas = [...additions, ...updates];
     for (const deltaValue of deltas) {
       const delta = object(deltaValue);
-      const fields = object(delta?.f) ?? {};
-      const address = text(delta?.a)?.toLowerCase() ?? "";
+      const fields = object(delta?.f) ?? delta ?? {};
+      const address = text(delta?.a ?? fields.address ?? fields.a)?.toLowerCase() ?? "";
       if (!delta || !ADDRESS.test(address)) continue;
       const previous = cache.get(address);
       const rawToken = {
