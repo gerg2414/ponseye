@@ -371,6 +371,17 @@ export async function rebuildAllPeakMetrics() {
   return processed;
 }
 
+export async function rebuildPeakMetricsForTokens(tokenAddresses: string[]) {
+  const tokens = [...new Set(tokenAddresses.map((token) => token.toLowerCase()))];
+  if (!tokens.length) return 0;
+
+  const { data, error } = await db.rpc("rebuild_peak_metrics_for_tokens", {
+    p_token_addresses: tokens,
+  });
+  assertOk(error, "rebuild selected peak metrics");
+  return Number(data ?? 0);
+}
+
 export async function warmTokenCache() {
   const tokens = await getActiveMarketTokens();
   console.log(`Loaded ${tokens.length} active tokens (${knownTokens.size} total tracked) into memory`);

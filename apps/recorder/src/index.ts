@@ -6,10 +6,15 @@ import { runHolderCollector } from "./holders.js";
 import { recoverMissingLaunchMetadata, recoverRecentLaunches } from "./launch-backfill.js";
 import { backfillGraduatedToken, runCompleteMarketHistoryRepair, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_CURVE_ACTIVITY, PONS_LAUNCH_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, getRecorderEnabled, getStreamStatus, markRecorderPaused, rebuildAllPeakMetrics, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getRecorderEnabled, getStreamStatus, markRecorderPaused, rebuildPeakMetricsForTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
+const SOURCE_PRICE_REPAIR_FEED = "source_price_history_v11";
+const SOURCE_PRICE_REPAIR_TOKENS = [
+  "0xd9bb2ea3eb72eafeac18456c6435ad612337d4cf",
+  "0x46b6995b02b1e3afa39033243999e00d739615f1",
+];
 let recorderMode: "paused" | "starting" | "recording" | "reconnecting" = "paused";
 let pauseReported = false;
 const traffic = {
@@ -256,24 +261,20 @@ async function main() {
   // slow historical launch-call queries cannot hold up peak and rule repairs.
   void getAccessToken()
     .then(async (auth) => {
-      const repairFeed = "source_price_history_v11";
-      const prior = await getStreamStatus(repairFeed);
+      const prior = await getStreamStatus(SOURCE_PRICE_REPAIR_FEED);
       if (prior?.status !== "completed") {
-        await updateStreamStatus(repairFeed, "running", "Restoring raw source prices previously removed by dust filtering");
+        await updateStreamStatus(SOURCE_PRICE_REPAIR_FEED, "running", "Restoring raw source prices previously removed by dust filtering");
         const repairSignal = AbortSignal.timeout(90 * 60_000);
-        const stored = await runCompleteMarketHistoryRepair(auth.access_token, repairSignal, [
-          "0xd9bb2ea3eb72eafeac18456c6435ad612337d4cf",
-          "0x46b6995b02b1e3afa39033243999e00d739615f1",
-        ]);
+        const stored = await runCompleteMarketHistoryRepair(auth.access_token, repairSignal, SOURCE_PRICE_REPAIR_TOKENS);
         if (repairSignal.aborted) throw new Error("Complete market history replay timed out before reaching the dataset cutoff");
-        const rebuilt = await rebuildAllPeakMetrics();
-        await updateStreamStatus(repairFeed, "completed", `Complete: replayed ${stored} historical market rows and rebuilt ${rebuilt} token peaks`);
+        const rebuilt = await rebuildPeakMetricsForTokens(SOURCE_PRICE_REPAIR_TOKENS);
+        await updateStreamStatus(SOURCE_PRICE_REPAIR_FEED, "completed", `Complete: replayed ${stored} historical market rows and rebuilt ${rebuilt} token peaks`);
       }
       await recoverMissingLaunchMetadata(auth.access_token, AbortSignal.timeout(30 * 60_000));
     })
     .catch(async (error) => {
       console.error("Paused dataset repair failed", error);
-      await updateStreamStatus("complete_market_history_v10", "error", error instanceof Error ? error.message : String(error));
+      await updateStreamStatus(SOURCE_PRICE_REPAIR_FEED, "error", error instanceof Error ? error.message : String(error));
     });
 
   while (true) {
