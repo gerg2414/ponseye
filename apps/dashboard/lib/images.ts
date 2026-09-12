@@ -40,11 +40,10 @@ export function imageCandidates(value: string | null) {
     if (!match) return [safe];
     const path = match[1];
     return [
-      `/api/token-image/${encodeURIComponent(path)}`,
+      safe,
       `https://w3s.link/ipfs/${path}`,
       `https://nftstorage.link/ipfs/${path}`,
       `https://gateway.pinata.cloud/ipfs/${path}`,
-      `https://ipfs.io/ipfs/${path}`,
       `https://gateway.lighthouse.storage/ipfs/${path}`,
     ];
   } catch {
