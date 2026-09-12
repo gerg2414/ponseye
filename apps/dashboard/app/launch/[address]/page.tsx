@@ -150,7 +150,8 @@ export default async function LaunchPage({ params, searchParams }: {
   if (!detail) notFound();
 
   const { launch, marketTrades, chartCandles, bondPriceUsd } = detail;
-  if (!isPreview && launch.research_state !== "target_locked") notFound();
+  const isAcquired = launch.research_state === "target_locked" || Boolean(launch.acquired_at || launch.position_status);
+  if (!isPreview && !isAcquired) notFound();
   const usd = (value: number | null) => value && value > 0 ? quoteValue(value, "USDG") : "No price yet";
   const money = (value: number | null) => value == null || !Number.isFinite(value)
     ? "Pending"
