@@ -1,7 +1,6 @@
 const imageHosts = new Set([
   "ipfs.io",
   "gateway.pinata.cloud",
-  "gmgn.ai",
   "pbs.twimg.com",
   "img.koyen.fun",
   "m.rapidlaunch.io",
@@ -48,9 +47,10 @@ export function imageCandidates(value: string | null) {
   try {
     const url = new URL(safe);
     const match = url.pathname.match(/^\/ipfs\/(.+)$/);
-    if (!match) return [safe, `/api/token-image/source?url=${encodeURIComponent(safe)}`];
+    if (!match) return [`/api/token-image/source?url=${encodeURIComponent(safe)}`, safe];
     const path = match[1];
     return [...new Set([
+      `/api/token-image/${path}`,
       `https://w3s.link/ipfs/${path}`,
       `https://nftstorage.link/ipfs/${path}`,
       `https://gateway.pinata.cloud/ipfs/${path}`,

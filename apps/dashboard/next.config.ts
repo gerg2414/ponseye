@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "ipfs.io" },
       { protocol: "https", hostname: "gateway.pinata.cloud" },
-      { protocol: "https", hostname: "gmgn.ai" },
       { protocol: "https", hostname: "pbs.twimg.com" },
       { protocol: "https", hostname: "img.koyen.fun" },
       { protocol: "https", hostname: "m.rapidlaunch.io" },
