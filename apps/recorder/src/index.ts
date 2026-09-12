@@ -256,7 +256,7 @@ async function main() {
   // slow historical launch-call queries cannot hold up peak and rule repairs.
   void getAccessToken()
     .then(async (auth) => {
-      const repairFeed = "complete_market_history_v7";
+      const repairFeed = "complete_market_history_v8";
       const prior = await getStreamStatus(repairFeed);
       if (!(prior?.status === "connected" && prior.message?.startsWith("Complete:"))) {
         await updateStreamStatus(repairFeed, "connecting", "Auditing all migrated tokens through the paused dataset cutoff");
@@ -269,7 +269,7 @@ async function main() {
     })
     .catch(async (error) => {
       console.error("Paused dataset repair failed", error);
-      await updateStreamStatus("complete_market_history_v7", "error", error instanceof Error ? error.message : String(error));
+      await updateStreamStatus("complete_market_history_v8", "error", error instanceof Error ? error.message : String(error));
     });
 
   while (true) {
