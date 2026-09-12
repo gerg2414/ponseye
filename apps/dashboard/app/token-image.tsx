@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { imageCandidates } from "../lib/images";
 
+const candidateDelays = [0, 300, 900, 1_800, 3_000];
+
 export function TokenImage({
   src,
   alt,
@@ -61,10 +63,9 @@ export function TokenImage({
       loaders.push(loader);
     };
 
-    const delays = [0, 300, 900, 1_800, 3_000];
     candidates.forEach((candidate, index) => {
       if (index === 0) start(candidate);
-      else timers.push(setTimeout(() => start(candidate), delays[index] ?? index * 900));
+      else timers.push(setTimeout(() => start(candidate), candidateDelays[index] ?? index * 900));
     });
 
     return () => {
