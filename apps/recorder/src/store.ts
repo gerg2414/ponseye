@@ -334,15 +334,18 @@ export async function saveMarketHistoryRepair(rows: MarketTradeRow[]) {
     const payload = marketTradePayload(row);
     return payload ? [payload] : [];
   });
-  if (!payloads.length) return 0;
+  const uniquePayloads = [...new Map(
+    payloads.map((payload) => [payload.market_event_id, payload]),
+  ).values()];
+  if (!uniquePayloads.length) return 0;
 
-  for (let index = 0; index < payloads.length; index += 5_000) {
+  for (let index = 0; index < uniquePayloads.length; index += 5_000) {
     const { error } = await db.rpc("ingest_market_history_repair", {
-      rows: payloads.slice(index, index + 5_000),
+      rows: uniquePayloads.slice(index, index + 5_000),
     });
     assertOk(error, "bulk save market history repair");
   }
-  return payloads.length;
+  return uniquePayloads.length;
 }
 
 export async function warmTokenCache() {
