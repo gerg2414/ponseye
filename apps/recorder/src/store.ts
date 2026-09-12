@@ -193,7 +193,6 @@ export async function saveTrade(row: EventRow) {
     token_amount_raw: String(side === "buy" ? args.tokensOut : args.tokensIn),
     fee_raw: String(args.fee ?? "0"),
     tax_raw: String(args.tax ?? "0"),
-    raw_event: row,
   }, { onConflict: "event_id", ignoreDuplicates: true });
   assertOk(error, "save trade");
   return true;
@@ -235,7 +234,6 @@ function marketTradePayload(row: MarketTradeRow) {
     quote_token_address: row.Pair.QuoteToken?.Address?.toLowerCase() ?? null,
     quote_symbol: row.Pair.QuoteToken?.Symbol ?? null,
     protocol,
-    raw_trade: row,
   };
 }
 
