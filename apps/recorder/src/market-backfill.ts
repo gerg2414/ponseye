@@ -78,7 +78,7 @@ export async function runCompleteMarketHistoryRepair(accessToken: string, signal
   let stored = 0;
   const failures: string[] = [];
   let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(1, candidates.length) }, async () => {
+  const workers = Array.from({ length: Math.min(2, candidates.length) }, async () => {
     while (!signal.aborted) {
       const candidate = candidates[nextIndex++];
       if (!candidate) return;
