@@ -77,17 +77,22 @@ export async function runCompleteMarketHistoryRepair(accessToken: string, signal
   const candidates = await getCompleteMarketBackfillCandidates();
   let stored = 0;
   const failures: string[] = [];
-  for (const candidate of candidates) {
-    if (signal.aborted) break;
-    try {
-      stored += await backfillCandidate(accessToken, candidate, signal, true);
-    } catch (error) {
-      if (!signal.aborted) {
-        failures.push(candidate.token_address);
-        console.error(`Complete market history failed for ${candidate.token_address}`, error);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(6, candidates.length) }, async () => {
+    while (!signal.aborted) {
+      const candidate = candidates[nextIndex++];
+      if (!candidate) return;
+      try {
+        stored += await backfillCandidate(accessToken, candidate, signal, true);
+      } catch (error) {
+        if (!signal.aborted) {
+          failures.push(candidate.token_address);
+          console.error(`Complete market history failed for ${candidate.token_address}`, error);
+        }
       }
     }
-  }
+  });
+  await Promise.all(workers);
   if (signal.aborted) throw new Error("Complete market history replay did not reach the dataset cutoff");
   if (failures.length) throw new Error(`Complete market history failed for ${failures.length} tokens: ${failures.join(",")}`);
   console.log(`Complete market history replay stored ${stored} rows across ${candidates.length} migrated tokens`);
