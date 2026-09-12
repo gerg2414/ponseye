@@ -89,8 +89,9 @@ function morphToAcquired(
 
   const dx = nextRect.left - priorRect.left;
   const dy = nextRect.top - priorRect.top;
-  const widthMid = priorRect.width + (nextRect.width - priorRect.width) * .55;
-  const heightMid = priorRect.height + (nextRect.height - priorRect.height) * .38;
+  const morphDuration = 1_450;
+  const widthMid = priorRect.width + (nextRect.width - priorRect.width) * .58;
+  const heightMid = priorRect.height + (nextRect.height - priorRect.height) * .55;
 
   const movement = ghost.animate([
     {
@@ -101,28 +102,28 @@ function morphToAcquired(
     {
       left: `${priorRect.left + dx * .52}px`, top: `${priorRect.top + dy * .24}px`,
       width: `${widthMid}px`, height: `${heightMid}px`,
-      transform: "translate3d(0,-10px,0)", offset: .48,
+      transform: "translate3d(0,-10px,0)", offset: .52,
     },
     {
       left: `${nextRect.left}px`, top: `${nextRect.top}px`,
       width: `${nextRect.width}px`, height: `${nextRect.height}px`,
       transform: "translate3d(0,0,0)",
     },
-  ], { duration: 1_080, easing: "cubic-bezier(.2,.72,.18,1)", fill: "forwards" });
+  ], { duration: morphDuration, easing: "cubic-bezier(.2,.68,.18,1)", fill: "forwards" });
 
   compactFace.animate([
     { opacity: 1, transform: "scale(1)" },
-    { opacity: 1, transform: "scale(1)", offset: .38 },
-    { opacity: 0, transform: "scale(.985)", offset: .68 },
+    { opacity: 1, transform: "scale(1)", offset: .26 },
+    { opacity: 0, transform: "scale(.985)", offset: .62 },
     { opacity: 0, transform: "scale(.985)" },
-  ], { duration: 1_080, easing: "ease", fill: "forwards" });
+  ], { duration: morphDuration, easing: "ease", fill: "forwards" });
 
   acquiredFace.animate([
     { opacity: 0, transform: "scale(.985)" },
-    { opacity: 0, transform: "scale(.985)", offset: .34 },
-    { opacity: 1, transform: "scale(1)", offset: .76 },
+    { opacity: 0, transform: "scale(.985)", offset: .18 },
+    { opacity: 1, transform: "scale(1)", offset: .72 },
     { opacity: 1, transform: "scale(1)" },
-  ], { duration: 1_080, easing: "ease", fill: "forwards" });
+  ], { duration: morphDuration, easing: "ease", fill: "forwards" });
 
   movement.finished.then(() => {
     ghost.remove();

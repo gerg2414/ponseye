@@ -440,7 +440,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitViews button b { min-width: 22px; padding: 4px 6px; border-radius: 3px; color: #747b89; background: #090b0f; font-size: 11px; text-align: center; }
 .circuitViews button.active { border-color: rgba(165,108,255,.44); color: #d2bbf7; background: rgba(165,108,255,.09); }
 .circuitViews button.active b { color: var(--purple); }
-.circuitTableHead,.circuitRow { display: grid; grid-template-columns: minmax(220px,1.5fr) 140px 110px 110px 80px 100px minmax(145px,.8fr); align-items: center; gap: 14px; }
+.circuitTableHead,.circuitRow { display: grid; grid-template-columns: minmax(230px,1.6fr) 145px 120px 120px 115px minmax(100px,.6fr); align-items: center; gap: 16px; }
 .circuitTableHead { min-height: 46px; padding: 0 18px; border-bottom: 1px solid #20242c; color: #747b88; font-size: 11px; font-weight: 700; letter-spacing: .065em; text-transform: uppercase; }
 .circuitRow { min-height: 76px; padding: 10px 18px; border-bottom: 1px solid #20242c; color: #adb2bd; text-decoration: none; transition: background .15s ease,border-color .15s ease; }
 .circuitRow:last-child { border-bottom: 0; }
@@ -455,15 +455,14 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitPnl { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 14px !important; }
 .circuitOutcome { width: fit-content; padding: 8px 9px; display: flex; align-items: center; gap: 7px; border: 1px solid #30343e; border-radius: 4px; color: #9298a4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .circuitOutcome i { width: 6px; height: 6px; background: currentColor; box-shadow: 0 0 7px currentColor; }
-.circuitOutcome b { margin-left: 3px; color: #c8ccd4; }
+.circuitOutcome b { color: #c8ccd4; font-size: 14px; }
 .circuitOutcome.win { border-color: rgba(154,255,79,.25); color: var(--green); background: rgba(154,255,79,.035); }
 .circuitOutcome.loss { border-color: rgba(255,113,140,.28); color: #ff718c; background: rgba(255,113,140,.04); }
 .circuitOutcome.open { border-color: rgba(165,108,255,.3); color: var(--purple); background: rgba(165,108,255,.045); }
 .circuitEmpty { min-height: 190px; display: grid; place-items: center; color: #666c79; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 13px; }
 @media (max-width: 1050px) {
   .circuitStats { grid-template-columns: repeat(3,minmax(0,1fr)); }
-  .circuitTableHead,.circuitRow { grid-template-columns: minmax(220px,1.4fr) 125px 100px 80px 90px minmax(150px,.8fr); }
-  .circuitTableHead span:nth-child(4),.circuitRow > :nth-child(4) { display: none; }
+  .circuitTableHead,.circuitRow { grid-template-columns: minmax(210px,1.4fr) 125px 100px 100px 100px minmax(92px,.6fr); gap: 12px; }
 }
 @media (max-width: 720px) {
   .circuitHeading { min-height: 86px; padding-top: 14px; display: grid; align-content: center; }

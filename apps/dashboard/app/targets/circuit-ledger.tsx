@@ -53,12 +53,13 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
       </nav>
 
       <div className="circuitTableHead" aria-hidden="true">
-        <span>Target</span><span>Acquired</span><span>Entry MC</span><span>Peak MC</span><span>Peak</span><span>P&amp;L</span><span>Result</span>
+        <span>Target</span><span>Acquired</span><span>Entry MC</span><span>Exit MC</span><span>P&amp;L</span><span>Result</span>
       </div>
       <div className="circuitRows">
         {visible.length ? visible.map(({ token, outcome, pnlUsd }) => {
-          const peakMarketCap = token.signal_market_cap_usd && token.future_peak_multiple
-            ? token.signal_market_cap_usd * token.future_peak_multiple
+          const resultMultiple = outcome.closed ? outcome.exitMultiple : token.final_multiple;
+          const exitMarketCap = outcome.closed && token.signal_market_cap_usd
+            ? token.signal_market_cap_usd * outcome.exitMultiple
             : null;
           const href = `/launch/${token.token_address}?from=targets&entry=${encodeURIComponent(token.signal_at)}&entryMc=${token.signal_market_cap_usd ?? ""}`;
           return (
@@ -69,10 +70,9 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
               </div>
               <time>{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(token.signal_at))}</time>
               <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
-              <strong>{compactMoney(peakMarketCap)}</strong>
-              <strong className={(token.future_peak_multiple ?? 0) >= 2 ? "runner" : ""}>{multiple(token.future_peak_multiple)}</strong>
+              <strong>{outcome.closed ? compactMoney(exitMarketCap) : "Open"}</strong>
               <strong className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}>{pnlUsd >= 0 ? "+" : ""}{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(pnlUsd)}</strong>
-              <span className={`circuitOutcome ${outcome.tone}`}><i />{outcome.label}<b>{outcome.closed ? multiple(outcome.exitMultiple) : multiple(token.final_multiple)}</b></span>
+              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}><i /><b>{multiple(resultMultiple)}</b></span>
             </Link>
           );
         }) : <div className="circuitEmpty">No positions match this view yet.</div>}
