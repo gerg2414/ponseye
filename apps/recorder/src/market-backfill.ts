@@ -3,7 +3,7 @@ import { marketTradeHistory } from "./queries.js";
 import {
   getMarketBackfillCandidate,
   getMarketBackfillCandidates,
-  saveMarketTrade,
+  saveMarketTrades,
   type MarketBackfillCandidate,
   type MarketTradeRow,
 } from "./store.js";
@@ -38,9 +38,7 @@ async function backfillCandidate(accessToken: string, candidate: MarketBackfillC
       if (rows.length >= 5_000) {
         console.warn(`Market history window reached its limit for ${candidate.token_address}`);
       }
-      for (const row of rows) {
-        if (await saveMarketTrade(row)) stored += 1;
-      }
+      stored += await saveMarketTrades(rows);
       cursor = windowEnd + 1;
     }
 
