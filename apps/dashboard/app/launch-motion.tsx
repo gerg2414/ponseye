@@ -266,27 +266,15 @@ export function LaunchMotionController() {
     if (!board) return;
 
     let queued = 0;
+    const syncPositions = () => {
+      previous.current = cardsOnBoard();
+    };
     const compare = () => {
       queued = 0;
       const current = cardsOnBoard();
 
-      // On phones the lanes are independently scrollable. Comparing viewport
-      // coordinates after a refresh mistakes the user's scroll for a card
-      // reorder and visibly pulls cards towards their previous positions.
-      if (window.matchMedia("(max-width: 620px)").matches) {
-        previous.current = current;
-        return;
-      }
-
       current.forEach((next, token) => {
         const prior = previous.current.get(token);
-        if (prior && prior.state === next.state) {
-          const delta = prior.rect.top - next.rect.top;
-          if (Math.abs(delta) > 1) next.element.animate([
-            { transform: `translateY(${delta}px)` },
-            { transform: "translateY(0)" },
-          ], { duration: 520, easing: "cubic-bezier(.2,.76,.24,1)" });
-        }
         if (prior?.state === "sighted" && next.state === "under_watch") {
           flySnapshot(prior, next, "purple");
         }
@@ -310,6 +298,7 @@ export function LaunchMotionController() {
       queued = window.requestAnimationFrame(compare);
     });
     observer.observe(board, { childList: true, subtree: true });
+    document.addEventListener("scroll", syncPositions, { passive: true, capture: true });
 
     const preview = () => {
       document.querySelectorAll(".launchAnimationDemo").forEach((element) => element.remove());
@@ -357,6 +346,7 @@ export function LaunchMotionController() {
     return () => {
       window.cancelAnimationFrame(queued);
       observer.disconnect();
+      document.removeEventListener("scroll", syncPositions, true);
       window.removeEventListener("ponseye:test-transitions", preview);
     };
   }, []);
