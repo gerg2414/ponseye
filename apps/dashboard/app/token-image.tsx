@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { imageCandidates } from "../lib/images";
 
-const candidateDelays = [0, 300, 900, 1_800, 3_000];
+const candidateDelays = [0, 120, 320, 650, 1_000, 1_400, 1_900, 2_500];
 
 export function TokenImage({
   src,
