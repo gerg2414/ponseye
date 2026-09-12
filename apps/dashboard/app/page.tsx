@@ -34,12 +34,12 @@ function targetLockScore(launch: Launch) {
   const creatorClear = launch.creator_sells === 0 ? 10 : 0;
   const earlyBuyers = Math.min(1, launch.first_minute_buyers / 6) * 15;
   const momentum = Math.min(1, (launch.peak_multiple ?? 0) / 1.2) * 10;
-  const peakHeld = launch.drawdown_from_peak_pct == null || launch.drawdown_from_peak_pct <= 40 ? 10 : 0;
-  const holderSpread = launch.top_10_holder_pct == null || launch.top_10_holder_pct <= 70 ? 5 : 0;
-  const creatorBalance = launch.creator_balance_pct == null || launch.creator_balance_pct <= 5 ? 5 : 0;
+  const peakHeld = launch.drawdown_from_peak_pct != null && launch.drawdown_from_peak_pct <= 40 ? 10 : 0;
+  const holderSpread = launch.top_10_holder_pct != null && launch.top_10_holder_pct <= 70 ? 5 : 0;
+  const creatorBalance = launch.creator_balance_pct != null && launch.creator_balance_pct <= 5 ? 5 : 0;
   const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
 
-  return Math.round(score);
+  return Math.min(99, Math.round(score));
 }
 
 function lockLabel(launch: Launch, score: number) {
