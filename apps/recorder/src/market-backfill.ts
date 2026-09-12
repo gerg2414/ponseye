@@ -82,25 +82,34 @@ export async function runCompleteMarketHistoryRepair(
   const candidates = (await getCompleteMarketBackfillCandidates())
     .filter((candidate) => !requested || requested.has(candidate.token_address));
   let stored = 0;
-  const failures: string[] = [];
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(2, candidates.length) }, async () => {
-    while (!signal.aborted) {
-      const candidate = candidates[nextIndex++];
-      if (!candidate) return;
-      try {
-        stored += await backfillCandidate(accessToken, candidate, signal, true);
-      } catch (error) {
-        if (!signal.aborted) {
-          failures.push(candidate.token_address);
-          console.error(`Complete market history failed for ${candidate.token_address}`, error);
+  let pending = candidates;
+
+  for (let attempt = 1; attempt <= 3 && pending.length && !signal.aborted; attempt += 1) {
+    const failures: MarketBackfillCandidate[] = [];
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(2, pending.length) }, async () => {
+      while (!signal.aborted) {
+        const candidate = pending[nextIndex++];
+        if (!candidate) return;
+        try {
+          const count = await backfillCandidate(accessToken, candidate, signal, true);
+          stored += count;
+        } catch (error) {
+          if (!signal.aborted) {
+            failures.push(candidate);
+            console.error(`Complete market history attempt ${attempt} failed for ${candidate.token_address}`, error);
+          }
         }
       }
-    }
-  });
-  await Promise.all(workers);
+    });
+    await Promise.all(workers);
+    pending = failures;
+  }
+
   if (signal.aborted) throw new Error("Complete market history replay did not reach the dataset cutoff");
-  if (failures.length) throw new Error(`Complete market history failed for ${failures.length} tokens: ${failures.join(",")}`);
+  if (pending.length) {
+    throw new Error(`Complete market history failed for ${pending.length} tokens: ${pending.map((row) => row.token_address).join(",")}`);
+  }
   console.log(`Complete market history replay stored ${stored} rows across ${candidates.length} migrated tokens`);
   return stored;
 }
