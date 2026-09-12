@@ -319,10 +319,8 @@ function normaliseExitProfile(value: unknown): ExitProfile | null {
   const storedModel = String(candidate.exitModel);
   const exitModel: ExitModel = storedModel === "nostop" ? "fixed" : ["fixed", "breakeven", "initials", "staggered"].includes(storedModel) ? storedModel as ExitModel : "fixed";
   const storedLevels = Array.isArray(candidate.takeProfitLevels) ? candidate.takeProfitLevels.slice(0, 3) : [];
-  const levels = storedLevels.flatMap((level) => {
-    if (typeof level === "number" && runnerOptions.includes(level)) {
-      return [{ target: level, sellPct: 100 / Math.max(1, storedLevels.length) }];
-    }
+  const hasLegacyLevels = storedLevels.some((level) => typeof level === "number");
+  const levels = hasLegacyLevels ? [] : storedLevels.flatMap((level) => {
     if (level && typeof level === "object") {
       const item = level as Partial<TakeProfitLevel>;
       if (typeof item.target === "number" && runnerOptions.includes(item.target) && typeof item.sellPct === "number") {
