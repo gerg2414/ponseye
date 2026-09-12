@@ -165,6 +165,7 @@ async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
   let errorCount = 0;
   let liveConnected = false;
   let liveDeltaRows = 0;
+  let fallbackRateLimited = false;
   const exactCheckedAt = new Map<string, number>();
   await updateStreamStatus("gmgn_shadow", "connecting", "Starting read-only Pons shadow feed");
   const liveCollector = (async () => {
@@ -221,6 +222,7 @@ async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
       traffic.gmgnRowsReceived += tokens.length;
       traffic.gmgnRowsStored += await saveGmgnShadowTokens(tokens);
       errorCount = 0;
+      fallbackRateLimited = false;
       if (!liveConnected) {
         await updateStreamStatus(
           "gmgn_shadow",
@@ -233,12 +235,15 @@ async function runGmgnShadowCollector(apiKey: string, signal: AbortSignal) {
       errorCount += 1;
       traffic.gmgnErrors += 1;
       const message = error instanceof Error ? error.message : String(error);
+      fallbackRateLimited = /RATE_LIMIT|HTTP 429/i.test(message);
       console.error("GMGN shadow poll failed", error);
       await updateStreamStatus("gmgn_shadow", "error", message);
     }
-    const retryAfter = errorCount
-      ? Math.min(60_000, 5_000 * 2 ** Math.min(errorCount - 1, 4))
-      : 10_000;
+    const retryAfter = fallbackRateLimited
+      ? 5 * 60_000
+      : errorCount
+        ? Math.min(2 * 60_000, 15_000 * 2 ** Math.min(errorCount - 1, 3))
+        : 60_000;
     await delayOrAbort(retryAfter, signal);
   }
   await liveCollector;
