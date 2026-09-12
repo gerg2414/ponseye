@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",
+    "gmgn-cli": "1.6.2",
     "graphql-ws": "6.2.1",
     "viem": "2.56.3",
     "ws": "8.21.3",

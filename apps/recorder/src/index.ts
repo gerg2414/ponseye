@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
+import { verifyGmgnReadAccess } from "./gmgn.js";
 import { runHolderCollector } from "./holders.js";
 import { marketTrades, PONS_ACTIVITY } from "./queries.js";
 import { getActiveMarketTokens, getRecorderEnabled, markRecorderPaused, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
@@ -226,6 +227,22 @@ async function main() {
 
   const trafficLog = setInterval(() => console.log("Recorder traffic", traffic), 60_000);
   trafficLog.unref();
+
+  if (!config.GMGN_API_KEY) {
+    await updateStreamStatus("gmgn_shadow", "stopped", "GMGN_API_KEY is not configured");
+  } else {
+    await updateStreamStatus("gmgn_shadow", "connecting", "Checking read-only Robinhood access");
+    try {
+      const sampleSymbol = await verifyGmgnReadAccess(config.GMGN_API_KEY);
+      const suffix = sampleSymbol ? `; sample ${sampleSymbol}` : "";
+      await updateStreamStatus("gmgn_shadow", "connected", `Read-only Robinhood query verified${suffix}`);
+      console.log("GMGN read-only Robinhood query verified");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await updateStreamStatus("gmgn_shadow", "error", message);
+      console.error("GMGN read-only verification failed", error);
+    }
+  }
 
   while (true) {
     try {
