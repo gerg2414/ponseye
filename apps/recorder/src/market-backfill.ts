@@ -73,8 +73,14 @@ async function backfillCandidate(
   return task;
 }
 
-export async function runCompleteMarketHistoryRepair(accessToken: string, signal: AbortSignal) {
-  const candidates = await getCompleteMarketBackfillCandidates();
+export async function runCompleteMarketHistoryRepair(
+  accessToken: string,
+  signal: AbortSignal,
+  onlyTokens?: string[],
+) {
+  const requested = onlyTokens ? new Set(onlyTokens.map((token) => token.toLowerCase())) : null;
+  const candidates = (await getCompleteMarketBackfillCandidates())
+    .filter((candidate) => !requested || requested.has(candidate.token_address));
   let stored = 0;
   const failures: string[] = [];
   let nextIndex = 0;
