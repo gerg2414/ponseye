@@ -72,7 +72,7 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
               <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
               <strong>{outcome.closed ? compactMoney(exitMarketCap) : "Open"}</strong>
               <strong className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}>{pnlUsd >= 0 ? "+" : ""}{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(pnlUsd)}</strong>
-              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}><i /><b>{multiple(resultMultiple)}</b></span>
+              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}><b>{multiple(resultMultiple)}</b></span>
             </Link>
           );
         }) : <div className="circuitEmpty">No positions match this view yet.</div>}
