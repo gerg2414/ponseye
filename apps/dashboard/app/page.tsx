@@ -49,18 +49,39 @@ function lockLabel(launch: Launch, score: number) {
   return "Scanning";
 }
 
+function sparklineGeometry(prices: number[]) {
+  const values = prices.filter((price) => Number.isFinite(price) && price > 0);
+  if (values.length < 2) {
+    return { line: "0,36 320,36", area: "M0 36L320 36V72H0Z", endY: 36 };
+  }
+
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const spread = maximum - minimum || maximum * 0.01 || 1;
+  const coordinates = values.map((price, index) => {
+    const x = (index / (values.length - 1)) * 320;
+    const y = 62 - ((price - minimum) / spread) * 52;
+    return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) };
+  });
+  const line = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
+  const area = `M${coordinates.map(({ x, y }) => `${x} ${y}`).join("L")}V72H0Z`;
+  return { line, area, endY: coordinates.at(-1)?.y ?? 36 };
+}
+
 function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired" }) {
   const lockScore = targetLockScore(launch);
   const acquired = mode === "acquired";
   const positionClosed = launch.position_status === "closed" || Boolean(launch.closed_at);
-  const usdMarketCap = launch.market_cap_usd ? quoteValue(launch.market_cap_usd, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
+  const valuationMarketCap = positionClosed ? launch.exit_market_cap_usd : launch.market_cap_usd;
+  const usdMarketCap = valuationMarketCap ? quoteValue(valuationMarketCap, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
-  const gainMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
-    ? launch.market_cap_usd / launch.entry_market_cap_usd
+  const gainMultiple = launch.entry_market_cap_usd && valuationMarketCap
+    ? valuationMarketCap / launch.entry_market_cap_usd
     : null;
   const positionLoss = gainMultiple != null && gainMultiple < 1;
   const positionGradientId = `position-fill-${launch.token_address.replace(/[^a-z0-9-]/gi, "")}`;
   const filledSegments = Math.ceil(lockScore / 6.25);
+  const sparkline = sparklineGeometry(launch.sparkline_prices ?? []);
 
   const card = (
       <article className={`launchCard ${acquired ? "isAcquired" : "isCompact"}`}>
@@ -85,7 +106,7 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
         {acquired ? (
           <div className="acquiredMetrics">
             <div><span>Entry MC</span><strong>{entryMarketCap ?? "Pending"}</strong></div>
-            <div><span>Current MC</span><strong>{usdMarketCap}</strong></div>
+            <div><span>{positionClosed ? "Exit MC" : "Current MC"}</span><strong>{usdMarketCap}</strong></div>
             <div className="gainMetric"><span>Gains</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></div>
           </div>
         ) : (
@@ -105,9 +126,9 @@ function TokenCard({ launch, mode }: { launch: Launch; mode: "sighted" | "survei
                 </linearGradient>
               </defs>
               <path className="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
-              <path className="positionFill" style={{ fill: `url(#${positionGradientId})` }} d={positionLoss ? "M0 28L32 24L64 31L96 27L128 42L160 36L192 50L224 45L256 56L288 51L320 59V72H0Z" : "M0 58L32 51L64 54L96 40L128 45L160 31L192 36L224 20L256 25L288 13L320 9V72H0Z"} />
-              <polyline className="positionLine" points={positionLoss ? "0,28 32,24 64,31 96,27 128,42 160,36 192,50 224,45 256,56 288,51 320,59" : "0,58 32,51 64,54 96,40 128,45 160,31 192,36 224,20 256,25 288,13 320,9"} />
-              <circle className="positionEnd" cx="318" cy={positionLoss ? "59" : "9"} r="4" />
+              <path className="positionFill" style={{ fill: `url(#${positionGradientId})` }} d={sparkline.area} />
+              <polyline className="positionLine" points={sparkline.line} />
+              <circle className="positionEnd" cx="318" cy={sparkline.endY} r="4" />
             </svg>
             <div className="positionMonitorFooter">
               <span><i />{positionClosed ? "Position closed" : "Position open"}</span>
@@ -180,7 +201,7 @@ export default async function Home() {
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
   const acquired = launches
-    .filter((launch) => launch.research_state === "target_locked")
+    .filter((launch) => launch.research_state === "target_locked" && Date.now() - new Date(launch.launched_at).getTime() < 24 * 60 * 60_000)
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
   const surveillance = launches
     .filter((launch) => launch.research_state === "under_watch")
