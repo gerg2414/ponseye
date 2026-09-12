@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getPonsEyeLabData } from "../../lib/lab-data";
+import { AutoRefresh } from "../auto-refresh";
 import { LabHeader } from "./lab-header";
 import { PonsEyeLab } from "./ponseye-lab";
 
@@ -14,6 +15,7 @@ export default async function LabPage() {
   const tokens = await getPonsEyeLabData();
   return (
     <main className="labPage">
+      <AutoRefresh intervalMs={5_000} />
       <LabHeader current="testing" />
 
       {tokens.length ? (

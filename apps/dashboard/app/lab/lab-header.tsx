@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-type LabPage = "testing" | "database";
+type LabPage = "testing" | "database" | "rules";
 
 export function LabHeader({ current }: { current: LabPage }) {
   return (
@@ -14,6 +14,7 @@ export function LabHeader({ current }: { current: LabPage }) {
       <nav className="labNavLinks" aria-label="Lab navigation">
         <Link className={`backLink${current === "testing" ? " active" : ""}`} href="/lab">Testing Lab <b>↗</b></Link>
         <Link className={`backLink${current === "database" ? " active" : ""}`} href="/lab/database">Token database <b>↗</b></Link>
+        <Link className={`backLink${current === "rules" ? " active" : ""}`} href="/lab/rules">Live rules <b>↗</b></Link>
         <Link className="backLink" href="/">Launch dashboard <b>↗</b></Link>
       </nav>
     </header>
