@@ -1,0 +1,24 @@
+.signalTime {
+  overflow: hidden;
+  color: #858b98;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.accepted strong {
+  color: var(--green) !important;
+}
+
+.rejected strong {
+  color: #ff718c !important;
+}
+
+.recorded {
+  overflow: hidden;
+  color: #737987;
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

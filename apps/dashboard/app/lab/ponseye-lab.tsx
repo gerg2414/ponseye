@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { LabToken } from "../../lib/lab-data";
 import { TokenImage } from "../token-image";
+import resultStyles from "./lab-results.module.css";
 
 type RuleKey = "trade_count" | "unique_traders" | "buy_pressure_pct" | "first_minute_buyers" | "momentum_multiple" | "peak_hold_pct" | "top_10_holder_pct" | "signal_market_cap_usd" | "early_buyer_share_pct";
 type Rule = {
@@ -41,6 +42,7 @@ type ScoredToken = LabToken & {
   labScore: number;
   selected: boolean;
   blockedBy: string[];
+  rejectedOn: string[];
   passedRules: number;
   availableRules: number;
 };
@@ -347,6 +349,7 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
   let passedWeight = 0;
   let passedRules = 0;
   let availableRules = 0;
+  const failedRules: Array<{ label: string; weight: number }> = [];
 
   for (const rule of settings.rules) {
     const value = valueFor(token, rule.key);
@@ -357,6 +360,8 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
     if (passed) {
       passedWeight += rule.weight;
       passedRules += 1;
+    } else if (rule.weight > 0) {
+      failedRules.push({ label: rule.short, weight: rule.weight });
     }
   }
 
@@ -377,6 +382,10 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
     labScore,
     selected: blockedBy.length === 0 && (labScore >= settings.scoreThreshold || fastConviction),
     blockedBy,
+    rejectedOn: [
+      ...blockedBy,
+      ...failedRules.sort((a, b) => b.weight - a.weight).map((rule) => rule.label),
+    ],
     passedRules,
     availableRules,
   };
@@ -411,20 +420,45 @@ function formatUsd(value: number) {
   }).format(value);
 }
 
+function formatSignalTime(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
 function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget: number }) {
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
+  const recordedState = token.actual_acquired ? "Acquired" : token.actual_binned ? "Binned" : "Surveillance";
+  const rejectionSummary = token.rejectedOn.length
+    ? token.rejectedOn.slice(0, 2).join(" + ")
+    : "insufficient score";
+  const modelStatus = token.selected ? "Would acquire" : `Rejected: ${rejectionSummary}`;
   const entryQuery = new URLSearchParams({ entry: token.signal_at });
   if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
   return (
     <Link className="labResultRow" href={`/launch/${token.token_address}?${entryQuery.toString()}`}>
       <div className="labResultIdentity">
         <TokenImage src={token.image_url} alt={token.name ?? "Token image"} size={48} />
-        <span><strong>{token.name ?? "Unknown token"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "No ticker"}</small></span>
+        <span>
+          <strong>{token.name ?? "Unknown token"}</strong>
+          <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "No ticker"}</small>
+          <time className={resultStyles.signalTime} dateTime={token.signal_at}>{formatSignalTime(token.signal_at)} UTC</time>
+        </span>
       </div>
       <div><small>Lab score</small><strong>{token.labScore.toFixed(0)}%</strong></div>
       <div><small>Signal market cap</small><strong>{formatMarketCap(token.signal_market_cap_usd)}</strong></div>
       <div><small>Peak after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
-      <div><small>Recorded state</small><strong>{token.actual_acquired ? "Acquired" : token.actual_binned ? "Terminated" : "Surveillance"}</strong></div>
+      <div className={token.selected ? resultStyles.accepted : resultStyles.rejected} title={token.selected ? "Passed the current Lab model" : `Rejected on: ${token.rejectedOn.join(", ") || "insufficient score"}`}>
+        <small>Model status</small>
+        <strong>{modelStatus}</strong>
+        <em className={resultStyles.recorded}>Recorded: {recordedState}</em>
+      </div>
       <b>→</b>
     </Link>
   );
@@ -441,7 +475,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [modelName, setModelName] = useState("");
   const [exitProfileName, setExitProfileName] = useState("");
   const [storageReady, setStorageReady] = useState(false);
-  const [resultView, setResultView] = useState<"signals" | "misses">("signals");
+  const [resultView, setResultView] = useState<"signals" | "misses" | "all">("signals");
 
   useEffect(() => {
     try {
@@ -548,6 +582,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     const simulatedRoi = capitalTested ? simulatedPnl * 100 / capitalTested : 0;
     const orderedSignals = [...selected].sort((a, b) => (b.future_peak_multiple ?? 0) - (a.future_peak_multiple ?? 0));
     const orderedMisses = [...misses].sort((a, b) => (b.future_peak_multiple ?? 0) - (a.future_peak_multiple ?? 0));
+    const orderedAll = [...scored].sort((a, b) => Date.parse(b.signal_at) - Date.parse(a.signal_at));
     const bands = [
       selected.filter((token) => (token.future_peak_multiple ?? 0) >= 5).length,
       selected.filter((token) => (token.future_peak_multiple ?? 0) >= 3 && (token.future_peak_multiple ?? 0) < 5).length,
@@ -563,7 +598,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       }).length,
       total: scored.filter((token) => (token.future_peak_multiple ?? 0) >= target).length,
     }));
-    return { selected, hits, misses, falsePositives, graduated, replayable, stopHits, targetExits, openAtEnd, capitalTested, simulatedEndValue, simulatedPnl, simulatedRoi, orderedSignals, orderedMisses, bands, runnerLadder };
+    return { selected, hits, misses, falsePositives, graduated, replayable, stopHits, targetExits, openAtEnd, capitalTested, simulatedEndValue, simulatedPnl, simulatedRoi, orderedSignals, orderedMisses, orderedAll, bands, runnerLadder };
   }, [tokens, settings, exitSettings]);
 
   function choosePreset(name: PresetName) {
@@ -628,7 +663,11 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   }
 
   const hitRate = analysis.selected.length ? analysis.hits.length * 100 / analysis.selected.length : 0;
-  const visibleResults = resultView === "signals" ? analysis.orderedSignals : analysis.orderedMisses;
+  const visibleResults = resultView === "signals"
+    ? analysis.orderedSignals
+    : resultView === "misses"
+      ? analysis.orderedMisses
+      : analysis.orderedAll;
   const entryLabel = activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label;
   const exitLabel = {
     fixed: "Fixed target",
@@ -855,11 +894,12 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
             <div className="labResultTabs">
               <button type="button" className={resultView === "signals" ? "active" : ""} onClick={() => setResultView("signals")}>Would reach Acquired <span>{analysis.selected.length}</span></button>
               <button type="button" className={resultView === "misses" ? "active" : ""} onClick={() => setResultView("misses")}>Rejected runners <span>{analysis.misses.length}</span></button>
+              <button type="button" className={resultView === "all" ? "active" : ""} onClick={() => setResultView("all")}>View all <span>{tokens.length}</span></button>
             </div>
-            <small>Sorted by peak performance</small>
+            <small>{resultView === "all" ? "Newest signals first" : "Sorted by peak performance"}</small>
           </header>
           <div className="labResultList">
-            {visibleResults.length ? visibleResults.slice(0, 40).map((token) => <ResultToken key={token.token_address} token={token} runnerTarget={exitSettings.runnerTarget} />) : (
+            {visibleResults.length ? (resultView === "all" ? visibleResults : visibleResults.slice(0, 40)).map((token) => <ResultToken key={token.token_address} token={token} runnerTarget={exitSettings.runnerTarget} />) : (
               <div className="labNoResults">No tokens match this model.</div>
             )}
           </div>

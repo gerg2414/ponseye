@@ -128,7 +128,7 @@ export default async function RulesPage() {
         <article>
           <span className={`${styles.branchLabel} ${styles.red}`}>Terminal route</span>
           <h2>Any active track → Binned</h2>
-          <p>A token is binned when the creator has sold and price has fallen to 50% or less of its peak. Binned is permanent.</p>
+          <p>A token is binned only after a confirmed creator sale. Price drawdown never bins a token, however large the swing. Binned is permanent.</p>
           <strong>{count(live.counts.binned)} currently binned</strong>
         </article>
       </section>

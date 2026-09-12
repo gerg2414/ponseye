@@ -33,7 +33,7 @@ export async function getRulesLiveData(): Promise<RulesLiveData> {
       acquired: acquired.count ?? 0,
       binned: binned.count ?? 0,
     },
-    ruleVersion: latest.data?.rule_version ?? "pons-momentum-v4",
+    ruleVersion: latest.data?.rule_version === "pons-momentum-v5" ? latest.data.rule_version : "pons-momentum-v5",
     latestTransitionAt: latest.data?.observed_at ?? null,
     recorderEnabled: recorder.data?.enabled === true,
   };
