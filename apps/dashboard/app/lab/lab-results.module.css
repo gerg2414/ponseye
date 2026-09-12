@@ -14,6 +14,20 @@
   color: #ff718c !important;
 }
 
+.reasonHint {
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+  cursor: help;
+  vertical-align: 1px;
+}
+
 .recorded {
   overflow: hidden;
   color: #737987;
@@ -21,4 +35,17 @@
   font-style: normal;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+:global(.labModelDock:has(.labDrawer[open])) {
+  z-index: 50;
+}
+
+:global(.labDrawer[open]) {
+  z-index: 60;
+}
+
+:global(.labDrawer > .labControls),
+:global(.labDrawer > .labStrategyPanel) {
+  z-index: 70;
 }

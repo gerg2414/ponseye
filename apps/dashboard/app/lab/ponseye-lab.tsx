@@ -435,10 +435,8 @@ function formatSignalTime(value: string) {
 function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget: number }) {
   const isRunner = (token.future_peak_multiple ?? 0) >= runnerTarget;
   const recordedState = token.actual_acquired ? "Acquired" : token.actual_binned ? "Binned" : "Surveillance";
-  const rejectionSummary = token.rejectedOn.length
-    ? token.rejectedOn.slice(0, 2).join(" + ")
-    : "insufficient score";
-  const modelStatus = token.selected ? "Would acquire" : `Rejected: ${rejectionSummary}`;
+  const rejectionReasons = token.rejectedOn.join(", ") || "insufficient score";
+  const modelStatus = token.selected ? "Would acquire" : "Rejected";
   const entryQuery = new URLSearchParams({ entry: token.signal_at });
   if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
   return (
@@ -454,9 +452,12 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
       <div><small>Lab score</small><strong>{token.labScore.toFixed(0)}%</strong></div>
       <div><small>Signal market cap</small><strong>{formatMarketCap(token.signal_market_cap_usd)}</strong></div>
       <div><small>Peak after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
-      <div className={token.selected ? resultStyles.accepted : resultStyles.rejected} title={token.selected ? "Passed the current Lab model" : `Rejected on: ${token.rejectedOn.join(", ") || "insufficient score"}`}>
+      <div className={token.selected ? resultStyles.accepted : resultStyles.rejected} title={token.selected ? "Passed the current Lab model" : `Rejected on: ${rejectionReasons}`}>
         <small>Model status</small>
-        <strong>{modelStatus}</strong>
+        <strong>
+          {modelStatus}
+          {!token.selected && <span className={resultStyles.reasonHint} title={`Rejected on: ${rejectionReasons}`} aria-label={`Rejected on: ${rejectionReasons}`}>?</span>}
+        </strong>
         <em className={resultStyles.recorded}>Recorded: {recordedState}</em>
       </div>
       <b>→</b>
