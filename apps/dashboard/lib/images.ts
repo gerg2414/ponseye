@@ -16,6 +16,8 @@ const imageHosts = new Set([
   "nftstorage.link",
   "w3s.link",
   "gateway.lighthouse.storage",
+  "edge.uxento.io",
+  "cdn.corenexis.com",
   "pons-avatar-cdn.carlitolhargraveslra.chatgpt.site",
   "uplift.cash",
 ]);
@@ -39,13 +41,13 @@ export function imageCandidates(value: string | null) {
     const match = url.pathname.match(/^\/ipfs\/(.+)$/);
     if (!match) return [safe];
     const path = match[1];
-    return [
-      safe,
+    return [...new Set([
       `https://w3s.link/ipfs/${path}`,
       `https://nftstorage.link/ipfs/${path}`,
       `https://gateway.pinata.cloud/ipfs/${path}`,
       `https://gateway.lighthouse.storage/ipfs/${path}`,
-    ];
+      safe,
+    ])];
   } catch {
     return [];
   }
