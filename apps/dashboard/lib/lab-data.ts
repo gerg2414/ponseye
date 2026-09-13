@@ -15,6 +15,7 @@ export type LabToken = {
   actual_binned: boolean;
   trade_count: number;
   buys: number;
+  recent_buys_20s: number;
   sells: number;
   unique_traders: number;
   buy_pressure_pct: number | null;
@@ -82,6 +83,7 @@ export function normaliseLabTokens(data: unknown): LabToken[] {
     signal_age_seconds: numberOrNull(token.signal_age_seconds),
     trade_count: Number(token.trade_count ?? 0),
     buys: Number(token.buys ?? 0),
+    recent_buys_20s: Number(token.recent_buys_20s ?? 0),
     sells: Number(token.sells ?? 0),
     unique_traders: Number(token.unique_traders ?? 0),
     buy_pressure_pct: numberOrNull(token.buy_pressure_pct),
@@ -246,6 +248,7 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
       actual_binned: false,
       trade_count: prior?.trade_count ?? 0,
       buys: prior?.buys ?? 0,
+      recent_buys_20s: prior?.recent_buys_20s ?? 0,
       sells: prior?.sells ?? 0,
       unique_traders: prior?.unique_traders ?? 0,
       buy_pressure_pct: prior?.buy_pressure_pct ?? null,

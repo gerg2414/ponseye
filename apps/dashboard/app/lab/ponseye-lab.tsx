@@ -31,12 +31,16 @@ type LabSettings = {
   fastConvictionOverride?: boolean;
   fastRouteEnabled?: boolean;
   fastRules?: Rule[];
+  quietPeakEnabled?: boolean;
+  quietPeakScoreThreshold?: number;
+  quietPeakHoldPct?: number;
+  quietPeakMaxBuys20s?: number;
   rules: Rule[];
 };
 
-type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
+type PresetName = "best" | "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
 type ControlTab = "sighted" | "surveilling" | "acquired" | "rejected" | "exit" | "position";
-type AcquisitionTab = "score" | "fast" | "rejection";
+type AcquisitionTab = "score" | "quiet" | "fast" | "rejection";
 type ResultSort = "newest" | "score" | "peak" | "market-cap";
 type ExitModel = "fixed" | "breakeven" | "initials" | "staggered";
 type TakeProfitLevel = { target: number; sellPct: number };
@@ -87,7 +91,7 @@ const fastTrackRules: Rule[] = [
   { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 60, min: 20, max: 100, step: 5, weight: 0, direction: "min", suffix: "%" },
 ];
 
-const basePresets: Record<PresetName, LabSettings> = {
+const basePresets: Record<Exclude<PresetName, "best">, LabSettings> = {
   balanced: {
     scoreThreshold: 70,
     runnerTarget: 2,
@@ -297,8 +301,8 @@ const basePresets: Record<PresetName, LabSettings> = {
   },
 };
 
-const presets = Object.fromEntries(
-  (Object.entries(basePresets) as Array<[PresetName, LabSettings]>).map(([name, settings]) => [
+const standardPresets = Object.fromEntries(
+  (Object.entries(basePresets) as Array<[Exclude<PresetName, "best">, LabSettings]>).map(([name, settings]) => [
     name,
     {
       ...settings,
@@ -310,9 +314,24 @@ const presets = Object.fromEntries(
       ],
     },
   ]),
-) as Record<PresetName, LabSettings>;
+) as Record<Exclude<PresetName, "best">, LabSettings>;
+
+const presets: Record<PresetName, LabSettings> = {
+  ...standardPresets,
+  best: {
+    ...standardPresets.market3x,
+    quietPeakEnabled: true,
+    quietPeakScoreThreshold: 50,
+    quietPeakHoldPct: 100,
+    quietPeakMaxBuys20s: 2,
+    fastRouteEnabled: false,
+    fastRules: standardPresets.market3x.fastRules?.map((rule) => ({ ...rule })),
+    rules: standardPresets.market3x.rules.map((rule) => ({ ...rule })),
+  },
+};
 
 const presetDetails: Array<{ name: PresetName; label: string; description: string }> = [
+  { name: "best", label: "Strict + Quiet Peak", description: "Tonight's leading entry model from the newest recorded batch" },
   { name: "steady2x", label: "Balanced Evidence", description: "Broader entry rules with a high score requirement" },
   { name: "market3x", label: "Strict Entry", description: "Stronger buyer, holder and momentum requirements" },
   { name: "fast3x", label: "Strict + Fast", description: "Strict scoring plus the all-pass fast qualification" },
@@ -323,21 +342,22 @@ const exitModelDetails: Array<{ name: ExitModel; label: string; description: str
   { name: "fixed", label: "Fixed target", description: "Stop first, then sell everything at target" },
   { name: "breakeven", label: "Break even at 2x", description: "Move the stop to entry after price reaches 2x" },
   { name: "initials", label: "Initials at 2x", description: "Sell half at 2x and leave the rest running" },
-  { name: "staggered", label: "Staggered take profit", description: "Sell one third at each of three selected profit levels" },
+  { name: "staggered", label: "Staggered take profit", description: "Split the position across up to four selected profit levels" },
 ];
 
 const savedModelsKey = "ponseye-lab-saved-models-v1";
-const currentModelKey = "ponseye-lab-current-model-v1";
+const currentModelKey = "ponseye-lab-current-model-v2";
 const savedExitProfilesKey = "ponseye-lab-saved-exits-v1";
-const currentExitProfileKey = "ponseye-lab-current-exit-v2";
+const currentExitProfileKey = "ponseye-lab-current-exit-v3";
 const currentSurveillanceGateKey = "ponseye-lab-surveillance-gate-v1";
 
 const runnerOptions = [1.5, 2, 3, 5, 10, 20, 50, 100];
 const runnerLadderTargets = [2, 5, 10, 20, 50, 100];
 const defaultTakeProfitLevels: TakeProfitLevel[] = [
-  { target: 2, sellPct: 50 },
-  { target: 5, sellPct: 25 },
-  { target: 10, sellPct: 25 },
+  { target: 10, sellPct: 20 },
+  { target: 20, sellPct: 20 },
+  { target: 50, sellPct: 50 },
+  { target: 100, sellPct: 10 },
 ];
 
 function normaliseExitProfile(value: unknown): ExitProfile | null {
@@ -346,7 +366,7 @@ function normaliseExitProfile(value: unknown): ExitProfile | null {
   if (![candidate.runnerTarget, candidate.stopLossPct, candidate.positionSizeUsd].every((number) => typeof number === "number")) return null;
   const storedModel = String(candidate.exitModel);
   const exitModel: ExitModel = storedModel === "nostop" ? "fixed" : ["fixed", "breakeven", "initials", "staggered"].includes(storedModel) ? storedModel as ExitModel : "fixed";
-  const storedLevels = Array.isArray(candidate.takeProfitLevels) ? candidate.takeProfitLevels.slice(0, 3) : [];
+  const storedLevels = Array.isArray(candidate.takeProfitLevels) ? candidate.takeProfitLevels.slice(0, 4) : [];
   const hasLegacyLevels = storedLevels.some((level) => typeof level === "number");
   const levels = hasLegacyLevels ? [] : storedLevels.flatMap((level) => {
     if (level && typeof level === "object") {
@@ -366,7 +386,7 @@ function normaliseExitProfile(value: unknown): ExitProfile | null {
     stopLossPct: candidate.stopLossPct as number,
     stopEnabled: storedModel === "nostop" ? false : candidate.stopEnabled !== false,
     positionSizeUsd: candidate.positionSizeUsd as number,
-    takeProfitLevels: levels.length === 3 && !wasTemporaryStaggeredDefault ? levels : defaultTakeProfitLevels.map((level) => ({ ...level })),
+    takeProfitLevels: levels.length >= 3 && !wasTemporaryStaggeredDefault ? levels : defaultTakeProfitLevels.map((level) => ({ ...level })),
   };
 }
 
@@ -388,6 +408,7 @@ function isLabSettings(value: unknown): value is LabSettings {
     && typeof candidate.creatorGate === "boolean"
     && typeof candidate.concentrationGate === "boolean"
     && typeof candidate.fastRouteEnabled === "boolean"
+    && typeof candidate.quietPeakEnabled === "boolean"
     && Array.isArray(candidate.fastRules)
     && Array.isArray(candidate.rules)
     && candidate.rules.length === presets.balanced.rules.length
@@ -406,6 +427,10 @@ function normaliseLabSettings(value: unknown): LabSettings | null {
   const migrated = {
     ...candidate,
     fastRouteEnabled: typeof candidate.fastRouteEnabled === "boolean" ? candidate.fastRouteEnabled : candidate.fastConvictionOverride === true,
+    quietPeakEnabled: candidate.quietPeakEnabled === true,
+    quietPeakScoreThreshold: typeof candidate.quietPeakScoreThreshold === "number" ? candidate.quietPeakScoreThreshold : 50,
+    quietPeakHoldPct: typeof candidate.quietPeakHoldPct === "number" ? candidate.quietPeakHoldPct : 100,
+    quietPeakMaxBuys20s: typeof candidate.quietPeakMaxBuys20s === "number" ? candidate.quietPeakMaxBuys20s : 2,
     fastRules: Array.isArray(candidate.fastRules) && candidate.fastRules.length
       ? fastTrackRules.map((template) => {
         const saved = candidate.fastRules?.find((rule) => rule?.key === template.key);
@@ -477,10 +502,15 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
       const value = valueFor(token, rule.key);
       return value != null && (rule.direction === "min" ? value >= rule.threshold : value <= rule.threshold);
     });
+  const quietPeakConviction = settings.quietPeakEnabled === true
+    && labScore >= (settings.quietPeakScoreThreshold ?? 50)
+    && token.peak_hold_pct != null
+    && token.peak_hold_pct >= (settings.quietPeakHoldPct ?? 100)
+    && token.recent_buys_20s <= (settings.quietPeakMaxBuys20s ?? 2);
   return {
     ...token,
     labScore,
-    selected: blockedBy.length === 0 && (labScore >= settings.scoreThreshold || fastConviction),
+    selected: blockedBy.length === 0 && (labScore >= settings.scoreThreshold || quietPeakConviction || fastConviction),
     blockedBy,
     rejectedOn: [...new Set([
       ...blockedBy,
@@ -613,13 +643,13 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [appliedSurveillanceGate, setAppliedSurveillanceGate] = useState<SurveillanceGateSettings | null>(null);
   const [isRunningFullFunnel, setIsRunningFullFunnel] = useState(false);
   const [fullFunnelError, setFullFunnelError] = useState("");
-  const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.market3x));
-  const [activePreset, setActivePreset] = useState<PresetName | "custom">("market3x");
+  const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.best));
+  const [activePreset, setActivePreset] = useState<PresetName | "custom">("best");
   const [controlTab, setControlTab] = useState<ControlTab>("acquired");
   const [acquisitionTab, setAcquisitionTab] = useState<AcquisitionTab>("score");
   const [exitSettings, setExitSettings] = useState<ExitProfile>({
-    exitModel: "fixed",
-    runnerTarget: 3,
+    exitModel: "staggered",
+    runnerTarget: 100,
     stopLossPct: 10,
     stopEnabled: false,
     positionSizeUsd: 25,
@@ -962,6 +992,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <div className={controlTab === "acquired" ? "active group" : "group"}>
             <button type="button" onClick={() => { setControlTab("acquired"); setAcquisitionTab("score"); }}><small>03</small><span>Acquired</span></button>
             <button type="button" className={controlTab === "acquired" && acquisitionTab === "score" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("score"); }}>Score rules</button>
+            <button type="button" className={controlTab === "acquired" && acquisitionTab === "quiet" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("quiet"); }}>Quiet Peak</button>
             <button type="button" className={controlTab === "acquired" && acquisitionTab === "fast" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("fast"); }}>Fast qualification</button>
             <button type="button" className={controlTab === "acquired" && acquisitionTab === "rejection" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("rejection"); }}>Hard rejection</button>
           </div>
@@ -974,7 +1005,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
         {controlTab === "acquired" && (<>
         <header>
           <div><small>Entry model</small><h2>{activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label}</h2></div>
-          <button type="button" onClick={() => choosePreset("market3x")}>Reset</button>
+          <button type="button" onClick={() => choosePreset("best")}>Reset</button>
         </header>
 
         <section className="labEntryModelBar">
@@ -1064,7 +1095,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           <>
             <section className="labStageIntro">
               <div><small>Column 3</small><strong>Surveilling → Acquired</strong></div>
-              <span>Pass score or fast qualification, then pass hard rejection rules.</span>
+              <span>Pass score, Quiet Peak or fast qualification, then pass hard rejection rules.</span>
             </section>
           </>
         )}
@@ -1117,9 +1148,23 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </>
         )}
 
+        {controlTab === "acquired" && acquisitionTab === "quiet" && (
+          <section className="labStagePanel">
+            <header><div><small>Secondary qualification</small><strong>Quiet Peak</strong></div><span>All must pass</span></header>
+            <p>Give a second chance to tokens rejected by the main score when price is holding its peak and buying has paused.</p>
+            <label className="labSurveillanceCreatorGate"><span><b>Quiet Peak route</b><small>Use the tested secondary entry route</small></span><input type="checkbox" checked={settings.quietPeakEnabled === true} onChange={(event) => { setSettings({ ...settings, quietPeakEnabled: event.target.checked }); setActivePreset("custom"); }} /></label>
+            <div className="labStageRuleList">
+              <article><span>Minimum evidence score</span><strong>{settings.quietPeakScoreThreshold ?? 50}%</strong></article>
+              <article><span>Peak retained</span><strong>{settings.quietPeakHoldPct ?? 100}%</strong></article>
+              <article><span>Buys in final 20 seconds</span><strong>{settings.quietPeakMaxBuys20s ?? 2} or fewer</strong></article>
+            </div>
+            <small className="labStageNote">Creator sale and holder concentration hard rejections still apply.</small>
+          </section>
+        )}
+
         {controlTab === "acquired" && acquisitionTab === "rejection" && (
           <section className="labSafety">
-            <div><small>Hard rejection rules</small><strong>Overrides both qualifications</strong></div>
+            <div><small>Hard rejection rules</small><strong>Overrides every qualification</strong></div>
             <p>A token cannot be acquired when one of these enabled rules fails.</p>
             <label><span><b>No creator sales</b><small>Reject any creator sell before signal</small></span><input type="checkbox" checked={settings.creatorGate} onChange={(event) => { setSettings({ ...settings, creatorGate: event.target.checked }); setActivePreset("custom"); }} /></label>
             <label><span><b>Holder concentration</b><small>Reject above the Top 10 rule limit</small></span><input type="checkbox" checked={settings.concentrationGate} onChange={(event) => { setSettings({ ...settings, concentrationGate: event.target.checked }); setActivePreset("custom"); }} /></label>
