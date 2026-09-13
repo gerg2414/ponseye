@@ -29,11 +29,13 @@ type LabSettings = {
   creatorGate: boolean;
   concentrationGate: boolean;
   fastConvictionOverride?: boolean;
+  fastRouteEnabled?: boolean;
+  fastRules?: Rule[];
   rules: Rule[];
 };
 
 type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
-type ControlTab = "models" | "rules" | "gates";
+type ControlTab = "normal" | "fast" | "safety";
 type ResultSort = "newest" | "score" | "peak" | "market-cap";
 type ExitModel = "fixed" | "breakeven" | "initials" | "staggered";
 type TakeProfitLevel = { target: number; sellPct: number };
@@ -60,6 +62,28 @@ type ScoredToken = LabToken & {
 const additionalRules: Rule[] = [
   { key: "signal_market_cap_usd", label: "Signal market cap", short: "market cap", threshold: 5000, min: 1000, max: 30000, step: 500, weight: 0, direction: "min", suffix: "$" },
   { key: "early_buyer_share_pct", label: "Early buyer share", short: "early share", threshold: 50, min: 10, max: 100, step: 5, weight: 0, direction: "min", suffix: "%" },
+];
+
+const ruleDescriptions: Record<RuleKey, string> = {
+  trade_count: "All buy and sell trades recorded by the signal",
+  unique_traders: "Different wallets that had traded by the signal",
+  buy_pressure_pct: "Buy trades as a percentage of all trades",
+  first_minute_buyers: "Different wallets that bought within 60 seconds of launch",
+  momentum_multiple: "Signal price divided by the token's first recorded price",
+  peak_hold_pct: "How much of the pre-signal peak price was still held",
+  top_10_holder_pct: "Percentage of supply held by the ten largest holders",
+  signal_market_cap_usd: "USD market cap when the signal was recorded",
+  early_buyer_share_pct: "First minute buyers as a percentage of all unique traders",
+};
+
+const fastTrackRules: Rule[] = [
+  { key: "signal_market_cap_usd", label: "Signal market cap", short: "market cap", threshold: 30000, min: 5000, max: 100000, step: 5000, weight: 0, direction: "min", suffix: "$" },
+  { key: "trade_count", label: "Trade depth", short: "trades", threshold: 50, min: 10, max: 100, step: 5, weight: 0, direction: "min", suffix: "" },
+  { key: "unique_traders", label: "Trader spread", short: "traders", threshold: 15, min: 5, max: 50, step: 1, weight: 0, direction: "min", suffix: "" },
+  { key: "buy_pressure_pct", label: "Buy pressure", short: "buy pressure", threshold: 58, min: 40, max: 90, step: 1, weight: 0, direction: "min", suffix: "%" },
+  { key: "first_minute_buyers", label: "Early buyers", short: "early buyers", threshold: 3, min: 1, max: 20, step: 1, weight: 0, direction: "min", suffix: "" },
+  { key: "momentum_multiple", label: "Launch momentum", short: "momentum", threshold: 1.2, min: 0.5, max: 3, step: 0.05, weight: 0, direction: "min", suffix: "x" },
+  { key: "peak_hold_pct", label: "Peak retained", short: "peak retained", threshold: 60, min: 20, max: 100, step: 5, weight: 0, direction: "min", suffix: "%" },
 ];
 
 const basePresets: Record<PresetName, LabSettings> = {
@@ -277,6 +301,8 @@ const presets = Object.fromEntries(
     name,
     {
       ...settings,
+      fastRouteEnabled: settings.fastConvictionOverride === true,
+      fastRules: fastTrackRules.map((rule) => ({ ...rule })),
       rules: [
         ...settings.rules,
         ...additionalRules.map((rule) => name === "market3x" || name === "fast3x" ? { ...rule, weight: 25 } : { ...rule }),
@@ -343,7 +369,11 @@ function normaliseExitProfile(value: unknown): ExitProfile | null {
 }
 
 function cloneSettings(settings: LabSettings): LabSettings {
-  return { ...settings, rules: settings.rules.map((rule) => ({ ...rule })) };
+  return {
+    ...settings,
+    fastRules: (settings.fastRules ?? fastTrackRules).map((rule) => ({ ...rule })),
+    rules: settings.rules.map((rule) => ({ ...rule })),
+  };
 }
 
 function isLabSettings(value: unknown): value is LabSettings {
@@ -355,6 +385,8 @@ function isLabSettings(value: unknown): value is LabSettings {
     && typeof candidate.stopLossPct === "number"
     && typeof candidate.creatorGate === "boolean"
     && typeof candidate.concentrationGate === "boolean"
+    && typeof candidate.fastRouteEnabled === "boolean"
+    && Array.isArray(candidate.fastRules)
     && Array.isArray(candidate.rules)
     && candidate.rules.length === presets.balanced.rules.length
     && candidate.rules.every((rule) => rule && typeof rule.threshold === "number" && typeof rule.weight === "number");
@@ -371,6 +403,13 @@ function normaliseLabSettings(value: unknown): LabSettings | null {
   });
   const migrated = {
     ...candidate,
+    fastRouteEnabled: typeof candidate.fastRouteEnabled === "boolean" ? candidate.fastRouteEnabled : candidate.fastConvictionOverride === true,
+    fastRules: Array.isArray(candidate.fastRules) && candidate.fastRules.length
+      ? fastTrackRules.map((template) => {
+        const saved = candidate.fastRules?.find((rule) => rule?.key === template.key);
+        return saved && typeof saved.threshold === "number" ? { ...template, threshold: saved.threshold } : { ...template };
+      })
+      : fastTrackRules.map((rule) => ({ ...rule })),
     positionSizeUsd: typeof candidate.positionSizeUsd === "number" ? candidate.positionSizeUsd : 25,
     stopLossPct: typeof candidate.stopLossPct === "number" ? candidate.stopLossPct : 50,
     rules,
@@ -431,17 +470,11 @@ function scoreToken(token: LabToken, settings: LabSettings): ScoredToken {
   }
 
   const labScore = availableWeight > 0 ? (passedWeight / availableWeight) * 100 : 0;
-  const fastConviction = settings.fastConvictionOverride === true
-    && token.signal_age_seconds != null
-    && token.signal_age_seconds <= 3
-    && token.trade_count >= 12
-    && token.unique_traders >= 10
-    && (token.buy_pressure_pct ?? 0) >= 80
-    && token.first_minute_buyers >= 8
-    && (token.momentum_multiple ?? 0) >= 2
-    && (token.peak_hold_pct ?? 0) >= 65
-    && (token.signal_market_cap_usd ?? 0) >= 10_000
-    && token.first_minute_buyers * 100 / Math.max(1, token.unique_traders) >= 75;
+  const fastConviction = settings.fastRouteEnabled === true
+    && (settings.fastRules ?? fastTrackRules).every((rule) => {
+      const value = valueFor(token, rule.key);
+      return value != null && (rule.direction === "min" ? value >= rule.threshold : value <= rule.threshold);
+    });
   return {
     ...token,
     labScore,
@@ -507,6 +540,9 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
   const recordedState = token.actual_acquired ? "Acquired" : token.actual_binned ? "Binned" : "Surveillance";
   const rejectionReasons = token.rejectedOn.join(" ") || "Insufficient score.";
   const modelStatus = token.selected ? "Would acquire" : "Rejected";
+  const peakMarketCap = token.signal_market_cap_usd != null && token.future_peak_multiple != null
+    ? token.signal_market_cap_usd * token.future_peak_multiple
+    : null;
   const entryQuery = new URLSearchParams({ entry: token.signal_at });
   if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
 
@@ -533,7 +569,8 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
         </div>
         <div><small>Lab score</small><strong>{token.labScore.toFixed(0)}%</strong></div>
         <div><small>Signal market cap</small><strong>{formatMarketCap(token.signal_market_cap_usd)}</strong></div>
-        <div><small>Peak after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
+        <div><small>Peak MC</small><strong>{formatMarketCap(peakMarketCap)}</strong></div>
+        <div><small>Gains after signal</small><strong className={isRunner ? "labRunnerValue" : ""}>{formatMultiple(token.future_peak_multiple)}</strong></div>
         <div className={token.selected ? resultStyles.accepted : resultStyles.rejected}>
           <small>Model status</small>
           <strong>
@@ -571,7 +608,7 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
 export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.market3x));
   const [activePreset, setActivePreset] = useState<PresetName | "custom">("market3x");
-  const [controlTab, setControlTab] = useState<ControlTab>("models");
+  const [controlTab, setControlTab] = useState<ControlTab>("normal");
   const [exitSettings, setExitSettings] = useState<ExitProfile>({
     exitModel: "fixed",
     runnerTarget: 3,
@@ -820,6 +857,14 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     setActivePreset("custom");
   }
 
+  function updateFastRule(index: number, value: number) {
+    setSettings((current) => ({
+      ...current,
+      fastRules: (current.fastRules ?? fastTrackRules).map((rule, ruleIndex) => ruleIndex === index ? { ...rule, threshold: value } : rule),
+    }));
+    setActivePreset("custom");
+  }
+
   const hitRate = analysis.selected.length ? analysis.hits.length * 100 / analysis.selected.length : 0;
   const resultPool = resultView === "signals"
     ? analysis.orderedSignals
@@ -857,65 +902,66 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </summary>
           <aside className="labControls">
         <header>
-          <div><small>Signal model</small><h2>{activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label}</h2></div>
+          <div><small>Entry model</small><h2>{activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label}</h2></div>
           <button type="button" onClick={() => choosePreset("market3x")}>Reset</button>
         </header>
 
+        <section className="labEntryModelBar">
+          <label className={resultStyles.modelSelect}>
+            <span>Load entry model</span>
+            <select aria-label="Entry model" value={activePreset} onChange={(event) => event.target.value !== "custom" && choosePreset(event.target.value as PresetName)}>
+              {activePreset === "custom" && <option value="custom">Custom setup</option>}
+              {presetDetails.map((preset) => <option key={preset.name} value={preset.name}>{preset.label}</option>)}
+            </select>
+            <small>{activePreset === "custom" ? "Your adjusted entry tracks" : presetDetails.find((preset) => preset.name === activePreset)?.description}</small>
+          </label>
+
+          <details className="labSavedModels labSavedCollapse">
+            <summary>Saved setups <span>{savedModels.length}</span></summary>
+            <form onSubmit={(event) => { event.preventDefault(); saveModel(); }}>
+              <input aria-label="Setup name" placeholder={`My setup ${savedModels.length + 1}`} value={modelName} onChange={(event) => setModelName(event.target.value)} />
+              <button type="submit">Save current</button>
+            </form>
+            {savedModels.length ? (
+              <div className="labSavedList">
+                {savedModels.map((model) => (
+                  <article key={model.name}>
+                    <button type="button" onClick={() => loadModel(model)}><strong>{model.name}</strong><small>{model.settings.scoreThreshold}% score to acquire</small></button>
+                    <button type="button" aria-label={`Delete ${model.name}`} onClick={() => deleteModel(model.name)}>×</button>
+                  </article>
+                ))}
+              </div>
+            ) : <p>No saved setups yet.</p>}
+          </details>
+        </section>
+
+        <div className="labEntryPath" aria-label="Entry funnel">
+          <span><small>Lab starts</small><strong>Surveillance</strong></span><b>→</b>
+          <span><small>Pass either</small><strong>Normal or fast</strong></span><b>→</b>
+          <span><small>Paper buy</small><strong>Acquired</strong></span>
+        </div>
+
         <nav className="labControlTabs" aria-label="Lab controls">
-          {(["models", "rules", "gates"] as const).map((tab) => (
-            <button key={tab} type="button" className={controlTab === tab ? "active" : ""} onClick={() => setControlTab(tab)}>{tab}</button>
-          ))}
+          <button type="button" className={controlTab === "normal" ? "active" : ""} onClick={() => setControlTab("normal")}>Normal route</button>
+          <button type="button" className={controlTab === "fast" ? "active" : ""} onClick={() => setControlTab("fast")}>Fast route</button>
+          <button type="button" className={controlTab === "safety" ? "active" : ""} onClick={() => setControlTab("safety")}>Safety</button>
         </nav>
 
-        {controlTab === "models" && (
-          <section className="labModelsPanel">
-            <label className={resultStyles.modelSelect}>
-              <span>Entry model</span>
-              <select
-                aria-label="Entry model"
-                value={activePreset}
-                onChange={(event) => event.target.value !== "custom" && choosePreset(event.target.value as PresetName)}
-              >
-                {activePreset === "custom" && <option value="custom">Custom setup</option>}
-                {presetDetails.map((preset) => <option key={preset.name} value={preset.name}>{preset.label}</option>)}
-              </select>
-              <small>{activePreset === "custom" ? "Your adjusted entry rules" : presetDetails.find((preset) => preset.name === activePreset)?.description}</small>
-            </label>
-
-            <div className="labSavedModels">
-              <header><div><small>Saved setups</small><strong>This browser</strong></div></header>
-              <form onSubmit={(event) => { event.preventDefault(); saveModel(); }}>
-                <input aria-label="Setup name" placeholder={`My setup ${savedModels.length + 1}`} value={modelName} onChange={(event) => setModelName(event.target.value)} />
-                <button type="submit">Save current</button>
-              </form>
-              {savedModels.length ? (
-                <div className="labSavedList">
-                  {savedModels.map((model) => (
-                    <article key={model.name}>
-                      <button type="button" onClick={() => loadModel(model)}><strong>{model.name}</strong><small>{model.settings.scoreThreshold}% score to acquire</small></button>
-                      <button type="button" aria-label={`Delete ${model.name}`} onClick={() => deleteModel(model.name)}>×</button>
-                    </article>
-                  ))}
-                </div>
-              ) : <p>No saved setups yet.</p>}
-            </div>
-          </section>
-        )}
-
-        {controlTab === "rules" && (
+        {controlTab === "normal" && (
           <>
             <section className="labPrimaryControl">
-              <label htmlFor="scoreThreshold"><span>Score to acquire</span><strong>{settings.scoreThreshold}%</strong></label>
+              <label htmlFor="scoreThreshold"><span>Normal route score required</span><strong>{settings.scoreThreshold}%</strong></label>
               <input id="scoreThreshold" type="range" min="30" max="100" step="5" value={settings.scoreThreshold} onChange={(event) => { setSettings({ ...settings, scoreThreshold: Number(event.target.value) }); setActivePreset("custom"); }} />
             </section>
 
+            <section className="labRulesHelp"><strong>Normal route</strong><span>Each passing rule adds to the score. Pass mark is what the token must achieve. Importance controls how much the rule counts.</span></section>
             <div className="labRuleHeading"><span>Rule</span><span>Pass mark</span><span>Weight</span></div>
             <div className="labRules">
               {settings.rules.map((rule, index) => (
                 <section className="labRule" key={rule.key}>
-                  <div className="labRuleTitle"><strong>{rule.label}</strong><span>{rule.direction === "min" ? "Minimum" : "Maximum"}</span></div>
-                  <label>
-                    <span>{formatMetric(rule.threshold, rule.suffix)}</span>
+                  <div className="labRuleTitle"><strong>{rule.label}</strong><span>{ruleDescriptions[rule.key]}</span><small>{rule.direction === "min" ? "Minimum required" : "Maximum allowed"}</small></div>
+                  <label className="labRuleValue">
+                    <span>{rule.suffix === "$" ? "$" : ""}<input aria-label={`${rule.label} exact pass mark`} type="number" min={rule.min} max={rule.max} step={rule.step} value={rule.threshold} onChange={(event) => updateRule(index, "threshold", Math.max(rule.min, Math.min(rule.max, Number(event.target.value) || rule.min)))} />{rule.suffix === "$" ? "" : rule.suffix}</span>
                     <input aria-label={`${rule.label} pass mark`} type="range" min={rule.min} max={rule.max} step={rule.step} value={rule.threshold} onChange={(event) => updateRule(index, "threshold", Number(event.target.value))} />
                   </label>
                   <label>
@@ -928,7 +974,28 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </>
         )}
 
-        {controlTab === "gates" && (
+        {controlTab === "fast" && (
+          <>
+            <section className="labTrackSwitch">
+              <span><strong>Fast acquisition route</strong><small>Acquire when every fast rule passes, even if the normal score does not.</small></span>
+              <label><input type="checkbox" checked={settings.fastRouteEnabled === true} onChange={(event) => { setSettings({ ...settings, fastRouteEnabled: event.target.checked }); setActivePreset("custom"); }} /><i /></label>
+            </section>
+            <div className="labRuleHeading labFastHeading"><span>All rules required</span><span>Pass mark</span></div>
+            <div className={`labRules labFastRules ${settings.fastRouteEnabled ? "" : "disabled"}`}>
+              {(settings.fastRules ?? fastTrackRules).map((rule, index) => (
+                <section className="labRule" key={rule.key}>
+                  <div className="labRuleTitle"><strong>{rule.label}</strong><span>{ruleDescriptions[rule.key]}</span><small>{rule.direction === "min" ? "Minimum required" : "Maximum allowed"}</small></div>
+                  <label className="labRuleValue">
+                    <span>{rule.suffix === "$" ? "$" : ""}<input aria-label={`Fast route ${rule.label} pass mark`} type="number" min={rule.min} max={rule.max} step={rule.step} value={rule.threshold} disabled={!settings.fastRouteEnabled} onChange={(event) => updateFastRule(index, Math.max(rule.min, Math.min(rule.max, Number(event.target.value) || rule.min)))} />{rule.suffix === "$" ? "" : rule.suffix}</span>
+                    <input aria-label={`Fast route ${rule.label} slider`} type="range" min={rule.min} max={rule.max} step={rule.step} value={rule.threshold} disabled={!settings.fastRouteEnabled} onChange={(event) => updateFastRule(index, Number(event.target.value))} />
+                  </label>
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+
+        {controlTab === "safety" && (
           <section className="labSafety">
             <div><small>Safety gates</small><strong>Automatic rejection</strong></div>
             <p>Gates reject a token before its weighted score is considered.</p>
@@ -1030,11 +1097,9 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
       <section className="labOutput">
         <div className="labSummaryGrid">
           <article className="primary"><small>Would reach Acquired</small><strong>{analysis.selected.length}</strong><span>from {tokens.length} Surveillance tokens</span></article>
-          <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>{analysis.hits.length} reached {exitSettings.runnerTarget}x</span></article>
+          <article className={`simulatedResult ${analysis.simulatedPnl >= 0 ? "positive" : "negative"}`}><small>P&amp;L</small><strong>{analysis.simulatedPnl >= 0 ? "+" : "−"}{formatUsd(Math.abs(analysis.simulatedPnl))}</strong><span>{formatUsd(analysis.capitalTested)} in · {formatUsd(analysis.simulatedEndValue)} returned</span></article>
           <article className={analysis.simulatedRoi >= 0 ? "positive" : "negative"}><small>ROI</small><strong>{analysis.simulatedRoi >= 0 ? "+" : ""}{analysis.simulatedRoi.toFixed(1)}%</strong><span>on {formatUsd(analysis.capitalTested)} tested</span></article>
-          <article><small>Under 1.2x</small><strong>{analysis.falsePositives.length}</strong><span>selected but stalled</span></article>
-          <article><small>Migrated</small><strong>{analysis.graduated.length}</strong><span>selected signals</span></article>
-          <article className={`simulatedResult ${analysis.simulatedPnl >= 0 ? "positive" : "negative"}`}><small>Simulated result</small><strong>{formatUsd(analysis.simulatedEndValue)}</strong><span>{formatUsd(analysis.capitalTested)} out {analysis.simulatedPnl >= 0 ? "+" : "−"} {formatUsd(Math.abs(analysis.simulatedPnl))} {analysis.simulatedPnl >= 0 ? "profit" : "loss"} = {formatUsd(analysis.simulatedEndValue)} returned</span></article>
+          <article><small>Hit rate</small><strong>{hitRate.toFixed(1)}%</strong><span>{analysis.hits.length} reached {exitSettings.runnerTarget}x</span></article>
         </div>
 
         <details className="labMoreAnalysis">
