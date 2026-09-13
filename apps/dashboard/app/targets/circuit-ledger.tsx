@@ -23,6 +23,10 @@ function multiple(value: number | null) {
   return value == null || !Number.isFinite(value) ? "Pending" : `${value.toFixed(value >= 10 ? 1 : 2)}x`;
 }
 
+function money(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+}
+
 export function CircuitLedger({ items }: { items: CircuitItem[] }) {
   const [view, setView] = useState<View>("all");
   const counts = useMemo(() => ({
@@ -53,14 +57,18 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
       </nav>
 
       <div className="circuitTableHead" aria-hidden="true">
-        <span>Target</span><span>Acquired</span><span>Entry MC</span><span>Exit MC</span><span>P&amp;L</span><span>Result</span>
+        <span>Target</span><span>Acquired</span><span>Entry MC</span><span>Position value</span><span>P&amp;L</span><span>Result</span>
       </div>
       <div className="circuitRows">
         {visible.length ? visible.map(({ token, outcome, pnlUsd }) => {
           const resultMultiple = outcome.closed ? outcome.exitMultiple : token.final_multiple;
-          const exitMarketCap = outcome.closed
-            ? token.exit_market_cap_usd ?? (token.signal_market_cap_usd ? token.signal_market_cap_usd * outcome.exitMultiple : null)
-            : null;
+          const sizeUsd = token.position_size_usd ?? 25;
+          const positionValueUsd = sizeUsd * outcome.exitMultiple;
+          const realisedValueUsd = sizeUsd * (token.realised_return_multiple ?? (outcome.closed ? outcome.exitMultiple : 0));
+          const unrealisedValueUsd = Math.max(0, positionValueUsd - realisedValueUsd);
+          const remainingPct = token.remaining_pct ?? (outcome.closed ? 0 : 100);
+          const soldPct = 100 - remainingPct;
+          const stageMultiple = token.hit_100x_at ? 100 : token.hit_50x_at ? 50 : token.hit_20x_at ? 20 : token.hit_10x_at ? 10 : null;
           const href = `/launch/${token.token_address}?from=targets&entry=${encodeURIComponent(token.signal_at)}&entryMc=${token.signal_market_cap_usd ?? ""}`;
           return (
             <Link className="circuitRow" href={href} key={token.token_address}>
@@ -70,9 +78,9 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
               </div>
               <time>{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(token.signal_at))}</time>
               <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
-              <strong>{outcome.closed ? compactMoney(exitMarketCap) : "Open"}</strong>
-              <strong className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}>{pnlUsd >= 0 ? "+" : ""}{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(pnlUsd)}</strong>
-              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}><b>{multiple(resultMultiple)}</b><small>{outcome.label}</small></span>
+              <span className="circuitValue"><strong>{money(positionValueUsd)}</strong><small>{outcome.closed ? "Returned" : `${money(realisedValueUsd)} realised · ${money(unrealisedValueUsd)} live`}</small></span>
+              <span className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}><strong>{pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong><small>{outcome.closed ? "Realised" : "Includes unrealised"}</small></span>
+              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}><b>{multiple(resultMultiple)}</b><small>{stageMultiple ? `${soldPct}% sold at ${stageMultiple}x · ${remainingPct}% ${outcome.closed ? "closed" : "live"}` : outcome.label}</small></span>
             </Link>
           );
         }) : <div className="circuitEmpty">No positions match this view yet.</div>}
