@@ -7,11 +7,15 @@ import {
   LineStyle,
   PriceScaleMode,
   createChart,
+  createSeriesMarkers,
   createTextWatermark,
   type CandlestickData,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +28,18 @@ const INTERVALS = [
   { label: "15m", value: 15 * 60_000 },
   { label: "1h", value: 60 * 60_000 },
 ] as const;
+
+export type StageExit = {
+  at: string | null;
+  multiple: number;
+  soldPct: number;
+};
+
+function nearestCandle(candles: CandlestickData<UTCTimestamp>[], value: string | null) {
+  if (!value || !candles.length) return null;
+  const target = new Date(value).getTime() / 1_000;
+  return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
+}
 
 function buildCandles(seedCandles: ChartCandle[], trades: MarketTrade[], interval: number) {
   const buckets = new Map<number, CandlestickData<UTCTimestamp>>();
@@ -82,7 +98,7 @@ function mergeTrades(current: MarketTrade[], incoming: MarketTrade[]) {
     .slice(-2_500);
 }
 
-export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondPriceUsd, acquiredAt, closedAt, entryMarketCap }: {
+export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondPriceUsd, acquiredAt, closedAt, entryMarketCap, stageExits }: {
   trades: MarketTrade[];
   candles: ChartCandle[];
   tokenAddress: string;
@@ -91,12 +107,14 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
   acquiredAt: string | null;
   closedAt: string | null;
   entryMarketCap: number | null;
+  stageExits: StageExit[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const entryMarkerRef = useRef<HTMLDivElement>(null);
   const exitMarkerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const stageMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const bondLineRef = useRef<IPriceLine | null>(null);
   const entryLineRef = useRef<IPriceLine | null>(null);
   const fittedIntervalRef = useRef<number | null>(null);
@@ -105,13 +123,19 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
   const [liveTrades, setLiveTrades] = useState(trades);
   const [interval, setInterval] = useState(60_000);
   const candles = useMemo(() => buildCandles(seedCandles, liveTrades, interval), [interval, liveTrades, seedCandles]);
-  const nearestCandle = (value: string | null) => {
-    if (!value || !candles.length) return null;
-    const target = new Date(value).getTime() / 1_000;
-    return candles.reduce((closest, candle) => Math.abs(Number(candle.time) - target) < Math.abs(Number(closest.time) - target) ? candle : closest);
-  };
-  const entryCandle = useMemo(() => nearestCandle(acquiredAt), [acquiredAt, candles]);
-  const exitCandle = useMemo(() => nearestCandle(closedAt), [candles, closedAt]);
+  const entryCandle = useMemo(() => nearestCandle(candles, acquiredAt), [acquiredAt, candles]);
+  const exitCandle = useMemo(() => nearestCandle(candles, closedAt), [candles, closedAt]);
+  const stageMarkers = useMemo(() => stageExits.flatMap((exit) => {
+    const candle = nearestCandle(candles, exit.at);
+    if (!candle) return [];
+    return [{
+      time: candle.time,
+      position: "aboveBar" as const,
+      color: "#ff718c",
+      shape: "arrowDown" as const,
+      text: `SELL ${exit.soldPct}% · ${exit.multiple}X`,
+    } satisfies SeriesMarker<Time>];
+  }), [candles, stageExits]);
 
   useEffect(() => {
     setLiveTrades((current) => mergeTrades(current, trades));
@@ -222,11 +246,13 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
 
     chartRef.current = chart;
     seriesRef.current = series;
+    stageMarkersRef.current = createSeriesMarkers(series, [], { zOrder: "top" });
 
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      stageMarkersRef.current = null;
     };
   }, []);
 
@@ -245,6 +271,10 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
       fittedIntervalRef.current = interval;
     }
   }, [candles, interval]);
+
+  useEffect(() => {
+    stageMarkersRef.current?.setMarkers(stageMarkers);
+  }, [stageMarkers]);
 
   useEffect(() => {
     const chart = chartRef.current;
