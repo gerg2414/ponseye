@@ -84,7 +84,7 @@ export default async function DatabasePage({
 
   return (
     <main className="databasePage">
-      <AutoRefresh intervalMs={3_000} />
+      <AutoRefresh intervalMs={15_000} />
       <LabHeader current="database" />
 
       <RecorderControl enabled={recorder.enabled} feeds={recorder.feeds} />
