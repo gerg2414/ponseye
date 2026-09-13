@@ -80,7 +80,10 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
               <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
               <span className="circuitValue"><strong>{money(positionValueUsd)}</strong><small>{outcome.closed ? "Returned" : `${money(realisedValueUsd)} realised · ${money(unrealisedValueUsd)} live`}</small></span>
               <span className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}><strong>{pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong><small>{outcome.closed ? "Realised" : "Includes unrealised"}</small></span>
-              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}><b>{multiple(resultMultiple)}</b><small>{stageMultiple ? `${soldPct}% sold at ${stageMultiple}x · ${remainingPct}% ${outcome.closed ? "closed" : "live"}` : outcome.label}</small></span>
+              <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}>
+                <b>{multiple(resultMultiple)}</b>
+                <small>{stageMultiple ? <><span className="circuitOutcomeDesktop">{soldPct}% sold at {stageMultiple}x · {remainingPct}% {outcome.closed ? "closed" : "live"}</span><span className="circuitOutcomeMobile">{soldPct}%@{stageMultiple}x · {remainingPct}% {outcome.closed ? "closed" : "live"}</span></> : outcome.label}</small>
+              </span>
             </Link>
           );
         }) : <div className="circuitEmpty">No positions match this view yet.</div>}
