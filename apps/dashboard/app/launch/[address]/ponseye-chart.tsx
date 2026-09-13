@@ -133,7 +133,7 @@ export function PonsEyeChart({ trades, candles: seedCandles, tokenAddress, bondP
       position: "aboveBar" as const,
       color: "#ff718c",
       shape: "arrowDown" as const,
-      text: `SELL ${exit.soldPct}% · ${exit.multiple}X`,
+      text: `${exit.soldPct}% @ ${exit.multiple}X`,
     } satisfies SeriesMarker<Time>];
   }), [candles, stageExits]);
 
