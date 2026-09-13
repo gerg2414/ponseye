@@ -315,7 +315,7 @@ async function loadDashboardData() {
 
 const getCachedDashboardData = unstable_cache(
   loadDashboardData,
-  ["dashboard-home-v2"],
+  ["dashboard-home-v3"],
   { revalidate: 5 },
 );
 
