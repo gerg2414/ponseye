@@ -27,6 +27,18 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
 
+function acquiredDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/London",
+  }).format(new Date(value));
+}
+
 export function CircuitLedger({ items }: { items: CircuitItem[] }) {
   const [view, setView] = useState<View>("all");
   const counts = useMemo(() => ({
@@ -75,9 +87,13 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
             <Link className="circuitRow" href={href} key={token.token_address}>
               <div className="circuitToken">
                 <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={48} />
-                <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small></span>
+                <span>
+                  <strong>{token.name ?? "Metadata pending"}</strong>
+                  <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small>
+                  <small className="circuitAcquiredMobile">Acquired {acquiredDate(token.signal_at)}</small>
+                </span>
               </div>
-              <time>{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(token.signal_at))}</time>
+              <time dateTime={token.signal_at}>{acquiredDate(token.signal_at)}</time>
               <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
               <span className="circuitValue"><strong>{money(positionValueUsd)}</strong><small>{outcome.closed ? "Returned" : `${money(realisedValueUsd)} realised · ${money(unrealisedValueUsd)} live`}</small></span>
               <span className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}><strong>{pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong><small>{outcome.closed ? "Realised" : "Includes unrealised"}</small></span>
