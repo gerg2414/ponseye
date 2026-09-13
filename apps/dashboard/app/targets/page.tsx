@@ -210,7 +210,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       <section className="equityPanel">
         <header className="equityPanelHead">
           <div className="equityRunningTotal">
-            <span>Running total</span>
+            <span>Running total · realised plus live value</span>
             <strong>{money(balance)}</strong>
             <small className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</small>
           </div>
@@ -221,7 +221,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       </section>
 
       <section className="circuitStats">
-        <article><span>Net return</span><strong className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</strong><small>{roi.toFixed(1)}% on capital deployed</small></article>
+        <article><span>Net return</span><strong className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</strong><small>{roi.toFixed(1)}% including open positions</small></article>
         <article><span>Acquired</span><strong>{tokens.length}</strong><small>{money(capitalDeployed)} deployed</small></article>
         <article><span>Profitable positions</span><strong>{tokens.length ? ((winners / tokens.length) * 100).toFixed(1) : "0.0"}%</strong><small>{winners} currently profitable</small></article>
         <article><span>2x+ runners</span><strong>{runners.length}</strong><small>{tokens.length ? ((runners.length / tokens.length) * 100).toFixed(1) : "0.0"}% of acquired</small></article>
