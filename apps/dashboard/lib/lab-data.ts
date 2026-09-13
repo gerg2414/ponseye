@@ -102,7 +102,7 @@ async function loadPonsEyeLabData(): Promise<LabToken[]> {
 
 const getCachedPonsEyeLabData = unstable_cache(
   loadPonsEyeLabData,
-  ["ponseye-lab-dataset-v5"],
+  ["ponseye-lab-dataset-v6"],
   { revalidate: 600 },
 );
 
