@@ -19,7 +19,6 @@ const sorts: Array<{ value: DatabaseSort; label: string }> = [
   { value: "newest", label: "Newest collected" },
   { value: "peak", label: "Highest peak MC" },
   { value: "current", label: "Highest current MC" },
-  { value: "multiple", label: "Highest peak multiple" },
   { value: "trades", label: "Most trades" },
   { value: "volume", label: "Highest volume" },
 ];
@@ -110,7 +109,7 @@ export default async function DatabasePage({
         <div className="databaseTableWrap">
           <table>
             <thead>
-              <tr><th>Token</th><th>Collected</th><th>Status</th><th>Current MC</th><th>Peak MC</th><th>Peak</th><th>Trades</th><th>Volume</th><th>Links</th></tr>
+              <tr><th>Token</th><th>Collected</th><th>Status</th><th>Current MC</th><th>Peak MC</th><th>Trades</th><th>Volume</th><th>Links</th></tr>
             </thead>
             <tbody>
               {tokens.map((token) => (
@@ -125,7 +124,6 @@ export default async function DatabasePage({
                   <td><span className={`databaseStatus ${token.graduated_at ? "graduated" : ""}`}>{statusLabel(token.status, token.graduated_at)}</span></td>
                   <td><strong>{money(token.market_cap_usd)}</strong></td>
                   <td><strong className="peakValue">{money(token.ath_market_cap_usd)}</strong></td>
-                  <td>{token.peak_multiple ? `${token.peak_multiple.toFixed(2)}x` : "Pending"}</td>
                   <td><span>{token.trade_count.toLocaleString("en-GB")}</span><small>{token.buys} buys · {token.sells} sells</small></td>
                   <td>{money(token.volume_usd)}</td>
                   <td>
@@ -135,7 +133,7 @@ export default async function DatabasePage({
                   </td>
                 </tr>
               ))}
-              {!tokens.length ? <tr><td className="databaseEmpty" colSpan={9}>No tokens match that search.</td></tr> : null}
+              {!tokens.length ? <tr><td className="databaseEmpty" colSpan={8}>No tokens match that search.</td></tr> : null}
             </tbody>
           </table>
         </div>
