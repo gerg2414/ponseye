@@ -221,18 +221,28 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
   if (!url || !key) throw new Error("Capital Circuit database environment is missing");
 
   const db = createClient(url, key, { auth: { persistSession: false }, db: { retry: false } });
-  const [labTokens, positionsResult, launchesResult, metricsResult] = await Promise.all([
+  const [labTokens, positionsResult] = await Promise.all([
     getPonsEyeLabData(),
     db.from("acquired_positions").select("token_address,acquired_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,peak_price_usd,target_multiple,stop_multiple,strategy_version,position_size_usd,remaining_pct,realised_return_multiple,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at,position_status,closed_at,exit_reason"),
-    db.from("launches").select("token_address,name,symbol,image_url,launched_at,status"),
-    db.from("launch_metrics").select("token_address,price_usd"),
   ]);
 
   if (positionsResult.error) throw new Error(positionsResult.error.message);
+  const positions = (positionsResult.data ?? []) as CapitalPosition[];
+  if (!positions.length) return [];
+
+  const acquiredAddresses = positions.map((position) => position.token_address);
+  const [launchesResult, metricsResult] = await Promise.all([
+    db.from("launches")
+      .select("token_address,name,symbol,image_url,launched_at,status")
+      .in("token_address", acquiredAddresses),
+    db.from("launch_metrics")
+      .select("token_address,price_usd")
+      .in("token_address", acquiredAddresses),
+  ]);
+
   if (launchesResult.error) throw new Error(launchesResult.error.message);
   if (metricsResult.error) throw new Error(metricsResult.error.message);
 
-  const positions = (positionsResult.data ?? []) as CapitalPosition[];
   const launches = new Map(((launchesResult.data ?? []) as CapitalLaunch[]).map((launch) => [launch.token_address, launch]));
   const metrics = new Map(((metricsResult.data ?? []) as CapitalMetric[]).map((metric) => [metric.token_address, metric]));
   const existing = new Map(labTokens.map((token) => [token.token_address, token]));
@@ -312,7 +322,7 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
 
 const getCachedCapitalCircuitData = unstable_cache(
   loadCapitalCircuitData,
-  ["ponseye-capital-circuit-v2"],
+  ["ponseye-capital-circuit-v3"],
   { revalidate: 5 },
 );
 
