@@ -10,7 +10,7 @@ import { TokenImage } from "./token-image";
 
 export const dynamic = "force-dynamic";
 
-const currentFeeds = new Set(["launch_activity", "curve_trades", "market_trades", "holder_snapshots"]);
+const currentFeeds = new Set(["gmgn_trenches"]);
 const targetMeterColours = [
   "#552a94", "#6230a8", "#7036bc", "#7e3ccf",
   "#8c43e1", "#9a49ef", "#aa4ff1", "#ba54e8",
@@ -73,29 +73,10 @@ function targetLockScore(launch: Launch, mode: "sighted" | "surveillance" | "acq
 
 function lockLabel(launch: Launch, score: number, mode: "sighted" | "surveillance" | "acquired") {
   if (launch.research_state === "target_locked") return "Target locked";
-  if (mode === "sighted") return score >= 35 ? "Qualifying" : "Scanning";
+  if (mode === "sighted") return "Migrated";
   if (score >= 80) return "Final checks";
   if (score >= 48) return "Tracking";
   return "Scanning";
-}
-
-function sparklineGeometry(prices: number[]) {
-  const values = prices.filter((price) => Number.isFinite(price) && price > 0);
-  if (values.length < 2) {
-    return { line: "0,36 320,36", area: "M0 36L320 36V72H0Z", endY: 36 };
-  }
-
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const spread = maximum - minimum || maximum * 0.01 || 1;
-  const coordinates = values.map((price, index) => {
-    const x = (index / (values.length - 1)) * 320;
-    const y = 62 - ((price - minimum) / spread) * 52;
-    return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) };
-  });
-  const line = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
-  const area = `M${coordinates.map(({ x, y }) => `${x} ${y}`).join("L")}V72H0Z`;
-  return { line, area, endY: coordinates.at(-1)?.y ?? 36 };
 }
 
 function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mode: "sighted" | "surveillance" | "acquired"; imagePriority?: boolean }) {
@@ -110,9 +91,7 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
     : null;
   const gainMultiple = launch.position_value_multiple ?? priceGainMultiple;
   const positionLoss = gainMultiple != null && gainMultiple < 1;
-  const positionGradientId = `position-fill-${launch.token_address.replace(/[^a-z0-9-]/gi, "")}`;
   const filledSegments = Math.ceil(lockScore / 6.25);
-  const sparkline = sparklineGeometry(launch.sparkline_prices ?? []);
 
   const card = (
       <article className={`launchCard ${acquired ? "isAcquired" : "isCompact"}`}>
@@ -149,21 +128,9 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
 
         {acquired ? (
           <div className={`positionMonitor ${positionClosed ? "closed" : "live"} ${positionLoss ? "loss" : "profit"}`}>
-            <svg viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <linearGradient id={positionGradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={positionLoss ? "#ff718c" : "#9aff4f"} stopOpacity=".34" />
-                  <stop offset="100%" stopColor={positionLoss ? "#ff718c" : "#9aff4f"} stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path className="positionGrid" d="M0 18H320M0 36H320M0 54H320M64 0V72M128 0V72M192 0V72M256 0V72" />
-              <path className="positionFill" style={{ fill: `url(#${positionGradientId})` }} d={sparkline.area} />
-              <polyline className="positionLine" points={sparkline.line} />
-              <circle className="positionEnd" cx="318" cy={sparkline.endY} r="4" />
-            </svg>
             <div className="positionMonitorFooter">
               <span><i />{positionClosed ? "Position closed" : "Position open"}</span>
-              <span className="chartLink">View chart <b>↗</b></span>
+              <strong className={positionLoss ? "gainDown" : "gainUp"}>{positionLoss ? "↓" : "↑"} {gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong>
             </div>
           </div>
         ) : (
@@ -182,7 +149,7 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
             </div>
             <div className="lockFooter">
               <span>{launch.research_state === "target_locked" ? "Awaiting execution" : "Ponseye monitoring"}</span>
-              <span className="signalPrivate">{mode === "sighted" ? "Awaiting surveillance" : "Surveillance active"}</span>
+              <span className="signalPrivate">{mode === "sighted" ? "Watching post migration" : "Surveillance active"}</span>
             </div>
           </div>
         )}
@@ -195,11 +162,7 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
     "data-launched-at": launch.launched_at,
   };
 
-  return acquired ? (
-    <Link className="launchCardLink" href={`/launch/${launch.token_address}`} {...motionData}>{card}</Link>
-  ) : (
-    <div className="launchCardLink launchCardStatic" {...motionData}>{card}</div>
-  );
+  return <div className="launchCardLink launchCardStatic" {...motionData}>{card}</div>;
 }
 
 function LaunchLane({ title, count, tone, icon, mode, launches, empty }: {
@@ -292,11 +255,11 @@ export default async function Home() {
         <section className="boardSection">
           <MobileLaneTabs counts={{ sighted: sightings.length, surveillance: surveillance.length, acquired: acquired.length }} />
           <div className="launchBoard">
-            <LaunchLane title="Sighted" count={sightings.length} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for a new launch" />
+            <LaunchLane title="Sighted" count={sightings.length} tone="new" icon="/ponseye-sighted-icon.svg" mode="sighted" launches={sightings} empty="Watching for the next PONS migration" />
             <LaunchLane title="Surveilling" count={surveillance.length} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
             <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="No targets acquired yet" />
           </div>
-          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} launches</span><span>Targets appear after confirmation</span></footer>
+          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} migrated tokens</span><span>Targets appear after dip confirmation</span></footer>
         </section>
       </div>
     </main>

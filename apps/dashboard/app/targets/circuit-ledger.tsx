@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import type { LabToken } from "../../lib/lab-data";
 import { TokenImage } from "../token-image";
 
@@ -82,9 +81,9 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
           const soldPct = 100 - remainingPct;
           const stageMultiple = token.hit_100x_at ? 100 : token.hit_50x_at ? 50 : token.hit_20x_at ? 20 : token.hit_10x_at ? 10 : null;
           const protectedExit = token.exit_reason === "failure_8m" || token.exit_reason === "failure_sustained" || token.exit_reason === "post_10x_below_3x";
-          const href = `/launch/${token.token_address}?from=targets&entry=${encodeURIComponent(token.signal_at)}&entryMc=${token.signal_market_cap_usd ?? ""}`;
+          const direction = (resultMultiple ?? 1) >= 1 ? "up" : "down";
           return (
-            <Link className="circuitRow" href={href} key={token.token_address}>
+            <article className="circuitRow" key={token.token_address}>
               <div className="circuitToken">
                 <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={48} />
                 <span>
@@ -98,10 +97,10 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
               <span className="circuitValue"><strong>{money(positionValueUsd)}</strong><small>{outcome.closed ? "Returned" : `${money(realisedValueUsd)} realised · ${money(unrealisedValueUsd)} live`}</small></span>
               <span className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}><strong>{pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong><small>{outcome.closed ? "Realised" : "Includes unrealised"}</small></span>
               <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}>
-                <span className="circuitOutcomeTop"><b>{multiple(resultMultiple)}</b><em className={outcome.closed ? "closed" : "live"}>{outcome.closed ? "Closed" : "Live"}</em></span>
+                <span className="circuitOutcomeTop"><i className={`circuitDirection ${direction}`} aria-hidden="true">{direction === "up" ? "↑" : "↓"}</i><b>{multiple(resultMultiple)}</b><em className={outcome.closed ? "closed" : "live"}>{outcome.closed ? "Closed" : "Live"}</em></span>
                 <small>{protectedExit ? outcome.label : stageMultiple ? <><span className="circuitOutcomeDesktop">{soldPct}% sold at {stageMultiple}x · {remainingPct}% {outcome.closed ? "closed" : "live"}</span><span className="circuitOutcomeMobile">{soldPct}%@{stageMultiple}x · {remainingPct}% {outcome.closed ? "closed" : "live"}</span></> : outcome.label}</small>
               </span>
-            </Link>
+            </article>
           );
         }) : <div className="circuitEmpty">No positions match this view yet.</div>}
       </div>

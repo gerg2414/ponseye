@@ -216,11 +216,18 @@ type CapitalLaunch = {
   name: string | null;
   symbol: string | null;
   image_url: string | null;
-  launched_at: string;
-  status: string;
+  created_at: string;
+  lifecycle_stage: string;
+  price_usd: number | string | null;
+  market_cap_usd: number | string | null;
+  ath_market_cap_usd: number | string | null;
+  swaps_24h: number | string | null;
+  buys_24h: number | string | null;
+  sells_24h: number | string | null;
+  holder_count: number | string | null;
+  top_10_holder_pct: number | string | null;
+  creator_balance_pct: number | string | null;
 };
-
-type CapitalMetric = { token_address: string; price_usd: number | string | null };
 
 async function loadCapitalCircuitData(): Promise<LabToken[]> {
   const url = process.env.SUPABASE_URL;
@@ -228,38 +235,28 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
   if (!url || !key) throw new Error("Capital Circuit database environment is missing");
 
   const db = createClient(url, key, { auth: { persistSession: false }, db: { retry: false } });
-  const [labTokens, positionsResult] = await Promise.all([
-    getPonsEyeLabData(),
-    db.from("acquired_positions").select("token_address,acquired_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,peak_price_usd,target_multiple,stop_multiple,strategy_version,position_size_usd,remaining_pct,realised_return_multiple,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at,position_status,closed_at,exit_reason"),
-  ]);
+  const positionsResult = await db.from("acquired_positions")
+    .select("token_address,acquired_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,peak_price_usd,target_multiple,stop_multiple,strategy_version,position_size_usd,remaining_pct,realised_return_multiple,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at,position_status,closed_at,exit_reason")
+    .order("acquired_at", { ascending: false });
 
   if (positionsResult.error) throw new Error(positionsResult.error.message);
   const positions = (positionsResult.data ?? []) as CapitalPosition[];
   if (!positions.length) return [];
 
   const acquiredAddresses = positions.map((position) => position.token_address);
-  const [launchesResult, metricsResult] = await Promise.all([
-    db.from("launches")
-      .select("token_address,name,symbol,image_url,launched_at,status")
-      .in("token_address", acquiredAddresses),
-    db.from("launch_metrics")
-      .select("token_address,price_usd")
-      .in("token_address", acquiredAddresses),
-  ]);
+  const launchesResult = await db.from("gmgn_launches")
+    .select("token_address,name,symbol,image_url,created_at,lifecycle_stage,price_usd,market_cap_usd,ath_market_cap_usd,swaps_24h,buys_24h,sells_24h,holder_count,top_10_holder_pct,creator_balance_pct")
+    .in("token_address", acquiredAddresses);
 
   if (launchesResult.error) throw new Error(launchesResult.error.message);
-  if (metricsResult.error) throw new Error(metricsResult.error.message);
 
   const launches = new Map(((launchesResult.data ?? []) as CapitalLaunch[]).map((launch) => [launch.token_address, launch]));
-  const metrics = new Map(((metricsResult.data ?? []) as CapitalMetric[]).map((metric) => [metric.token_address, metric]));
-  const existing = new Map(labTokens.map((token) => [token.token_address, token]));
 
-  return positions.map((position) => {
-    const prior = existing.get(position.token_address);
+  return positions.flatMap((position) => {
     const launch = launches.get(position.token_address);
-    const metric = metrics.get(position.token_address);
+    if (!launch) return [];
     const entryPrice = numberOrNull(position.entry_price_usd);
-    const currentPrice = numberOrNull(metric?.price_usd);
+    const currentPrice = numberOrNull(launch.price_usd);
     const peakPrice = numberOrNull(position.peak_price_usd);
     const entryMarketCap = numberOrNull(position.entry_market_cap_usd);
     const exitMarketCap = numberOrNull(position.exit_market_cap_usd);
@@ -269,41 +266,48 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
     const peakMultiple = entryPrice && peakPrice ? peakPrice / entryPrice : null;
     const remainingPct = numberOrNull(position.remaining_pct) ?? 100;
     const realisedReturnMultiple = numberOrNull(position.realised_return_multiple) ?? 0;
-    const markMultiple = liveMultiple ?? prior?.final_multiple ?? 1;
+    const markMultiple = liveMultiple ?? (entryMarketCap && numberOrNull(launch.market_cap_usd)
+      ? numberOrNull(launch.market_cap_usd)! / entryMarketCap
+      : 1);
     const positionValueMultiple = realisedReturnMultiple + (remainingPct / 100) * markMultiple;
+    const buys = Number(launch.buys_24h ?? 0);
+    const sells = Number(launch.sells_24h ?? 0);
+    const tradeCount = Number(launch.swaps_24h ?? buys + sells);
 
     return {
       token_address: position.token_address,
-      name: prior?.name ?? launch?.name ?? null,
-      symbol: prior?.symbol ?? launch?.symbol ?? null,
-      image_url: prior?.image_url ?? launch?.image_url ?? null,
-      launched_at: prior?.launched_at ?? launch?.launched_at ?? position.acquired_at,
+      name: launch.name,
+      symbol: launch.symbol,
+      image_url: launch.image_url,
+      launched_at: launch.created_at,
       signal_at: position.acquired_at,
-      signal_age_seconds: prior?.signal_age_seconds ?? null,
-      status: launch?.status ?? prior?.status ?? "active",
+      signal_age_seconds: Math.max(0, Math.round((Date.parse(position.acquired_at) - Date.parse(launch.created_at)) / 1_000)),
+      status: launch.lifecycle_stage,
       actual_state: "target_locked",
       actual_acquired: true,
       actual_binned: false,
-      trade_count: prior?.trade_count ?? 0,
-      buys: prior?.buys ?? 0,
-      recent_buys_20s: prior?.recent_buys_20s ?? 0,
-      sells: prior?.sells ?? 0,
-      unique_traders: prior?.unique_traders ?? 0,
-      buy_pressure_pct: prior?.buy_pressure_pct ?? null,
-      creator_sells: prior?.creator_sells ?? 0,
-      first_minute_buyers: prior?.first_minute_buyers ?? 0,
-      momentum_multiple: prior?.momentum_multiple ?? null,
-      peak_hold_pct: prior?.peak_hold_pct ?? null,
-      holder_count: prior?.holder_count ?? null,
-      top_10_holder_pct: prior?.top_10_holder_pct ?? null,
-      creator_balance_pct: prior?.creator_balance_pct ?? null,
+      trade_count: tradeCount,
+      buys,
+      recent_buys_20s: 0,
+      sells,
+      unique_traders: 0,
+      buy_pressure_pct: tradeCount ? buys * 100 / tradeCount : null,
+      creator_sells: 0,
+      first_minute_buyers: 0,
+      momentum_multiple: null,
+      peak_hold_pct: null,
+      holder_count: numberOrNull(launch.holder_count),
+      top_10_holder_pct: numberOrNull(launch.top_10_holder_pct),
+      creator_balance_pct: numberOrNull(launch.creator_balance_pct),
       signal_price_usd: entryPrice,
       signal_market_cap_usd: entryMarketCap,
-      signal_volume_usd: prior?.signal_volume_usd ?? 0,
-      followup_trades: prior?.followup_trades ?? 0,
-      outcome_scope: prior?.outcome_scope ?? "full_market",
-      future_peak_multiple: peakMultiple ?? prior?.future_peak_multiple ?? null,
-      future_low_multiple: prior?.future_low_multiple ?? null,
+      signal_volume_usd: 0,
+      followup_trades: tradeCount,
+      outcome_scope: "full_market",
+      future_peak_multiple: peakMultiple ?? (entryMarketCap && numberOrNull(launch.ath_market_cap_usd)
+        ? numberOrNull(launch.ath_market_cap_usd)! / entryMarketCap
+        : null),
+      future_low_multiple: null,
       final_multiple: positionValueMultiple,
       closed_at: position.closed_at,
       position_status: position.position_status,
@@ -321,8 +325,8 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
       hit_20x_at: position.hit_20x_at,
       hit_50x_at: position.hit_50x_at,
       hit_100x_at: position.hit_100x_at,
-      pre_target_low_multiples: prior?.pre_target_low_multiples ?? {},
-      post_2x_pre_target_low_multiples: prior?.post_2x_pre_target_low_multiples ?? {},
+      pre_target_low_multiples: {},
+      post_2x_pre_target_low_multiples: {},
     } satisfies LabToken;
   });
 }
