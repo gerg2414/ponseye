@@ -1,6 +1,8 @@
+import sharp from "sharp";
 import { safeImageUrl } from "../../../../lib/images";
 
 const maximumImageBytes = 5_000_000;
+const thumbnailSize = 192;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,10 +30,15 @@ export async function GET(request: Request) {
     if (contentLength > maximumImageBytes) throw new Error("Image is too large");
     const body = await response.arrayBuffer();
     if (!body.byteLength || body.byteLength > maximumImageBytes) throw new Error("Invalid image size");
+    const thumbnail = await sharp(Buffer.from(body))
+      .rotate()
+      .resize(thumbnailSize, thumbnailSize, { fit: "cover", position: "centre", withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toBuffer();
 
-    return new Response(body, {
+    return new Response(new Uint8Array(thumbnail), {
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
         "X-Content-Type-Options": "nosniff",
       },
