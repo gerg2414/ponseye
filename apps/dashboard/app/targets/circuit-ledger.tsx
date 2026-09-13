@@ -12,7 +12,7 @@ type CircuitItem = {
   pnlUsd: number;
 };
 
-const viewLabels: Array<[View, string]> = [["all", "All acquired"], ["runners", "2x+ runners"], ["closed", "Closed"], ["open", "Still tracking"]];
+const viewLabels: Array<[View, string]> = [["all", "All acquired"], ["open", "Live"], ["closed", "Closed"], ["runners", "2x+ runners"]];
 
 function compactMoney(value: number | null) {
   if (!value || !Number.isFinite(value)) return "Pending";
@@ -48,7 +48,7 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
     <section className="circuitLedger">
       <header>
         <div><span>Position ledger</span><h2>Every acquired target</h2></div>
-        <p><b>{counts.closed}</b> positions closed <i /> <b>{counts.open}</b> still tracking</p>
+        <p><b>{counts.closed}</b> positions closed <i /> <b>{counts.open}</b> live</p>
       </header>
       <nav className="circuitViews" aria-label="Position view">
         {viewLabels.map(([value, label]) => (
@@ -82,7 +82,7 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
               <span className="circuitValue"><strong>{money(positionValueUsd)}</strong><small>{outcome.closed ? "Returned" : `${money(realisedValueUsd)} realised · ${money(unrealisedValueUsd)} live`}</small></span>
               <span className={`circuitPnl ${pnlUsd >= 0 ? "positive" : "negative"}`}><strong>{pnlUsd >= 0 ? "+" : ""}{money(pnlUsd)}</strong><small>{outcome.closed ? "Realised" : "Includes unrealised"}</small></span>
               <span className={`circuitOutcome ${outcome.tone}`} aria-label={`${outcome.label}: ${multiple(resultMultiple)}`}>
-                <b>{multiple(resultMultiple)}</b>
+                <span className="circuitOutcomeTop"><b>{multiple(resultMultiple)}</b><em className={outcome.closed ? "closed" : "live"}>{outcome.closed ? "Closed" : "Live"}</em></span>
                 <small>{protectedExit ? outcome.label : stageMultiple ? <><span className="circuitOutcomeDesktop">{soldPct}% sold at {stageMultiple}x · {remainingPct}% {outcome.closed ? "closed" : "live"}</span><span className="circuitOutcomeMobile">{soldPct}%@{stageMultiple}x · {remainingPct}% {outcome.closed ? "closed" : "live"}</span></> : outcome.label}</small>
               </span>
             </Link>

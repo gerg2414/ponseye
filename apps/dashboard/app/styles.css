@@ -464,7 +464,11 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitPnl.positive strong { color: var(--green); }
 .circuitPnl.negative strong { color: #ff718c; }
 .circuitOutcome { min-width: 0; display: grid; gap: 5px; color: #9298a4; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-weight: 800; }
-.circuitOutcome b { color: currentColor; font-size: 20px; line-height: 1; letter-spacing: -.045em; }
+.circuitOutcomeTop { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.circuitOutcomeTop b { color: currentColor; font-size: 20px; line-height: 1; letter-spacing: -.045em; }
+.circuitOutcomeTop em { flex: 0 0 auto; padding: 4px 6px; border: 1px solid currentColor; border-radius: 3px; font-size: 8px; font-style: normal; letter-spacing: .06em; line-height: 1; text-transform: uppercase; }
+.circuitOutcomeTop em.live { color: var(--green); background: rgba(154,255,79,.06); }
+.circuitOutcomeTop em.closed { color: #ff718c; background: rgba(255,113,140,.06); }
 .circuitOutcome small { overflow: hidden; color: #7f8794; font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: .025em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .circuitOutcomeMobile { display: none; }
 .circuitOutcome.win { color: var(--green); text-shadow: 0 0 13px rgba(154,255,79,.22); }
@@ -494,7 +498,8 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .circuitRow > .circuitValue { display: none; }
   .circuitRow > .circuitPnl { grid-column: 1; padding-left: 60px; }
   .circuitOutcome { width: 132px; grid-column: 2; grid-row: 1 / span 2; justify-items: end; justify-self: end; text-align: right; }
-  .circuitOutcome b,.circuitOutcome small { width: 100%; text-align: right; }
+  .circuitOutcomeTop,.circuitOutcome small { width: 100%; text-align: right; }
+  .circuitOutcomeTop { justify-content: flex-end; }
   .circuitOutcomeDesktop { display: none; }
   .circuitOutcomeMobile { display: inline; }
 }
