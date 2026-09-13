@@ -329,7 +329,7 @@ const exitModelDetails: Array<{ name: ExitModel; label: string; description: str
 const savedModelsKey = "ponseye-lab-saved-models-v1";
 const currentModelKey = "ponseye-lab-current-model-v1";
 const savedExitProfilesKey = "ponseye-lab-saved-exits-v1";
-const currentExitProfileKey = "ponseye-lab-current-exit-v1";
+const currentExitProfileKey = "ponseye-lab-current-exit-v2";
 const currentSurveillanceGateKey = "ponseye-lab-surveillance-gate-v1";
 
 const runnerOptions = [1.5, 2, 3, 5, 10, 20, 50, 100];
@@ -621,7 +621,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     exitModel: "fixed",
     runnerTarget: 3,
     stopLossPct: 10,
-    stopEnabled: true,
+    stopEnabled: false,
     positionSizeUsd: 25,
     takeProfitLevels: defaultTakeProfitLevels.map((level) => ({ ...level })),
   });
