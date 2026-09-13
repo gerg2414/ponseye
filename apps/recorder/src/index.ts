@@ -5,7 +5,7 @@ import { createBitqueryClient, getAccessToken } from "./bitquery.js";
 import { recoverCurveTrades } from "./curve-backfill.js";
 import { runHolderCollector } from "./holders.js";
 import { recoverMissingLaunchMetadata, recoverRecentLaunches } from "./launch-backfill.js";
-import { backfillGraduatedToken, runCompleteMarketHistoryRepair, runMarketHistoryRepair } from "./market-backfill.js";
+import { backfillGraduatedToken, runCompleteMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_CURVE_ACTIVITY, PONS_LAUNCH_ACTIVITY } from "./queries.js";
 import { getActiveMarketTokens, getLatestCurveTradeTime, getRecorderEnabled, getStreamStatus, markRecorderPaused, rebuildPeakMetricsForTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrades, saveTrades, updateStreamStatus, type EventRow, type MarketTradeRow } from "./store.js";
 
@@ -243,9 +243,6 @@ async function recordingCycle() {
     }
   })();
   const holderCollector = runHolderCollector(auth.access_token, collectorAbort.signal);
-  const marketHistoryRepair = runMarketHistoryRepair(auth.access_token, collectorAbort.signal)
-    .catch((error) => console.error("Market history repair failed", error));
-
   const refreshAfter = Math.max(60, auth.expires_in - 120) * 1_000;
   const pauseMonitor = (async () => {
     while (!collectorAbort.signal.aborted) {
@@ -266,7 +263,6 @@ async function recordingCycle() {
   collectorAbort.abort();
   await holderCollector;
   await launchHistoryRepair;
-  await marketHistoryRepair;
   await poolFeeds.stop();
   await client.dispose();
   if (cycleResult === "paused") {
