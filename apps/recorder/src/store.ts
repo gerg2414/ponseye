@@ -19,7 +19,7 @@ type LaunchCall = {
   Call: { To: string; Value: string; Input: string; Output: string };
 };
 
-type EventRow = {
+export type EventRow = {
   Block: { Time: string; Number?: string };
   Transaction: { Hash: string; From?: string };
   LogHeader: { Address: string };
@@ -169,36 +169,13 @@ export async function saveFactoryEvent(row: EventRow) {
   return token;
 }
 
-export async function saveTrade(row: EventRow) {
+function curveTradePayload(row: EventRow, tokenAddress: string) {
   const args = argumentMap(row.Arguments);
   const side = row.Log.Signature.Name === "CurveBuy" ? "buy" : "sell";
   const curve = row.LogHeader.Address.toLowerCase();
   const trader = String(args.buyer ?? args.seller ?? row.Transaction.From ?? "").toLowerCase();
   const id = eventId([row.Transaction.Hash, curve, side, row.Arguments]);
-  let tokenAddress = tokenByCurve.get(curve);
-  if (!tokenAddress && unknownCurves.has(curve)) return false;
-  if (!tokenAddress) {
-    const { data: launch } = await db
-      .from("launches")
-      .select("token_address")
-      .eq("curve_address", curve)
-      .maybeSingle();
-    tokenAddress = launch?.token_address;
-    if (tokenAddress) {
-      tokenByCurve.set(curve, tokenAddress);
-      knownTokens.add(tokenAddress);
-    } else {
-      // Most CurveBuy/CurveSell events on Robinhood are unrelated to Pons.
-      // Remember misses for this recorder cycle instead of querying Supabase on
-      // every subsequent trade from the same unrelated curve.
-      unknownCurves.add(curve);
-    }
-  }
-
-  // Ignore older or unrelated curves that are not part of this fresh PonsEye run.
-  if (!tokenAddress) return false;
-
-  const { error } = await db.from("trades").upsert({
+  return {
     event_id: id,
     token_address: tokenAddress,
     curve_address: curve,
@@ -212,9 +189,64 @@ export async function saveTrade(row: EventRow) {
     token_amount_raw: String(side === "buy" ? args.tokensOut : args.tokensIn),
     fee_raw: String(args.fee ?? "0"),
     tax_raw: String(args.tax ?? "0"),
-  }, { onConflict: "event_id", ignoreDuplicates: true });
-  assertOk(error, "save trade");
-  return true;
+  };
+}
+
+export async function saveTrades(rows: EventRow[]) {
+  if (!rows.length) return 0;
+
+  const unresolvedCurves = [...new Set(rows
+    .map((row) => row.LogHeader.Address.toLowerCase())
+    .filter((curve) => !tokenByCurve.has(curve) && !unknownCurves.has(curve)))];
+
+  for (let index = 0; index < unresolvedCurves.length; index += 500) {
+    const curves = unresolvedCurves.slice(index, index + 500);
+    const { data, error } = await db
+      .from("launches")
+      .select("token_address,curve_address")
+      .in("curve_address", curves);
+    assertOk(error, "resolve curve trade launches");
+
+    const found = new Set<string>();
+    for (const launch of data ?? []) {
+      const curve = String(launch.curve_address).toLowerCase();
+      const token = String(launch.token_address).toLowerCase();
+      tokenByCurve.set(curve, token);
+      knownTokens.add(token);
+      found.add(curve);
+    }
+    for (const curve of curves) {
+      if (!found.has(curve)) unknownCurves.add(curve);
+    }
+  }
+
+  const payloads = rows.flatMap((row) => {
+    const tokenAddress = tokenByCurve.get(row.LogHeader.Address.toLowerCase());
+    return tokenAddress ? [curveTradePayload(row, tokenAddress)] : [];
+  });
+  const uniquePayloads = [...new Map(payloads.map((payload) => [payload.event_id, payload])).values()];
+
+  for (let index = 0; index < uniquePayloads.length; index += 200) {
+    const { error } = await db.from("trades")
+      .upsert(uniquePayloads.slice(index, index + 200), { onConflict: "event_id", ignoreDuplicates: true });
+    assertOk(error, "save trade batch");
+  }
+  return uniquePayloads.length;
+}
+
+export async function saveTrade(row: EventRow) {
+  return (await saveTrades([row])) > 0;
+}
+
+export async function getLatestCurveTradeTime() {
+  const { data, error } = await db
+    .from("trades")
+    .select("block_time")
+    .order("block_time", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  assertOk(error, "load latest curve trade time");
+  return data?.block_time ? String(data.block_time) : null;
 }
 
 function marketTradePayload(row: MarketTradeRow) {

@@ -85,6 +85,35 @@ export const PONS_CURVE_ACTIVITY = `
   }
 `;
 
+export function ponsCurveHistory(since: string, till: string) {
+  return `
+    query PonsCurveHistory {
+      EVM(network: robinhood) {
+        CurveEvents: Events(
+          limit: {count: 10000}
+          orderBy: {ascending: Block_Time}
+          where: {
+            Block: {Time: {since: "${since}", till: "${till}"}}
+            Log: {Signature: {Name: {in: ["CurveBuy", "CurveSell"]}}}
+          }
+        ) {
+          Block { Time Number }
+          Transaction { Hash From }
+          LogHeader { Address }
+          Log { Signature { Name } }
+          Arguments {
+            Name
+            Value {
+              ... on EVM_ABI_Address_Value_Arg { address }
+              ... on EVM_ABI_BigInt_Value_Arg { bigInteger }
+            }
+          }
+        }
+      }
+    }
+  `;
+}
+
 const MARKET_TRADE_FIELDS = `
   Block { Time }
   Side

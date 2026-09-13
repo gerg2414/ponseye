@@ -2,11 +2,12 @@ import { createServer } from "node:http";
 import type { Client } from "graphql-ws";
 import { config } from "./config.js";
 import { createBitqueryClient, getAccessToken } from "./bitquery.js";
+import { recoverCurveTrades } from "./curve-backfill.js";
 import { runHolderCollector } from "./holders.js";
 import { recoverMissingLaunchMetadata, recoverRecentLaunches } from "./launch-backfill.js";
 import { backfillGraduatedToken, runCompleteMarketHistoryRepair, runMarketHistoryRepair } from "./market-backfill.js";
 import { marketTrades, PONS_CURVE_ACTIVITY, PONS_LAUNCH_ACTIVITY } from "./queries.js";
-import { getActiveMarketTokens, getRecorderEnabled, getStreamStatus, markRecorderPaused, rebuildPeakMetricsForTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrade, saveTrade, updateStreamStatus } from "./store.js";
+import { getActiveMarketTokens, getLatestCurveTradeTime, getRecorderEnabled, getStreamStatus, markRecorderPaused, rebuildPeakMetricsForTokens, saveFactoryEvent, saveLaunchCall, saveMarketTrades, saveTrades, updateStreamStatus, type EventRow, type MarketTradeRow } from "./store.js";
 
 let healthy = false;
 let connectedAt: string | null = null;
@@ -26,6 +27,12 @@ const traffic = {
   marketRowsStored: 0,
   subscriptionRestarts: 0,
 };
+const sourceTimes = {
+  curve: null as string | null,
+  market: null as string | null,
+};
+
+type BatchStatus = { status: string; message?: string } | void;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -47,7 +54,7 @@ function subscribe(
   client: Client,
   feed: string | string[],
   query: string,
-  handler: (row: never, collection: string) => Promise<unknown>,
+  handler: (rows: never[], collection: string) => Promise<BatchStatus>,
   signal: AbortSignal,
 ) {
   const feeds = Array.isArray(feed) ? feed : [feed];
@@ -86,10 +93,16 @@ function subscribe(
           const data = result.data as { EVM?: Record<string, never[]>; Trading?: Record<string, never[]> } | undefined;
           const root = data?.EVM ?? data?.Trading;
           const collections = root ? Object.entries(root) : [];
+          let batchStatus: Exclude<BatchStatus, void> | undefined;
           for (const [collection, rows] of collections) {
-            for (const row of rows) await handler(row as never, collection);
+            const nextStatus = await handler(rows, collection);
+            if (nextStatus) batchStatus = nextStatus;
           }
-          await Promise.all(feeds.map((name) => updateStreamStatus(name, "connected")));
+          await Promise.all(feeds.map((name) => updateStreamStatus(
+            name,
+            batchStatus?.status ?? "connected",
+            batchStatus?.message,
+          )));
         }).catch((error) => reportError(error, "processing failed"));
       },
       error: scheduleRestart,
@@ -129,9 +142,13 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
 
       disposeMarketFeed?.();
       disposeMarketFeed = addresses.length
-        ? subscribe(client, "market_trades", marketTrades(addresses), async (row) => {
-          traffic.marketRowsReceived += 1;
-          if (await saveMarketTrade(row)) traffic.marketRowsStored += 1;
+        ? subscribe(client, "market_trades", marketTrades(addresses), async (rows) => {
+          const marketRows = rows as MarketTradeRow[];
+          traffic.marketRowsReceived += marketRows.length;
+          traffic.marketRowsStored += await saveMarketTrades(marketRows);
+          const latest = marketRows.reduce<string | null>((value, row) =>
+            !value || row.Block.Time > value ? row.Block.Time : value, sourceTimes.market);
+          sourceTimes.market = latest;
         }, signal)
         : null;
       addressSignature = nextSignature;
@@ -164,6 +181,7 @@ function createPoolFeedController(client: Client, signal: AbortSignal) {
 
 async function recordingCycle() {
   const auth = await getAccessToken();
+  const curveRecoveryStart = await getLatestCurveTradeTime();
   const collectorAbort = new AbortController();
   const client = createBitqueryClient(auth.access_token, () => {
     healthy = true;
@@ -173,37 +191,54 @@ async function recordingCycle() {
   });
   const poolFeeds = createPoolFeedController(client, collectorAbort.signal);
 
-  subscribe(client, "launch_activity", PONS_LAUNCH_ACTIVITY, async (row, collection) => {
-    if (collection === "Calls") {
-      traffic.launchRows += 1;
-      return saveLaunchCall(row);
-    }
-    traffic.factoryRows += 1;
-    const tokenAddress = await saveFactoryEvent(row);
-    const event = row as { Log?: { Signature?: { Name?: string } } };
-    if (event.Log?.Signature?.Name === "PoolGraduated") {
-      await poolFeeds.refresh();
-      if (tokenAddress) {
-        void delayOrAbort(5_000, collectorAbort.signal)
-          .then(() => backfillGraduatedToken(auth.access_token, tokenAddress, collectorAbort.signal))
-          .catch((error) => console.error(`Graduation backfill failed for ${tokenAddress}`, error));
+  subscribe(client, "launch_activity", PONS_LAUNCH_ACTIVITY, async (rows, collection) => {
+    for (const row of rows) {
+      if (collection === "Calls") {
+        traffic.launchRows += 1;
+        await saveLaunchCall(row);
+        continue;
+      }
+      traffic.factoryRows += 1;
+      const tokenAddress = await saveFactoryEvent(row);
+      const event = row as { Log?: { Signature?: { Name?: string } } };
+      if (event.Log?.Signature?.Name === "PoolGraduated") {
+        await poolFeeds.refresh();
+        if (tokenAddress) {
+          void delayOrAbort(5_000, collectorAbort.signal)
+            .then(() => backfillGraduatedToken(auth.access_token, tokenAddress, collectorAbort.signal))
+            .catch((error) => console.error(`Graduation backfill failed for ${tokenAddress}`, error));
+        }
       }
     }
   }, collectorAbort.signal);
-  subscribe(client, "curve_trades", PONS_CURVE_ACTIVITY, async (row) => {
-    traffic.curveRowsReceived += 1;
-    if (await saveTrade(row)) traffic.curveRowsStored += 1;
+  subscribe(client, "curve_trades", PONS_CURVE_ACTIVITY, async (rows) => {
+    const curveRows = rows as EventRow[];
+    traffic.curveRowsReceived += curveRows.length;
+    traffic.curveRowsStored += await saveTrades(curveRows);
+    const latest = curveRows.reduce<string | null>((value, row) =>
+      !value || row.Block.Time > value ? row.Block.Time : value, sourceTimes.curve);
+    sourceTimes.curve = latest;
+    const lagSeconds = latest ? Math.max(0, Math.round((Date.now() - new Date(latest).getTime()) / 1_000)) : null;
+    return lagSeconds != null && lagSeconds > 120
+      ? { status: "lagging", message: `Processing source data ${lagSeconds}s behind live` }
+      : { status: "connected" };
   }, collectorAbort.signal);
   void recoverRecentLaunches(auth.access_token, collectorAbort.signal)
-    .catch((error) => console.error("Launch history recovery failed", error));
+    .then(() => recoverCurveTrades(auth.access_token, collectorAbort.signal, curveRecoveryStart))
+    .catch((error) => console.error("Launch or curve history recovery failed", error));
   const launchHistoryRepair = (async () => {
     while (!collectorAbort.signal.aborted) {
       await delayOrAbort(10 * 60_000, collectorAbort.signal);
       if (collectorAbort.signal.aborted) break;
       try {
         await recoverRecentLaunches(auth.access_token, collectorAbort.signal);
+        await recoverCurveTrades(
+          auth.access_token,
+          collectorAbort.signal,
+          new Date(Date.now() - 12 * 60_000).toISOString(),
+        );
       } catch (error) {
-        console.error("Launch history recovery failed", error);
+        console.error("Launch or curve history recovery failed", error);
       }
     }
   })();
@@ -251,7 +286,20 @@ async function main() {
       return;
     }
     response.writeHead(healthy ? 200 : 503, { "content-type": "application/json" });
-    response.end(JSON.stringify({ healthy, recorderMode, connectedAt, traffic }));
+    const lagSeconds = (value: string | null) => value
+      ? Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1_000))
+      : null;
+    response.end(JSON.stringify({
+      healthy,
+      recorderMode,
+      connectedAt,
+      traffic,
+      sourceTimes,
+      sourceLagSeconds: {
+        curve: lagSeconds(sourceTimes.curve),
+        market: lagSeconds(sourceTimes.market),
+      },
+    }));
   }).listen(config.PORT, "0.0.0.0", () => console.log(`Health server listening on ${config.PORT}`));
 
   const trafficLog = setInterval(() => console.log("Recorder traffic", traffic), 60_000);
