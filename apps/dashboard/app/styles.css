@@ -294,7 +294,7 @@ tbody tr:hover { background: rgba(165,108,255,.045); }
 .lockFooter .chartLink b,.positionMonitorFooter .chartLink b { font-size: 11px; transition: transform .16s ease; }
 a.chartLink:hover,a.chartLink:focus-visible { color: #090b0d; background: var(--purple); outline: none; }
 a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px); }
-.positionMonitor { position: relative; height: 134px; margin-top: 12px; overflow: hidden; border: 1px solid #26302a; border-radius: 8px; background: #090d0b; }
+.positionMonitor { position: relative; height: 42px; margin-top: 12px; overflow: hidden; border: 1px solid #26302a; border-radius: 8px; background: #090d0b; }
 .positionMonitor > svg { width: 100%; height: 93px; display: block; }
 .positionGrid { fill: none; stroke: #18231d; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .positionLine { fill: none; stroke: var(--green); stroke-width: 2.25; filter: drop-shadow(0 0 3px rgba(154,255,79,.38)); vector-effect: non-scaling-stroke; }
@@ -308,6 +308,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .positionMonitorFooter { height: 40px; padding: 0 9px 0 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #202a24; }
 .positionMonitorFooter > span:first-child { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .positionMonitorFooter > span:first-child i { width: 6px; height: 6px; background: var(--green); box-shadow: 0 0 7px rgba(154,255,79,.65); }
+.positionMonitorFooter > strong { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 17px; }
+.positionMonitorFooter > strong.gainUp { color: var(--green); }
+.positionMonitorFooter > strong.gainDown { color: #ff718c; }
 .positionMonitor.closed .positionMonitorFooter { border-color: #262b34; }
 .positionMonitor.closed .positionMonitorFooter > span:first-child { color: #ff718c; }
 .positionMonitor.closed .positionMonitorFooter > span:first-child i { background: #ff718c; box-shadow: 0 0 7px rgba(255,113,140,.55); }
@@ -472,6 +475,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitOutcome { min-width: 0; display: grid; gap: 5px; color: #9298a4; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-weight: 800; }
 .circuitOutcomeTop { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .circuitOutcomeTop b { color: currentColor; font-size: 20px; line-height: 1; letter-spacing: -.045em; }
+.circuitDirection { flex: 0 0 auto; color: currentColor; font-size: 24px; font-style: normal; line-height: 1; }
+.circuitDirection.up { color: var(--green); }
+.circuitDirection.down { color: #ff718c; }
 .circuitOutcomeTop em { flex: 0 0 auto; padding: 4px 6px; border: 1px solid currentColor; border-radius: 3px; font-size: 8px; font-style: normal; letter-spacing: .06em; line-height: 1; text-transform: uppercase; }
 .circuitOutcomeTop em.live { color: var(--green); background: rgba(154,255,79,.06); }
 .circuitOutcomeTop em.closed { color: #ff718c; background: rgba(255,113,140,.06); }
@@ -937,7 +943,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .labResultTabs button { padding: 12px 14px; font-size: 13px; }
 .labResultTabs button span { margin-left: 6px; color: var(--purple); }
 .labResultList { max-height: 650px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #343844 #0a0c0f; }
-.labResultRow { min-height: 72px; padding: 10px 14px; display: grid; grid-template-columns: minmax(190px,1.5fr) repeat(5,minmax(95px,.7fr)) 20px; align-items: center; gap: 13px; border-bottom: 1px solid #20232b; color: inherit; text-decoration: none; transition: background .15s ease; }
+.labResultRow { min-height: 72px; padding: 10px 14px; display: grid; grid-template-columns: minmax(190px,1.5fr) repeat(5,minmax(95px,.7fr)); align-items: center; gap: 13px; border-bottom: 1px solid #20232b; color: inherit; text-decoration: none; transition: background .15s ease; }
 .labResultRow:hover { background: rgba(165,108,255,.05); }
 .labResultIdentity { min-width: 0; display: flex; align-items: center; gap: 11px; }
 .labResultIdentity > img,.labResultIdentity > span:first-child { width: 48px; height: 48px; flex: 0 0 48px; border: 1px solid rgba(165,108,255,.42); border-radius: 10px; object-fit: cover; }
@@ -983,7 +989,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .labRule { grid-template-columns: 1fr 90px 65px; }
   .labRule:nth-child(odd) { border-right: 1px solid #20232b; }
   .labRuleHeading { display: none; }
-  .labResultRow { grid-template-columns: minmax(180px,1.5fr) repeat(3,minmax(90px,.7fr)) 20px; }
+  .labResultRow { grid-template-columns: minmax(180px,1.5fr) repeat(3,minmax(90px,.7fr)); }
   .labResultRow > div:nth-child(2),.labResultRow > div:nth-child(6) { display: none; }
 }
 @media (max-width: 620px) {
@@ -1127,7 +1133,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .labResults > header > small { display: none; }
   .labResultTabs { width: 100%; }
   .labResultTabs button { flex: 1; }
-  .labResultRow { grid-template-columns: minmax(150px,1.5fr) 82px 70px 16px; gap: 8px; padding-inline: 10px; }
+  .labResultRow { grid-template-columns: minmax(150px,1.5fr) 82px 70px; gap: 8px; padding-inline: 10px; }
   .labResultRow > div:nth-child(2),.labResultRow > div:nth-child(3),.labResultRow > div:nth-child(6) { display: none; }
   .labMethodNote { grid-template-columns: 1fr; gap: 7px; }
 }

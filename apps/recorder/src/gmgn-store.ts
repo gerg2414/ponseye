@@ -44,6 +44,15 @@ function timestampOrNow(value: unknown) {
   return Number.isFinite(milliseconds) ? new Date(milliseconds).toISOString() : new Date().toISOString();
 }
 
+function timestampOrNull(value: unknown) {
+  const numeric = numberOrNull(value);
+  if (numeric === 0) return null;
+  const milliseconds = numeric == null
+    ? Date.parse(String(value ?? ""))
+    : numeric < 10_000_000_000 ? numeric * 1_000 : numeric;
+  return Number.isFinite(milliseconds) ? new Date(milliseconds).toISOString() : null;
+}
+
 function percent(value: unknown) {
   const parsed = numberOrNull(value);
   if (parsed == null) return null;
@@ -51,7 +60,14 @@ function percent(value: unknown) {
 }
 
 function stageState(stage: GmgnLifecycleStage) {
-  return stage === "new_creation" ? "sighted" : "under_watch";
+  void stage;
+  return "sighted";
+}
+
+function preserveResearchState(existing: string | undefined, observed: string) {
+  if (existing === "target_locked" || existing === "binned") return existing;
+  if (existing === "under_watch" && observed === "sighted") return existing;
+  return observed;
 }
 
 function launchPayload(row: GmgnToken, observedAt: string) {
@@ -70,12 +86,14 @@ function launchPayload(row: GmgnToken, observedAt: string) {
     lifecycle_stage: row.lifecycle_stage,
     research_state: stageState(row.lifecycle_stage),
     created_at: createdAt,
-    opened_at: pick(row, "open_timestamp") == null ? null : timestampOrNow(pick(row, "open_timestamp")),
-    completed_at: pick(row, "complete_timestamp") == null ? null : timestampOrNow(pick(row, "complete_timestamp")),
+    opened_at: timestampOrNull(pick(row, "open_timestamp")),
+    completed_at: timestampOrNull(pick(row, "complete_timestamp")),
     last_seen_at: observedAt,
     price_usd: numberOrNull(pick(row, "price")),
     market_cap_usd: marketCap,
-    ath_market_cap_usd: numberOrNull(pick(row, "history_highest_market_cap", "ath_market_cap")) ?? marketCap,
+    // For the migrated-only strategy, ATH begins at our first post-migration
+    // observation. GMGN's lifetime ATH can include the bonding-curve phase.
+    ath_market_cap_usd: marketCap,
     initial_liquidity_usd: numberOrNull(pick(row, "initial_liquidity")),
     liquidity_usd: numberOrNull(pick(row, "liquidity")),
     progress_pct: progress == null ? null : progress <= 1 ? progress * 100 : progress,
@@ -141,15 +159,17 @@ export async function saveTrenches(rows: GmgnToken[]) {
   const addresses = payloads.map((row) => row.token_address);
   const { data: existing, error: existingError } = await db
     .from("gmgn_launches")
-    .select("token_address,research_state")
+    .select("token_address,research_state,ath_market_cap_usd")
     .in("token_address", addresses);
   assertOk(existingError, "read existing GMGN launches");
   const existingState = new Map((existing ?? []).map((row) => [row.token_address, row.research_state]));
+  const existingAth = new Map((existing ?? []).map((row) => [row.token_address, numberOrNull(row.ath_market_cap_usd)]));
 
   const firstRows = payloads.map((row) => ({
     ...row,
     first_seen_at: observedAt,
     initial_market_cap_usd: row.market_cap_usd,
+    initial_liquidity_usd: row.initial_liquidity_usd ?? row.liquidity_usd,
   }));
   const { error: insertError } = await db.from("gmgn_launches")
     .upsert(firstRows, { onConflict: "token_address", ignoreDuplicates: true });
@@ -157,9 +177,8 @@ export async function saveTrenches(rows: GmgnToken[]) {
 
   const updateRows = payloads.map((row) => ({
     ...row,
-    research_state: ["target_locked", "binned"].includes(existingState.get(row.token_address) ?? "")
-      ? existingState.get(row.token_address)
-      : row.research_state,
+    ath_market_cap_usd: Math.max(existingAth.get(row.token_address) ?? 0, row.ath_market_cap_usd ?? 0) || null,
+    research_state: preserveResearchState(existingState.get(row.token_address), row.research_state),
   }));
   const { error: updateError } = await db.from("gmgn_launches")
     .upsert(updateRows, { onConflict: "token_address" });
@@ -196,15 +215,38 @@ export async function saveTrenches(rows: GmgnToken[]) {
 
 export async function getNextCandleCandidate() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { data, error } = await db.from("gmgn_launches")
-    .select("token_address,created_at,candles_checked_at")
-    .gte("created_at", cutoff)
-    .neq("research_state", "binned")
+  const { data: candidate, error } = await db.from("gmgn_launches")
+    .select("token_address,created_at,completed_at,candles_checked_at")
+    .eq("lifecycle_stage", "completed")
+    .gte("completed_at", cutoff)
     .order("candles_checked_at", { ascending: true, nullsFirst: true })
     .limit(1)
     .maybeSingle();
-  assertOk(error, "choose GMGN candle candidate");
-  return data as { token_address: string; created_at: string; candles_checked_at: string | null } | null;
+  assertOk(error, "choose migrated PONS candle candidate");
+  if (!candidate) return null;
+
+  const { data: latestCandle, error: candleError } = await db.from("gmgn_candles")
+    .select("candle_at")
+    .eq("token_address", candidate.token_address)
+    .eq("resolution", "1m")
+    .order("candle_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  assertOk(candleError, "read GMGN candle checkpoint");
+
+  return {
+    token_address: candidate.token_address,
+    created_at: candidate.created_at,
+    completed_at: candidate.completed_at,
+    candles_checked_at: candidate.candles_checked_at,
+    latest_candle_at: latestCandle?.candle_at ?? null,
+  } as {
+    token_address: string;
+    created_at: string;
+    completed_at: string | null;
+    candles_checked_at: string | null;
+    latest_candle_at: string | null;
+  };
 }
 
 export async function saveCandles(tokenAddress: string, candles: GmgnCandle[]) {
@@ -221,8 +263,21 @@ export async function saveCandles(tokenAddress: string, candles: GmgnCandle[]) {
     })), { onConflict: "token_address,resolution,candle_at" });
     assertOk(error, "save GMGN candles");
   }
+  const { data: launch, error: launchError } = await db.from("gmgn_launches")
+    .select("ath_market_cap_usd,total_supply")
+    .eq("token_address", tokenAddress)
+    .single();
+  assertOk(launchError, "read GMGN launch valuation");
+  const totalSupply = numberOrNull(launch?.total_supply);
+  const candleAth = totalSupply == null
+    ? null
+    : Math.max(0, ...candles.map((candle) => candle.high * totalSupply));
+  const priorAth = numberOrNull(launch?.ath_market_cap_usd);
   const { error } = await db.from("gmgn_launches")
-    .update({ candles_checked_at: new Date().toISOString() })
+    .update({
+      candles_checked_at: new Date().toISOString(),
+      ath_market_cap_usd: Math.max(priorAth ?? 0, candleAth ?? 0) || null,
+    })
     .eq("token_address", tokenAddress);
   assertOk(error, "mark GMGN candle check");
 }

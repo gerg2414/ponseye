@@ -48,7 +48,7 @@ export function RecorderControl({ enabled, feeds }: { enabled: boolean; feeds: R
       <div className="recorderConsoleState">
         <small>Recorder</small>
         <strong><i />{enabled ? "Running" : "Paused"}</strong>
-        <span>{enabled ? "New launches and trades are being collected" : "Bitquery collection is switched off"}</span>
+        <span>{enabled ? "GMGN PONS migrations and candle history are being collected" : "GMGN recording is switched off"}</span>
       </div>
       <div className="recorderFeedGrid">
         {feeds.map((feed) => (

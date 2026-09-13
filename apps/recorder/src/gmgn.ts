@@ -63,21 +63,13 @@ export async function fetchPonsTrenches(): Promise<GmgnToken[]> {
   const response = await runRawJson([
     "market", "trenches",
     "--chain", "robinhood",
-    "--type", "new_creation",
-    "--type", "near_completion",
     "--type", "completed",
     "--launchpad-platform", "pons",
     "--limit", "80",
   ]);
   const root = asObject(response);
   const data = asObject(root.data ?? response);
-  const categories: Array<[string, GmgnLifecycleStage]> = [
-    ["new_creation", "new_creation"],
-    ["pump", "near_completion"],
-    ["near_completion", "near_completion"],
-    ["completed", "completed"],
-  ];
-  const rank = { new_creation: 1, near_completion: 2, completed: 3 } as const;
+  const categories: Array<[string, GmgnLifecycleStage]> = [["completed", "completed"]];
   const tokens = new Map<string, GmgnToken>();
 
   for (const [key, lifecycleStage] of categories) {
@@ -86,10 +78,7 @@ export async function fetchPonsTrenches(): Promise<GmgnToken[]> {
       const token = asObject(row);
       const address = String(token.address ?? token.token_address ?? "").toLowerCase();
       if (!address) continue;
-      const prior = tokens.get(address);
-      if (!prior || rank[lifecycleStage] > rank[prior.lifecycle_stage]) {
-        tokens.set(address, { ...token, address, lifecycle_stage: lifecycleStage });
-      }
+      tokens.set(address, { ...token, address, lifecycle_stage: lifecycleStage });
     }
   }
   return [...tokens.values()];

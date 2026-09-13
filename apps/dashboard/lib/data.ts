@@ -220,24 +220,10 @@ async function loadDashboardData() {
     .map((launch) => launch.token_address);
 
   if (acquiredAddresses.length) {
-    const [curveResult, marketResult, positionsResult] = await Promise.all([
-      db.from("trades")
-        .select("token_address,block_time,quote_amount_raw,token_amount_raw")
-        .in("token_address", acquiredAddresses)
-        .order("block_time", { ascending: false })
-        .limit(1_000),
-      db.from("trade_market_data")
-        .select("token_address,block_time,price_usd")
-        .in("token_address", acquiredAddresses)
-        .order("block_time", { ascending: false })
-        .limit(1_000),
-      db.from("acquired_positions")
-        .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at,position_size_usd,remaining_pct,realised_return_multiple,strategy_version,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at")
-        .in("token_address", acquiredAddresses),
-    ]);
+    const positionsResult = await db.from("acquired_positions")
+      .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at,position_size_usd,remaining_pct,realised_return_multiple,strategy_version,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at")
+      .in("token_address", acquiredAddresses);
 
-    if (curveResult.error) console.error("[dashboard] curve sparkline request failed", curveResult.error.message);
-    if (marketResult.error) console.error("[dashboard] market sparkline request failed", marketResult.error.message);
     if (positionsResult.error) console.error("[dashboard] position request failed", positionsResult.error.message);
 
     const launchesByAddress = new Map(launches.map((launch) => [launch.token_address, launch]));
@@ -264,38 +250,6 @@ async function loadDashboardData() {
         ? launch.market_cap_usd / launch.entry_market_cap_usd
         : 1;
       launch.position_value_multiple = Number(position.realised_return_multiple) + Number(position.remaining_pct) * priceMultiple / 100;
-    }
-    const pointsByAddress = new Map<string, Array<{ time: number; price: number }>>();
-    const addPoint = (tokenAddress: string, blockTime: string, price: number) => {
-      if (!Number.isFinite(price) || price <= 0) return;
-      const time = Date.parse(blockTime);
-      if (!Number.isFinite(time)) return;
-      const points = pointsByAddress.get(tokenAddress) ?? [];
-      points.push({ time, price });
-      pointsByAddress.set(tokenAddress, points);
-    };
-
-    for (const row of (curveResult.data ?? []) as CurveSparkPoint[]) {
-      const launch = launchesByAddress.get(row.token_address);
-      const quoteAmount = Number(row.quote_amount_raw);
-      const tokenAmount = Number(row.token_amount_raw);
-      const lastQuoteAmount = Number(launch?.last_quote_amount_raw);
-      const lastTokenAmount = Number(launch?.last_token_amount_raw);
-      if (!launch?.price_usd || tokenAmount <= 0 || lastTokenAmount <= 0) continue;
-      const lastRawPrice = lastQuoteAmount / lastTokenAmount;
-      if (!Number.isFinite(lastRawPrice) || lastRawPrice <= 0) continue;
-      addPoint(row.token_address, row.block_time, (quoteAmount / tokenAmount) * (launch.price_usd / lastRawPrice));
-    }
-
-    for (const row of (marketResult.data ?? []) as MarketSparkPoint[]) {
-      addPoint(row.token_address, row.block_time, Number(row.price_usd));
-    }
-
-    for (const launch of launches) {
-      launch.sparkline_prices = (pointsByAddress.get(launch.token_address) ?? [])
-        .sort((a, b) => a.time - b.time)
-        .slice(-40)
-        .map((point) => point.price);
     }
   }
 

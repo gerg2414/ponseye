@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { defaultSurveillanceGate, type LabToken, type SurveillanceGateSettings } from "../../lib/lab-data";
@@ -575,9 +574,6 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
   const peakMarketCap = token.signal_market_cap_usd != null && token.future_peak_multiple != null
     ? token.signal_market_cap_usd * token.future_peak_multiple
     : null;
-  const entryQuery = new URLSearchParams({ entry: token.signal_at });
-  if (token.signal_market_cap_usd && token.signal_market_cap_usd > 0) entryQuery.set("entryMc", String(token.signal_market_cap_usd));
-
   function showReasonPopup(element: HTMLSpanElement) {
     const rect = element.getBoundingClientRect();
     const popupWidth = Math.min(300, window.innerWidth - 24);
@@ -590,7 +586,7 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
 
   return (
     <>
-      <Link className="labResultRow" href={`/launch/${token.token_address}?${entryQuery.toString()}`}>
+      <div className="labResultRow">
         <div className="labResultIdentity">
           <TokenImage src={token.image_url} alt={token.name ?? "Token image"} size={48} />
           <span>
@@ -618,8 +614,7 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
           </strong>
           <em className={resultStyles.recorded}>Recorded: {recordedState}</em>
         </div>
-        <b>→</b>
-      </Link>
+      </div>
       {reasonPopup && createPortal(
         <div
           className={`${resultStyles.reasonPopup} ${reasonPopup.above ? resultStyles.above : resultStyles.below}`}

@@ -59,19 +59,23 @@ async function recordingCycle() {
         recorderMode = "recording";
         connectedAt ??= lastGmgnRequestAt;
         lastError = null;
-        await setGmgnStatus("connected", `Tracking ${tokens.length} PONS tokens from GMGN Trenches`);
+        await setGmgnStatus("connected", `Tracking ${tokens.length} migrated PONS tokens from GMGN`);
         continue;
       }
 
       if (now >= nextKlineAt) {
         const candidate = await getNextCandleCandidate();
         if (candidate) {
-          const to = new Date();
-          const creationTime = Date.parse(candidate.created_at);
+          const now = new Date();
+          const migrationTime = Date.parse(candidate.completed_at ?? candidate.created_at);
+          const latestCandleTime = Date.parse(candidate.latest_candle_at ?? "");
+          const earliestAvailable = now.getTime() - 24 * 60 * 60_000;
           const from = new Date(Math.max(
-            Number.isFinite(creationTime) ? creationTime : to.getTime() - 24 * 60 * 60_000,
-            to.getTime() - 24 * 60 * 60_000,
+            Number.isFinite(migrationTime) ? migrationTime : earliestAvailable,
+            earliestAvailable,
+            Number.isFinite(latestCandleTime) ? latestCandleTime - 2 * 60_000 : 0,
           ));
+          const to = new Date(Math.min(now.getTime(), from.getTime() + 99 * 60_000));
           const candles = await fetchOneMinuteCandles(candidate.token_address, from, to);
           lastGmgnRequestAt = new Date().toISOString();
           traffic.candleRequests += 1;

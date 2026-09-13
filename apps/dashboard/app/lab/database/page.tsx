@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Token Database | PonsEye Lab",
-  description: "Search every Robinhood Chain token recorded by PonsEye.",
+  description: "Search every GMGN token recorded by PonsEye.",
 };
 
 const pageSize = 100;
@@ -133,7 +133,7 @@ export default async function DatabasePage({
                   </td>
                 </tr>
               ))}
-              {!tokens.length ? <tr><td className="databaseEmpty" colSpan={8}>No tokens match that search.</td></tr> : null}
+              {!tokens.length ? <tr><td className="databaseEmpty" colSpan={8}>{search ? "No tokens match that search." : "No GMGN tokens recorded yet."}</td></tr> : null}
             </tbody>
           </table>
         </div>
