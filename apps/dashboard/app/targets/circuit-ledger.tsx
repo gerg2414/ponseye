@@ -69,7 +69,7 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
           const remainingPct = token.remaining_pct ?? (outcome.closed ? 0 : 100);
           const soldPct = 100 - remainingPct;
           const stageMultiple = token.hit_100x_at ? 100 : token.hit_50x_at ? 50 : token.hit_20x_at ? 20 : token.hit_10x_at ? 10 : null;
-          const protectedExit = token.exit_reason === "failure_8m" || token.exit_reason === "post_10x_below_3x";
+          const protectedExit = token.exit_reason === "failure_8m" || token.exit_reason === "failure_sustained" || token.exit_reason === "post_10x_below_3x";
           const href = `/launch/${token.token_address}?from=targets&entry=${encodeURIComponent(token.signal_at)}&entryMc=${token.signal_market_cap_usd ?? ""}`;
           return (
             <Link className="circuitRow" href={href} key={token.token_address}>

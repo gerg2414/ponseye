@@ -194,6 +194,9 @@ export default async function LaunchPage({ params, searchParams }: {
     ...(launch.exit_reason === "post_10x_below_3x" && launch.closed_at && protectionExitMultiple
       ? [{ at: launch.closed_at, multiple: protectionExitMultiple, soldPct: 80 }]
       : []),
+    ...(launch.exit_reason === "failure_sustained" && launch.closed_at && protectionExitMultiple
+      ? [{ at: launch.closed_at, multiple: protectionExitMultiple, soldPct: 100 }]
+      : []),
   ].filter((exit) => exit.at) : [];
 
   return (
@@ -247,7 +250,7 @@ export default async function LaunchPage({ params, searchParams }: {
             <div><strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"}</strong></div>
             <div className="positionLegend" aria-label="Position chart markers">
               <span className="buy"><i>↑</i> Ponseye buy</span>
-              {stageExits.length ? <span className="exit"><i>↓</i> {launch.exit_reason === "post_10x_below_3x" ? "Protection exit" : "Staged sells"}</span> : null}
+              {stageExits.length ? <span className="exit"><i>↓</i> {launch.exit_reason === "post_10x_below_3x" || launch.exit_reason === "failure_sustained" ? "Protection exit" : "Staged sells"}</span> : null}
               {closed && !stageExits.length ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> {closed ? "Closed" : "Tracking live"}</span>}
             </div>
           </header>

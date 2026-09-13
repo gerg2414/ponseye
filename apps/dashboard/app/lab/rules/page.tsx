@@ -90,6 +90,17 @@ export default async function RulesPage() {
               <li>No creator sells</li>
             </ul>
           </div>
+          <div className={styles.gate}>
+            <h3>Young token confirmation</h3>
+            <ul>
+              <li>Applies when the entry signal arrives at 60 to 89 seconds old</li>
+              <li>Remain Surveilling for another 90 seconds</li>
+              <li>Price must hold at least 0.5x of the original signal price</li>
+              <li>Any creator sale bins the token</li>
+              <li>Confirmed entries use the later confirmation price</li>
+            </ul>
+          </div>
+          <p><strong>{count(live.confirmationsPending)}</strong> currently awaiting young token confirmation.</p>
           <footer>Not all passed <b>Stay in Surveillance</b></footer>
         </article>
 
@@ -105,7 +116,10 @@ export default async function RulesPage() {
               <li>Sell 20% at 20x</li>
               <li>Sell 50% at 50x</li>
               <li>Sell the final 10% at 100x</li>
-              <li>No stop loss</li>
+              <li>At minute 8, exit if still below the entry price</li>
+              <li>Before 10x, exit after two consecutive minute checks below 0.5x</li>
+              <li>After 10x, exit the remaining 80% below 3x if 20x is not reached within 3 minutes</li>
+              <li>No fixed stop loss</li>
             </ul>
           </div>
           <footer>Position result <b>Four staged exits</b></footer>
@@ -126,7 +140,7 @@ export default async function RulesPage() {
         <article>
           <span className={`${styles.branchLabel} ${styles.red}`}>Terminal route</span>
           <h2>Any active track → Binned</h2>
-          <p>A token is binned only after a confirmed creator sale. Price drawdown never bins a token, however large the swing. Binned is permanent.</p>
+          <p>A confirmed creator sale bins a token immediately. A young token is also binned if it fails its 90 second price confirmation. Binned is permanent.</p>
           <strong>{count(live.counts.binned)} currently binned</strong>
         </article>
       </section>

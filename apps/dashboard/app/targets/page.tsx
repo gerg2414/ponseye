@@ -58,6 +58,7 @@ function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number;
   if (token.strategy_version?.startsWith("strict-quiet-staggered")) {
     const exitMultiple = Math.max(0, token.position_value_multiple ?? token.final_multiple ?? 1);
     const latestStage = token.exit_reason === "failure_8m" ? "8 min protection"
+      : token.exit_reason === "failure_sustained" ? "Rug protection"
       : token.exit_reason === "post_10x_below_3x" ? "10x protection"
       : token.hit_100x_at ? "100x complete"
       : token.hit_50x_at ? "50x stage hit"

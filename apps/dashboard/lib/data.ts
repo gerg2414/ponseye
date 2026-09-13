@@ -52,7 +52,7 @@ export type Launch = {
   entry_market_cap_usd?: number | null;
   exit_market_cap_usd?: number | null;
   exit_price_usd?: number | null;
-  exit_reason?: "target" | "stop" | "failure_8m" | "post_10x_below_3x" | null;
+  exit_reason?: "target" | "stop" | "failure_8m" | "failure_sustained" | "post_10x_below_3x" | null;
   target_multiple?: number | null;
   position_status?: "open" | "closed" | null;
   position_size_usd?: number | null;
@@ -149,7 +149,7 @@ type PositionRecord = {
   entry_market_cap_usd: number | string | null;
   exit_market_cap_usd: number | string | null;
   exit_price_usd: number | string | null;
-  exit_reason: "target" | "stop" | "failure_8m" | "post_10x_below_3x" | null;
+  exit_reason: "target" | "stop" | "failure_8m" | "failure_sustained" | "post_10x_below_3x" | null;
   target_multiple: number | string;
   position_status: "open" | "closed";
   closed_at: string | null;
