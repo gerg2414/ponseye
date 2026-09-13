@@ -15,13 +15,12 @@ export async function getRulesLiveData(): Promise<RulesLiveData> {
   const db = createClient(url, key, { auth: { persistSession: false }, db: { retry: false } });
 
   const [sighted, surveillance, acquired, binned, confirmations, latest, recorder] = await Promise.all([
-    db.from("launch_metrics").select("token_address", { count: "exact", head: true }).eq("research_state", "sighted"),
-    db.from("launch_metrics").select("token_address", { count: "exact", head: true }).eq("research_state", "under_watch"),
-    db.from("launch_metrics").select("token_address", { count: "exact", head: true }).eq("research_state", "target_locked"),
-    db.from("launch_metrics").select("token_address", { count: "exact", head: true }).eq("research_state", "binned"),
-    db.from("launch_metrics").select("token_address", { count: "exact", head: true })
-      .eq("research_state", "under_watch").not("entry_confirmation_started_at", "is", null),
-    db.from("research_events").select("rule_version,observed_at").order("observed_at", { ascending: false }).limit(1).maybeSingle(),
+    db.from("gmgn_launches").select("token_address", { count: "exact", head: true }).eq("research_state", "sighted"),
+    db.from("gmgn_launches").select("token_address", { count: "exact", head: true }).eq("research_state", "under_watch"),
+    db.from("gmgn_launches").select("token_address", { count: "exact", head: true }).eq("research_state", "target_locked"),
+    db.from("gmgn_launches").select("token_address", { count: "exact", head: true }).eq("research_state", "binned"),
+    db.from("gmgn_launches").select("token_address", { count: "exact", head: true }).eq("token_address", "__no_pending_confirmations__"),
+    db.from("gmgn_snapshots").select("observed_at").order("observed_at", { ascending: false }).limit(1).maybeSingle(),
     db.from("recorder_control").select("enabled").eq("id", 1).single(),
   ]);
 
@@ -37,7 +36,7 @@ export async function getRulesLiveData(): Promise<RulesLiveData> {
       binned: binned.count ?? 0,
     },
     confirmationsPending: confirmations.count ?? 0,
-    ruleVersion: "pons-momentum-v7",
+    ruleVersion: "gmgn-clean-v1",
     latestTransitionAt: latest.data?.observed_at ?? null,
     recorderEnabled: recorder.data?.enabled === true,
   };

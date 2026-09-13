@@ -1,6 +1,6 @@
 # PonsEye
 
-PonsEye records PONS V2 launches and bonding curve trades on Robinhood Chain so launch behaviour can be measured and tested rather than guessed.
+PonsEye records PONS launches from GMGN on Robin Hood Chain so launch behaviour can be measured and tested against the same prices shown on GMGN.
 
 ## Structure
 
@@ -17,7 +17,9 @@ PonsEye records PONS V2 launches and bonding curve trades on Robinhood Chain so 
 
 ## Railway
 
-Create a service from this repository and set the root directory to `apps/recorder`. Add the four required secrets shown in `.env.example`. Use a current Supabase `sb_secret_...` key, not a browser key. Railway uses `npm run start` and the recorder exposes `/health` on `PORT`.
+Create a service from this repository and set the root directory to `apps/recorder`. Add the required secrets shown in `.env.example`. Use a current Supabase `sb_secret_...` key, not a browser key. Railway uses `npm run start` and the recorder exposes `/health` on `PORT`.
+
+The recorder uses GMGN Trenches with the `robinhood` chain and `pons` launchpad. All GMGN requests pass through one queue with at least 1.1 seconds between requests. The recorder checks `recorder_control.enabled` before starting any collection and defaults to stopped.
 
 ## Vercel
 
@@ -25,4 +27,4 @@ Import the same repository and set the root directory to `apps/dashboard`. Add `
 
 ## Data policy
 
-Raw Bitquery payloads are retained alongside parsed fields. This lets us improve parsers and test new research ideas without losing the original evidence.
+New data is stored only in `gmgn_launches`, `gmgn_snapshots` and `gmgn_candles`. The previous Bitquery tables remain archived but are not read by the dashboard, Lab, charts or Capital Circuit.

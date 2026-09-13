@@ -223,6 +223,11 @@ type CapitalLaunch = {
 type CapitalMetric = { token_address: string; price_usd: number | string | null };
 
 async function loadCapitalCircuitData(): Promise<LabToken[]> {
+  // A GMGN-only Capital Circuit starts empty. Legacy Bitquery positions remain
+  // archived in their original tables and are intentionally not displayed.
+  return [];
+
+  /* Archived Bitquery implementation retained temporarily for reference.
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) throw new Error("Capital Circuit database environment is missing");
@@ -325,6 +330,7 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
       post_2x_pre_target_low_multiples: prior?.post_2x_pre_target_low_multiples ?? {},
     } satisfies LabToken;
   });
+  */
 }
 
 const getCachedCapitalCircuitData = unstable_cache(

@@ -75,7 +75,7 @@ export async function getRecorderControlState(): Promise<RecorderControlState> {
     db.from("recorder_control").select("enabled,updated_at,updated_by").eq("id", 1).single(),
     db.from("stream_status")
       .select("feed,status,message,last_seen_at")
-      .in("feed", ["launch_activity", "curve_trades", "market_trades", "holder_snapshots"])
+      .eq("feed", "gmgn_trenches")
       .order("feed"),
   ]);
 
@@ -107,14 +107,14 @@ export async function getTokenDatabase({
   const to = from + pageSize - 1;
 
   let tokenQuery = db
-    .from("launch_board")
+    .from("gmgn_launch_board")
     .select(columns)
     .order(sortColumns[sort], { ascending: false, nullsFirst: false })
     .order("launched_at", { ascending: false })
     .range(from, to);
 
   let countQuery = db
-    .from("launches")
+    .from("gmgn_launches")
     .select("token_address", { count: "exact", head: true });
 
   if (safeSearch) {
