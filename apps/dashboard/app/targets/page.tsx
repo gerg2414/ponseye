@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import type { LabToken } from "../../lib/lab-data";
-import { getCapitalCircuitData } from "../../lib/lab-data";
+import { getCapitalCircuitAnalytics, getCapitalCircuitData } from "../../lib/lab-data";
 import { AutoRefresh } from "../auto-refresh";
+import { CircuitAnalytics } from "./circuit-analytics";
 import { CircuitLedger } from "./circuit-ledger";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 type Period = "1d" | "7d" | "30d" | "all";
+type CircuitTab = "portfolio" | "analytics";
 
 const startingEquity = 1_000;
 const positionSize = 25;
@@ -161,14 +163,18 @@ function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
 
 const periodLabels: Array<[Period, string]> = [["1d", "24H"], ["7d", "7D"], ["30d", "30D"], ["all", "All"]];
 
-export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ period?: string; tab?: string }> }) {
   const query = await searchParams;
   const period: Period = query.period === "1d" || query.period === "7d" || query.period === "30d" ? query.period : "all";
-  const allTokens = (await getCapitalCircuitData()).filter((token) => token.actual_acquired);
+  const tab: CircuitTab = query.tab === "analytics" ? "analytics" : "portfolio";
+  const [capitalTokens, allDaily] = await Promise.all([getCapitalCircuitData(), getCapitalCircuitAnalytics()]);
+  const allTokens = capitalTokens.filter((token) => token.actual_acquired);
   const cutoff = period === "all" ? 0 : Date.now() - Number.parseInt(period, 10) * 86_400_000;
   const tokens = allTokens
     .filter((token) => new Date(token.signal_at).getTime() >= cutoff)
     .sort((a, b) => new Date(a.signal_at).getTime() - new Date(b.signal_at).getTime());
+  const cutoffDay = cutoff ? new Date(cutoff).toISOString().slice(0, 10) : "";
+  const daily = allDaily.filter((day) => !cutoffDay || day.date >= cutoffDay);
   const outcomes = tokens.map((token) => {
     const outcome = modelOutcome(token);
     return { token, outcome, pnlUsd: (token.position_size_usd ?? positionSize) * (outcome.exitMultiple - 1) };
@@ -202,35 +208,43 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       </header>
 
       <section className="circuitHeading">
+        <nav className="circuitTabs" aria-label="Capital Circuit view">
+          <Link className={tab === "portfolio" ? "active" : ""} href={`/targets?period=${period}`}>Portfolio</Link>
+          <Link className={tab === "analytics" ? "active" : ""} href={`/targets?period=${period}&tab=analytics`}>Signal analytics</Link>
+        </nav>
         <nav className="circuitPeriods" aria-label="Performance period">
           {periodLabels.map(([value, label]) => (
-            <Link className={period === value ? "active" : ""} href={`/targets?period=${value}`} key={value}>{label}</Link>
+            <Link className={period === value ? "active" : ""} href={`/targets?period=${value}${tab === "analytics" ? "&tab=analytics" : ""}`} key={value}>{label}</Link>
           ))}
         </nav>
       </section>
 
-      <section className="equityPanel">
-        <header className="equityPanelHead">
-          <div className="equityRunningTotal">
-            <span>Running total · realised plus live value</span>
-            <strong>{money(balance)}</strong>
-            <small className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</small>
-          </div>
-        </header>
-        <div className="equityPlot">
-          <EquityCurve values={equityValues.length > 1 ? equityValues : [startingEquity, startingEquity]} dates={equityDates.length > 1 ? equityDates : [new Date().toISOString(), new Date().toISOString()]} />
-        </div>
-      </section>
+      {tab === "analytics" ? <CircuitAnalytics daily={daily} tokens={tokens} /> : (
+        <>
+          <section className="equityPanel">
+            <header className="equityPanelHead">
+              <div className="equityRunningTotal">
+                <span>Running total · realised plus live value</span>
+                <strong>{money(balance)}</strong>
+                <small className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</small>
+              </div>
+            </header>
+            <div className="equityPlot">
+              <EquityCurve values={equityValues.length > 1 ? equityValues : [startingEquity, startingEquity]} dates={equityDates.length > 1 ? equityDates : [new Date().toISOString(), new Date().toISOString()]} />
+            </div>
+          </section>
 
-      <section className="circuitStats">
-        <article><span>Net return</span><strong className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</strong><small>{roi.toFixed(1)}% including open positions</small></article>
-        <article><span>Acquired</span><strong>{tokens.length}</strong><small>{money(capitalDeployed)} deployed</small></article>
-        <article><span>Profitable positions</span><strong>{tokens.length ? ((winners / tokens.length) * 100).toFixed(1) : "0.0"}%</strong><small>{winners} currently profitable</small></article>
-        <article><span>2x+ runners</span><strong>{runners.length}</strong><small>{tokens.length ? ((runners.length / tokens.length) * 100).toFixed(1) : "0.0"}% of acquired</small></article>
-        <article className="best"><span>Best runner</span><strong>{multiple(bestRunner)}</strong><small>Peak after acquisition</small></article>
-      </section>
+          <section className="circuitStats">
+            <article><span>Net return</span><strong className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</strong><small>{roi.toFixed(1)}% including open positions</small></article>
+            <article><span>Acquired</span><strong>{tokens.length}</strong><small>{money(capitalDeployed)} deployed</small></article>
+            <article><span>Profitable positions</span><strong>{tokens.length ? ((winners / tokens.length) * 100).toFixed(1) : "0.0"}%</strong><small>{winners} currently profitable</small></article>
+            <article><span>2x+ runners</span><strong>{runners.length}</strong><small>{tokens.length ? ((runners.length / tokens.length) * 100).toFixed(1) : "0.0"}% of acquired</small></article>
+            <article className="best"><span>Best runner</span><strong>{multiple(bestRunner)}</strong><small>Peak after acquisition</small></article>
+          </section>
 
-      <CircuitLedger items={outcomes} />
+          <CircuitLedger items={outcomes} />
+        </>
+      )}
     </main>
   );
 }

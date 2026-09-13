@@ -54,6 +54,14 @@ export type LabToken = {
   post_2x_pre_target_low_multiples: Record<string, number | null>;
 };
 
+export type CapitalCircuitDaily = {
+  date: string;
+  launches: number;
+  sighted: number;
+  surveilling: number;
+  acquired: number;
+};
+
 export type SurveillanceGateSettings = {
   minAgeSeconds: number;
   maxAgeSeconds: number;
@@ -332,5 +340,46 @@ export async function getCapitalCircuitData() {
   } catch (error) {
     console.error("[capital-circuit] data request failed", error instanceof Error ? error.message : String(error));
     return [] as LabToken[];
+  }
+}
+
+async function loadCapitalCircuitAnalytics(): Promise<CapitalCircuitDaily[]> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) throw new Error("Capital Circuit database environment is missing");
+
+  const db = createClient(url, key, { auth: { persistSession: false }, db: { retry: false } });
+  const result = await db
+    .rpc("get_capital_circuit_analytics")
+    .abortSignal(AbortSignal.timeout(30_000));
+
+  if (result.error) throw new Error(result.error.message);
+  const payload = result.data && typeof result.data === "object" ? result.data as { dailyFunnel?: unknown } : {};
+  if (!Array.isArray(payload.dailyFunnel)) return [];
+
+  return payload.dailyFunnel.map((item) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    return {
+      date: String(row.date ?? ""),
+      launches: Number(row.launches ?? 0),
+      sighted: Number(row.sighted ?? 0),
+      surveilling: Number(row.surveilling ?? 0),
+      acquired: Number(row.acquired ?? 0),
+    };
+  }).filter((row) => row.date);
+}
+
+const getCachedCapitalCircuitAnalytics = unstable_cache(
+  loadCapitalCircuitAnalytics,
+  ["ponseye-capital-circuit-analytics-v1"],
+  { revalidate: 60 },
+);
+
+export async function getCapitalCircuitAnalytics() {
+  try {
+    return await getCachedCapitalCircuitAnalytics();
+  } catch (error) {
+    console.error("[capital-circuit] analytics request failed", error instanceof Error ? error.message : String(error));
+    return [] as CapitalCircuitDaily[];
   }
 }

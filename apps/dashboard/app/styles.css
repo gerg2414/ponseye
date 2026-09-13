@@ -399,9 +399,14 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 /* Capital Circuit */
 .circuitPage { max-width: none; margin: 0; padding-bottom: 80px; }
 .circuitPage::before,.circuitPage::after { left: 50%; width: 100vw; transform: translateX(-50%); }
-.circuitHeading { min-height: 72px; padding: 14px 4px 12px; display: flex; align-items: center; justify-content: flex-end; gap: 30px; }
+.circuitHeading { min-height: 72px; padding: 14px 4px 12px; display: flex; align-items: center; justify-content: space-between; gap: 30px; }
 .circuitKicker,.equityPanelHead span,.circuitStats span,.circuitLedger > header span { color: #858b98; font-size: 12px; font-weight: 700; letter-spacing: .075em; text-transform: uppercase; }
 .circuitHeading h1 { margin: 0; color: var(--white); font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: clamp(30px,3.2vw,44px); letter-spacing: -.045em; line-height: 1; }
+.circuitTabs { display: flex; align-self: stretch; gap: 24px; }
+.circuitTabs a { position: relative; display: flex; align-items: center; color: #747b88; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-decoration: none; text-transform: uppercase; }
+.circuitTabs a:hover,.circuitTabs a:focus-visible { color: #d9dce3; }
+.circuitTabs a.active { color: var(--white); }
+.circuitTabs a.active::after { position: absolute; right: 0; bottom: -12px; left: 0; height: 2px; content: ""; background: var(--purple); box-shadow: 0 0 12px rgba(165,108,255,.7); }
 .circuitPeriods { padding: 4px; display: flex; gap: 3px; border: 1px solid #262a33; border-radius: 7px; background: #0c0e12; }
 .circuitPeriods a { min-width: 64px; padding: 11px 14px; border-radius: 4px; color: #838a97; font-size: 12px; font-weight: 700; text-align: center; text-decoration: none; }
 .circuitPeriods a:hover,.circuitPeriods a:focus-visible { color: var(--white); }
@@ -476,12 +481,53 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitOutcome.loss { color: #ff718c; }
 .circuitOutcome.open { color: var(--purple); }
 .circuitEmpty { min-height: 190px; display: grid; place-items: center; color: #666c79; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 13px; }
+.signalAnalytics { display: grid; gap: 14px; }
+.analyticsPanel { overflow: hidden; border: 1px solid #252933; border-radius: 11px; background: radial-gradient(circle at 88% 0,rgba(165,108,255,.1),transparent 28rem),#0a0c10; }
+.analyticsPanelHead { min-height: 88px; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; gap: 30px; border-bottom: 1px solid #252933; }
+.analyticsPanelHead > div { display: grid; gap: 6px; }
+.analyticsPanelHead span { color: #858b98; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.analyticsPanelHead h1,.analyticsPanelHead h2 { margin: 0; color: #eef0f5; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: clamp(20px,2.4vw,29px); letter-spacing: -.035em; }
+.analyticsPanelHead p { margin: 0; color: #7f8693; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 11px; text-align: right; }
+.funnelLegend { padding: 16px 22px 0; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px 20px; }
+.funnelLegend span { display: flex; align-items: center; gap: 7px; color: #89909d; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.funnelLegend i { width: 9px; height: 9px; background: #59616f; }
+.funnelLegend .sighted i { background: #8570b0; }
+.funnelLegend .surveilling i { background: #a56cff; box-shadow: 0 0 9px rgba(165,108,255,.45); }
+.funnelLegend .acquired i { background: var(--green); box-shadow: 0 0 9px rgba(154,255,79,.35); }
+.funnelChartScroll { overflow-x: auto; }
+.funnelChart { --funnel-days: 1; width: max(100%,calc(92px + var(--funnel-days) * 150px)); min-width: 680px; height: 360px; padding: 20px 22px 22px; display: grid; grid-template-columns: 52px 1fr; gap: 12px; }
+.funnelYAxis { padding-bottom: 34px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #7b828f; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 10px; }
+.funnelPlot { position: relative; min-width: 0; }
+.funnelGrid { position: absolute; inset: 0 0 34px; display: flex; flex-direction: column; justify-content: space-between; }
+.funnelGrid i { width: 100%; height: 1px; background: rgba(165,108,255,.1); }
+.funnelDays { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--funnel-days),minmax(138px,1fr)); gap: 12px; }
+.funnelDay { min-width: 0; display: grid; grid-template-rows: 1fr 34px; }
+.funnelDayBars { min-width: 0; padding: 18px 9px 0; display: grid; grid-template-columns: repeat(4,minmax(18px,1fr)); align-items: end; gap: 6px; }
+.funnelVerticalBar { height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.funnelVerticalBar > i { position: relative; width: 100%; max-width: 31px; min-height: 1px; background: #59616f; box-shadow: 0 0 16px rgba(114,124,142,.16); }
+.funnelVerticalBar.sighted > i { background: #8570b0; }
+.funnelVerticalBar.surveilling > i { background: #a56cff; box-shadow: 0 0 17px rgba(165,108,255,.24); }
+.funnelVerticalBar.acquired > i { background: var(--green); box-shadow: 0 0 17px rgba(154,255,79,.2); }
+.funnelVerticalBar b { position: absolute; top: -17px; left: 50%; color: #a4abb8; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 9px; font-style: normal; transform: translateX(-50%); white-space: nowrap; }
+.funnelDay time { padding-top: 12px; border-top: 1px solid #30343e; color: #7d8491; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 10px; text-align: center; white-space: nowrap; }
+.runnerChart { height: 330px; padding: 26px 30px 20px; display: grid; grid-template-columns: repeat(6,minmax(74px,1fr)); gap: clamp(12px,2.5vw,34px); border-bottom: 1px solid #252933; }
+.runnerColumn { min-width: 0; display: grid; grid-template-rows: 48px 1fr 28px; gap: 7px; }
+.runnerValue { display: grid; align-content: end; justify-items: center; gap: 2px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+.runnerValue strong { color: #f0e8ff; font-size: clamp(20px,2.5vw,32px); letter-spacing: -.04em; }
+.runnerValue span { color: #818895; font-size: 10px; }
+.runnerTrack { position: relative; display: flex; align-items: flex-end; overflow: hidden; border: 1px solid #262a33; background: repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),rgba(165,108,255,.07) 25%); }
+.runnerTrack i { width: 100%; background: linear-gradient(to top,#7436cd,#ae78ff); box-shadow: 0 0 20px rgba(165,108,255,.28); }
+.runnerColumn > b { color: #c9b0ef; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 13px; text-align: center; }
+.runnerPanel > footer { padding: 14px 22px; color: #777e8b; font-size: 11px; line-height: 1.55; }
+.analyticsEmpty { min-height: 240px; margin: 0; display: grid; place-items: center; color: #707784; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 12px; }
 @media (max-width: 1050px) {
   .circuitStats { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .circuitTableHead,.circuitRow { grid-template-columns: minmax(190px,1.35fr) 118px 92px minmax(145px,.8fr) 112px minmax(154px,.8fr); gap: 10px; }
 }
 @media (max-width: 720px) {
   .circuitHeading { min-height: 86px; padding-top: 14px; display: grid; align-content: center; }
+  .circuitTabs { min-height: 45px; }
+  .circuitTabs a.active::after { bottom: 0; }
   .circuitPeriods { width: 100%; }
   .circuitPeriods a { min-width: 0; flex: 1; }
   .equityPanelHead { min-height: 92px; padding: 14px 18px; display: grid; align-items: center; }
@@ -502,6 +548,13 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .circuitOutcomeTop { justify-content: flex-end; }
   .circuitOutcomeDesktop { display: none; }
   .circuitOutcomeMobile { display: inline; }
+  .analyticsPanelHead { min-height: 112px; padding: 17px 18px; align-items: flex-start; flex-direction: column; gap: 11px; }
+  .analyticsPanelHead p { text-align: left; }
+  .funnelLegend { justify-content: flex-start; }
+  .funnelChart { padding-inline: 18px; }
+  .runnerChart { min-width: 650px; height: 300px; padding-inline: 22px; }
+  .runnerPanel { overflow-x: auto; }
+  .runnerPanel > header,.runnerPanel > footer { position: sticky; left: 0; min-width: calc(100vw - 32px); }
 }
 .launchPage { padding-bottom: 80px; }
 .launchLabNav { border-bottom: 1px solid var(--line); }
