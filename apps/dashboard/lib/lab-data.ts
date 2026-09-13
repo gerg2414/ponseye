@@ -56,7 +56,6 @@ export type LabToken = {
 
 export type CapitalCircuitDaily = {
   date: string;
-  launches: number;
   sighted: number;
   surveilling: number;
   acquired: number;
@@ -361,7 +360,6 @@ async function loadCapitalCircuitAnalytics(): Promise<CapitalCircuitDaily[]> {
     const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
     return {
       date: String(row.date ?? ""),
-      launches: Number(row.launches ?? 0),
       sighted: Number(row.sighted ?? 0),
       surveilling: Number(row.surveilling ?? 0),
       acquired: Number(row.acquired ?? 0),

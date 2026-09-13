@@ -1,10 +1,9 @@
 import type { CSSProperties } from "react";
 import type { CapitalCircuitDaily, LabToken } from "../../lib/lab-data";
 
-type FunnelKey = "launches" | "sighted" | "surveilling" | "acquired";
+type FunnelKey = "sighted" | "surveilling" | "acquired";
 
 const funnelSeries: Array<{ key: FunnelKey; label: string }> = [
-  { key: "launches", label: "Launches" },
   { key: "sighted", label: "Sighted" },
   { key: "surveilling", label: "Surveilling" },
   { key: "acquired", label: "Acquired" },
