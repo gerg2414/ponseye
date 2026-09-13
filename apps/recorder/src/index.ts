@@ -224,8 +224,9 @@ async function recordingCycle() {
       : { status: "connected" };
   }, collectorAbort.signal);
   void recoverRecentLaunches(auth.access_token, collectorAbort.signal)
-    .then(() => recoverCurveTrades(auth.access_token, collectorAbort.signal, curveRecoveryStart))
-    .catch((error) => console.error("Launch or curve history recovery failed", error));
+    .catch((error) => console.error("Launch history recovery failed", error));
+  void recoverCurveTrades(auth.access_token, collectorAbort.signal, curveRecoveryStart)
+    .catch((error) => console.error("Curve history recovery failed", error));
   const launchHistoryRepair = (async () => {
     while (!collectorAbort.signal.aborted) {
       await delayOrAbort(10 * 60_000, collectorAbort.signal);
