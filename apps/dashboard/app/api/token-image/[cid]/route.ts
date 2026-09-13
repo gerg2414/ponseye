@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 const gateways = [
   "https://w3s.link/ipfs/",
   "https://nftstorage.link/ipfs/",
@@ -7,6 +9,7 @@ const gateways = [
 ];
 
 const maximumImageBytes = 5_000_000;
+const thumbnailSize = 192;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,9 +41,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cid
 
   try {
     const image = await Promise.any(gateways.map((gateway) => fetchImage(`${gateway}${cid}`)));
-    return new Response(image.body, {
+    const thumbnail = await sharp(Buffer.from(image.body))
+      .rotate()
+      .resize(thumbnailSize, thumbnailSize, { fit: "cover", position: "centre", withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toBuffer();
+    return new Response(new Uint8Array(thumbnail), {
       headers: {
-        "Content-Type": image.contentType,
+        "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
         "X-Content-Type-Options": "nosniff",
       },
