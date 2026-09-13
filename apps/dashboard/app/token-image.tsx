@@ -49,7 +49,6 @@ export function TokenImage({
   }, [candidates]);
 
   const resolvedSrc = shouldLoad ? candidates[candidateIndex] ?? null : null;
-  const localProxy = resolvedSrc?.startsWith("/") ?? false;
 
   return (
     <span ref={host} className="tokenImageLoader">
@@ -62,7 +61,7 @@ export function TokenImage({
           width={size}
           height={size}
           priority={priority}
-          unoptimized={!localProxy}
+          unoptimized
           sizes={`${size}px`}
           style={{ opacity: loaded ? 1 : 0, transition: "opacity 120ms ease-out" }}
           onLoad={() => setLoaded(true)}
