@@ -988,11 +988,6 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               <div><small>Column 3</small><strong>Surveilling → Acquired</strong></div>
               <span>Pass score or fast qualification, then pass hard rejection rules.</span>
             </section>
-            <nav className="labAcquisitionTabs" aria-label="Acquired qualification rules">
-              <button type="button" className={acquisitionTab === "score" ? "active" : ""} onClick={() => setAcquisitionTab("score")}>Score rules</button>
-              <button type="button" className={acquisitionTab === "fast" ? "active" : ""} onClick={() => setAcquisitionTab("fast")}>Fast qualification</button>
-              <button type="button" className={acquisitionTab === "rejection" ? "active" : ""} onClick={() => setAcquisitionTab("rejection")}>Hard rejection</button>
-            </nav>
           </>
         )}
 
@@ -1213,7 +1208,7 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               <select aria-label="Sort Lab results" value={resultSort} onChange={(event) => setResultSort(event.target.value as ResultSort)}>
                 <option value="newest">Newest signals</option>
                 <option value="score">Highest Lab score</option>
-                <option value="peak">Highest peak after signal</option>
+                <option value="peak">Highest gains after signal</option>
                 <option value="market-cap">Highest signal market cap</option>
               </select>
             </label>
