@@ -7,7 +7,7 @@ import { quoteValue } from "../../../lib/market";
 import { TokenImage } from "../../token-image";
 import { CopyField } from "./copy-field";
 import { LaunchBackLink } from "./launch-back-link";
-import { PonsEyeChart } from "./ponseye-chart";
+import { PonsEyeChart, type StageExit } from "./ponseye-chart";
 
 export const revalidate = 5;
 
@@ -183,6 +183,12 @@ export default async function LaunchPage({ params, searchParams }: {
     ...(telegramUrl ? [{ kind: "telegram" as const, label: "Telegram", href: telegramUrl }] : []),
     ...(discordUrl ? [{ kind: "discord" as const, label: "Discord", href: discordUrl }] : []),
   ];
+  const stageExits: StageExit[] = launch.strategy_version === "strict-quiet-staggered-v1" ? [
+    { at: launch.hit_10x_at ?? null, multiple: 10, soldPct: 20 },
+    { at: launch.hit_20x_at ?? null, multiple: 20, soldPct: 20 },
+    { at: launch.hit_50x_at ?? null, multiple: 50, soldPct: 50 },
+    { at: launch.hit_100x_at ?? null, multiple: 100, soldPct: 10 },
+  ].filter((exit) => exit.at) : [];
 
   return (
     <main className="launchPage positionPage">
@@ -235,7 +241,8 @@ export default async function LaunchPage({ params, searchParams }: {
             <div><strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"}</strong></div>
             <div className="positionLegend" aria-label="Position chart markers">
               <span className="buy"><i>↑</i> Ponseye buy</span>
-              {closed ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> Tracking live</span>}
+              {stageExits.length ? <span className="exit"><i>↓</i> Staged sells</span> : null}
+              {closed && !stageExits.length ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> {closed ? "Closed" : "Tracking live"}</span>}
             </div>
           </header>
           <div className="positionChartFrame">
@@ -246,8 +253,9 @@ export default async function LaunchPage({ params, searchParams }: {
               graduatedAt={launch.graduated_at}
               bondPriceUsd={bondPriceUsd}
               acquiredAt={entryAt}
-              closedAt={launch.closed_at ?? null}
+              closedAt={stageExits.length ? null : launch.closed_at ?? null}
               entryMarketCap={entryMarketCap}
+              stageExits={stageExits}
             />
           </div>
         </section>
