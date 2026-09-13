@@ -108,20 +108,28 @@ export async function getTokenDatabase({
 
   let tokenQuery = db
     .from("launch_board")
-    .select(columns, { count: "exact" })
+    .select(columns)
     .order(sortColumns[sort], { ascending: false, nullsFirst: false })
     .order("launched_at", { ascending: false })
     .range(from, to);
+
+  let countQuery = db
+    .from("launches")
+    .select("token_address", { count: "exact", head: true });
 
   if (safeSearch) {
     tokenQuery = tokenQuery.or(
       `name.ilike.%${safeSearch}%,symbol.ilike.%${safeSearch}%,token_address.ilike.%${safeSearch}%`,
     );
+    countQuery = countQuery.or(
+      `name.ilike.%${safeSearch}%,symbol.ilike.%${safeSearch}%,token_address.ilike.%${safeSearch}%`,
+    );
   }
 
-  const tokenResult = await tokenQuery;
+  const [tokenResult, countResult] = await Promise.all([tokenQuery, countQuery]);
 
   if (tokenResult.error) throw new Error(tokenResult.error.message);
+  if (countResult.error) throw new Error(countResult.error.message);
 
   const tokens = (tokenResult.data ?? []).map((token) => ({
     ...token,
@@ -139,6 +147,6 @@ export async function getTokenDatabase({
 
   return {
     tokens,
-    filteredCount: tokenResult.count ?? 0,
+    filteredCount: countResult.count ?? 0,
   };
 }
