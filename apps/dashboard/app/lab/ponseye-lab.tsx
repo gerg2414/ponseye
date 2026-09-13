@@ -35,7 +35,8 @@ type LabSettings = {
 };
 
 type PresetName = "discovery" | "balanced" | "strict" | "early" | "crowd" | "quality" | "steady2x" | "runner3x" | "wide3x" | "tight3x" | "market3x" | "fast3x";
-type ControlTab = "normal" | "fast" | "safety";
+type ControlTab = "sighted" | "surveilling" | "acquired" | "rejected" | "exit" | "position";
+type AcquisitionTab = "score" | "fast" | "rejection";
 type ResultSort = "newest" | "score" | "peak" | "market-cap";
 type ExitModel = "fixed" | "breakeven" | "initials" | "staggered";
 type TakeProfitLevel = { target: number; sellPct: number };
@@ -312,9 +313,9 @@ const presets = Object.fromEntries(
 ) as Record<PresetName, LabSettings>;
 
 const presetDetails: Array<{ name: PresetName; label: string; description: string }> = [
-  { name: "steady2x", label: "Tested 2x", description: "Most consistent 2x model" },
-  { name: "market3x", label: "Market 3x", description: "Best strict 3x model" },
-  { name: "fast3x", label: "Fast Conviction", description: "Market 3x plus exceptional fast launches" },
+  { name: "steady2x", label: "Balanced Evidence", description: "Broader entry rules with a high score requirement" },
+  { name: "market3x", label: "Strict Entry", description: "Stronger buyer, holder and momentum requirements" },
+  { name: "fast3x", label: "Strict + Fast", description: "Strict scoring plus the all-pass fast qualification" },
 
 ];
 
@@ -608,7 +609,8 @@ function ResultToken({ token, runnerTarget }: { token: ScoredToken; runnerTarget
 export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
   const [settings, setSettings] = useState<LabSettings>(() => cloneSettings(presets.market3x));
   const [activePreset, setActivePreset] = useState<PresetName | "custom">("market3x");
-  const [controlTab, setControlTab] = useState<ControlTab>("normal");
+  const [controlTab, setControlTab] = useState<ControlTab>("acquired");
+  const [acquisitionTab, setAcquisitionTab] = useState<AcquisitionTab>("score");
   const [exitSettings, setExitSettings] = useState<ExitProfile>({
     exitModel: "fixed",
     runnerTarget: 3,
@@ -889,18 +891,33 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
     <>
       <section className="labModelDock">
         <header className="labBenchHeader">
-          <div><small>PonsEye test bench</small><strong>One entry. One exit. One result.</strong></div>
-          <label className={resultStyles.positionSize}>
-            <span>Position size</span>
-            <strong><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={exitSettings.positionSizeUsd} onChange={(event) => setExitSettings({ ...exitSettings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) })} /></strong>
-          </label>
+          <div><small>Current test</small><strong>{entryLabel} · {exitLabel} · {formatUsd(exitSettings.positionSizeUsd)}</strong></div>
         </header>
         <details className="labDrawer entry">
           <summary>
-            <div><small>Entry model</small><strong>{entryLabel}</strong><span>{analysis.selected.length} acquired · {hitRate.toFixed(1)}% hit rate</span></div>
-            <b>Tune entry</b>
+            <div><small>Funnel, entry and exit</small><strong>Configuration</strong><span>{analysis.selected.length} acquired · {hitRate.toFixed(1)}% hit rate</span></div>
+            <b>Open configuration</b>
           </summary>
           <aside className="labControls">
+        <div className="labConfigLayout">
+        <button type="button" className="labConfigClose" onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}>Close configuration ×</button>
+        <nav className="labConfigNav" aria-label="Configuration sections">
+          <header><small>Pipeline</small><strong>Rules by stage</strong></header>
+          <button type="button" className={controlTab === "sighted" ? "active" : ""} onClick={() => setControlTab("sighted")}><small>01</small><span>Sighted</span></button>
+          <button type="button" className={controlTab === "surveilling" ? "active" : ""} onClick={() => setControlTab("surveilling")}><small>02</small><span>Surveilling</span></button>
+          <div className={controlTab === "acquired" ? "active group" : "group"}>
+            <button type="button" onClick={() => { setControlTab("acquired"); setAcquisitionTab("score"); }}><small>03</small><span>Acquired</span></button>
+            <button type="button" className={controlTab === "acquired" && acquisitionTab === "score" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("score"); }}>Score rules</button>
+            <button type="button" className={controlTab === "acquired" && acquisitionTab === "fast" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("fast"); }}>Fast qualification</button>
+            <button type="button" className={controlTab === "acquired" && acquisitionTab === "rejection" ? "active" : ""} onClick={() => { setControlTab("acquired"); setAcquisitionTab("rejection"); }}>Hard rejection</button>
+          </div>
+          <button type="button" className={controlTab === "rejected" ? "active" : ""} onClick={() => setControlTab("rejected")}><small>04</small><span>Binned</span></button>
+          <hr />
+          <button type="button" className={controlTab === "exit" ? "active" : ""} onClick={() => setControlTab("exit")}><small>05</small><span>Exit strategy</span></button>
+          <button type="button" className={controlTab === "position" ? "active" : ""} onClick={() => setControlTab("position")}><small>06</small><span>Position size</span></button>
+        </nav>
+        <div className="labConfigPane">
+        {controlTab === "acquired" && (<>
         <header>
           <div><small>Entry model</small><h2>{activePreset === "custom" ? "Custom setup" : presetDetails.find((preset) => preset.name === activePreset)?.label}</h2></div>
           <button type="button" onClick={() => choosePreset("market3x")}>Reset</button>
@@ -934,27 +951,59 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
             ) : <p>No saved setups yet.</p>}
           </details>
         </section>
+        </>)}
 
-        <div className="labEntryPath" aria-label="Entry funnel">
-          <span><small>Lab starts</small><strong>Surveillance</strong></span><b>→</b>
-          <span><small>Pass either</small><strong>Normal or fast</strong></span><b>→</b>
-          <span><small>Paper buy</small><strong>Acquired</strong></span>
-        </div>
+        {controlTab === "sighted" && (
+          <section className="labStagePanel">
+            <header><div><small>Column 1</small><strong>Sighted</strong></div><span>Automatic</span></header>
+            <p>Every detected PONS launch enters Sighted. Nothing is scored or rejected at this point.</p>
+            <div className="labStageRuleList">
+              <article><span>Launch detected</span><strong>Required</strong></article>
+              <article><span>Token identity saved</span><strong>Automatic</strong></article>
+              <article><span>Trades, price and holders</span><strong>Start recording</strong></article>
+            </div>
+          </section>
+        )}
 
-        <nav className="labControlTabs" aria-label="Lab controls">
-          <button type="button" className={controlTab === "normal" ? "active" : ""} onClick={() => setControlTab("normal")}>Normal route</button>
-          <button type="button" className={controlTab === "fast" ? "active" : ""} onClick={() => setControlTab("fast")}>Fast route</button>
-          <button type="button" className={controlTab === "safety" ? "active" : ""} onClick={() => setControlTab("safety")}>Safety</button>
-        </nav>
+        {controlTab === "surveilling" && (
+          <section className="labStagePanel">
+            <header><div><small>Column 2</small><strong>Sighted → Surveilling</strong></div><span>All must pass</span></header>
+            <p>These are the live rules that promote a launch into Surveilling.</p>
+            <div className="labStageRuleList twoColumn">
+              <article><span>Launch age</span><strong>1 to 15 minutes</strong></article>
+              <article><span>Fresh market evidence</span><strong>Within 2 minutes</strong></article>
+              <article><span>Market cap</span><strong>$10,000 minimum</strong></article>
+              <article><span>Trades</span><strong>12 minimum</strong></article>
+              <article><span>Unique traders</span><strong>6 minimum</strong></article>
+              <article><span>Buy pressure</span><strong>52% minimum</strong></article>
+              <article><span>Creator sales</span><strong>None</strong></article>
+            </div>
+            <small className="labStageNote">The Lab currently begins with tokens that already reached Surveilling, so changing these would need Sighted snapshots added to the Lab dataset first.</small>
+          </section>
+        )}
 
-        {controlTab === "normal" && (
+        {controlTab === "acquired" && (
+          <>
+            <section className="labStageIntro">
+              <div><small>Column 3</small><strong>Surveilling → Acquired</strong></div>
+              <span>Pass score or fast qualification, then pass hard rejection rules.</span>
+            </section>
+            <nav className="labAcquisitionTabs" aria-label="Acquired qualification rules">
+              <button type="button" className={acquisitionTab === "score" ? "active" : ""} onClick={() => setAcquisitionTab("score")}>Score rules</button>
+              <button type="button" className={acquisitionTab === "fast" ? "active" : ""} onClick={() => setAcquisitionTab("fast")}>Fast qualification</button>
+              <button type="button" className={acquisitionTab === "rejection" ? "active" : ""} onClick={() => setAcquisitionTab("rejection")}>Hard rejection</button>
+            </nav>
+          </>
+        )}
+
+        {controlTab === "acquired" && acquisitionTab === "score" && (
           <>
             <section className="labPrimaryControl">
-              <label htmlFor="scoreThreshold"><span>Normal route score required</span><strong>{settings.scoreThreshold}%</strong></label>
+              <label htmlFor="scoreThreshold"><span>Score required to acquire</span><strong>{settings.scoreThreshold}%</strong></label>
               <input id="scoreThreshold" type="range" min="30" max="100" step="5" value={settings.scoreThreshold} onChange={(event) => { setSettings({ ...settings, scoreThreshold: Number(event.target.value) }); setActivePreset("custom"); }} />
             </section>
 
-            <section className="labRulesHelp"><strong>Normal route</strong><span>Each passing rule adds to the score. Pass mark is what the token must achieve. Importance controls how much the rule counts.</span></section>
+            <section className="labRulesHelp"><strong>Score qualification</strong><span>Each passing rule adds to the score. Pass mark is what the token must achieve. Weight controls how much the rule counts.</span></section>
             <div className="labRuleHeading"><span>Rule</span><span>Pass mark</span><span>Weight</span></div>
             <div className="labRules">
               {settings.rules.map((rule, index) => (
@@ -974,10 +1023,10 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </>
         )}
 
-        {controlTab === "fast" && (
+        {controlTab === "acquired" && acquisitionTab === "fast" && (
           <>
             <section className="labTrackSwitch">
-              <span><strong>Fast acquisition route</strong><small>Acquire when every fast rule passes, even if the normal score does not.</small></span>
+              <span><strong>Fast qualification</strong><small>Acquire when every fast rule passes, even if the main score is too low.</small></span>
               <label><input type="checkbox" checked={settings.fastRouteEnabled === true} onChange={(event) => { setSettings({ ...settings, fastRouteEnabled: event.target.checked }); setActivePreset("custom"); }} /><i /></label>
             </section>
             <div className="labRuleHeading labFastHeading"><span>All rules required</span><span>Pass mark</span></div>
@@ -995,31 +1044,31 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
           </>
         )}
 
-        {controlTab === "safety" && (
+        {controlTab === "acquired" && acquisitionTab === "rejection" && (
           <section className="labSafety">
-            <div><small>Safety gates</small><strong>Automatic rejection</strong></div>
-            <p>Gates reject a token before its weighted score is considered.</p>
+            <div><small>Hard rejection rules</small><strong>Overrides both qualifications</strong></div>
+            <p>A token cannot be acquired when one of these enabled rules fails.</p>
             <label><span><b>No creator sales</b><small>Reject any creator sell before signal</small></span><input type="checkbox" checked={settings.creatorGate} onChange={(event) => { setSettings({ ...settings, creatorGate: event.target.checked }); setActivePreset("custom"); }} /></label>
             <label><span><b>Holder concentration</b><small>Reject above the Top 10 rule limit</small></span><input type="checkbox" checked={settings.concentrationGate} onChange={(event) => { setSettings({ ...settings, concentrationGate: event.target.checked }); setActivePreset("custom"); }} /></label>
           </section>
         )}
-          </aside>
-        </details>
 
-        <div className="labChainCore">
-          <small>Signals routed</small>
-          <div className="labChainPulse"><i /><b /></div>
-          <strong>{analysis.selected.length}</strong>
-          <span>Acquired</span>
-        </div>
+        {controlTab === "rejected" && (
+          <section className="labStagePanel rejected">
+            <header><div><small>Removed from active columns</small><strong>Binned</strong></div><span>Permanent</span></header>
+            <p>A normal price swing does not bin a token. Both conditions below must happen.</p>
+            <div className="labStageRuleList conditionPair">
+              <article><small>Condition 1</small><span>Creator has sold</span><strong>Yes</strong></article>
+              <b>AND</b>
+              <article><small>Condition 2</small><span>Price versus its peak</span><strong>50% or lower</strong></article>
+            </div>
+            <small className="labStageNote">Once binned, the token stays binned.</small>
+          </section>
+        )}
 
-        <details className="labDrawer exit">
-          <summary>
-            <div><small>Exit model</small><strong>{exitLabel}</strong><span>{exitModel === "staggered" ? formatTakeProfitLevels(exitSettings.takeProfitLevels) : `${exitSettings.runnerTarget}x target`} · {exitSettings.stopEnabled ? `${exitSettings.stopLossPct}% stop` : "no stop"}</span></div>
-            <b>Tune exit</b>
-          </summary>
+        {controlTab === "exit" && (
           <section className="labStrategyPanel">
-          <header><div><small>Exit model</small><h2>Choose an exit model</h2></div><span>Applied to the selected entry model</span></header>
+          <header><div><small>Exit strategy</small><h2>{exitLabel}</h2></div><span>Applied after a token is acquired</span></header>
           <label className={`${resultStyles.modelSelect} ${resultStyles.exitSelect}`}>
             <span>Exit model</span>
             <select aria-label="Exit model" value={exitModel} onChange={(event) => chooseExitModel(event.target.value as ExitModel)}>
@@ -1048,7 +1097,6 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               </div>
             ) : <p>No saved exit profiles yet.</p>}
           </div>
-
           <div className="labStrategyControls">
             {exitModel === "staggered" ? (
               <div className={`target ${resultStyles.staggeredLevels}`}>
@@ -1084,13 +1132,22 @@ export function PonsEyeLab({ tokens }: { tokens: LabToken[] }) {
               </label>
             </div>
           </div>
-          <div className="labReplayCounts">
-            <article className="stopped"><small>Stop hit first</small><strong>{analysis.stopHits}</strong><span>sold at −{exitSettings.stopLossPct}%</span></article>
-            <article className="target"><small>{exitModel === "staggered" ? "Profit taken" : `${exitSettings.runnerTarget}x hit first`}</small><strong>{analysis.targetExits}</strong><span>{exitModel === "staggered" ? "hit at least one TP level" : "sold at target"}</span></article>
-            <article className="open"><small>Neither hit</small><strong>{analysis.openAtEnd}</strong><span>valued at final recorded price</span></article>
-            <article className="unknown"><small>No replay data</small><strong>{analysis.selected.length - analysis.replayable.length}</strong><span>excluded from money result</span></article>
-          </div>
           </section>
+        )}
+
+        {controlTab === "position" && (
+          <section className="labStagePanel labPositionPanel">
+            <header><div><small>Trade amount</small><strong>Position size</strong></div><span>Global</span></header>
+            <p>This amount is used for every token selected by the current entry rules.</p>
+            <label className={resultStyles.positionSize}>
+              <span>Dollars per acquired token</span>
+              <strong><b>$</b><input aria-label="Position size in dollars" type="number" min="1" step="1" value={exitSettings.positionSizeUsd} onChange={(event) => setExitSettings({ ...exitSettings, positionSizeUsd: Math.max(1, Number(event.target.value) || 1) })} /></strong>
+            </label>
+          </section>
+        )}
+        </div>
+        </div>
+          </aside>
         </details>
       </section>
 
