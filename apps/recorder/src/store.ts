@@ -239,9 +239,14 @@ export async function saveTrade(row: EventRow) {
 }
 
 export async function getLatestCurveTradeTime() {
+  // Look behind the live edge so a fresh row after a restart cannot hide an
+  // older processing gap. Replaying the overlap is safe because event_id is
+  // unique and duplicate inserts are ignored.
+  const liveEdgeCutoff = new Date(Date.now() - 10 * 60_000).toISOString();
   const { data, error } = await db
     .from("trades")
     .select("block_time")
+    .lt("block_time", liveEdgeCutoff)
     .order("block_time", { ascending: false })
     .limit(1)
     .maybeSingle();
