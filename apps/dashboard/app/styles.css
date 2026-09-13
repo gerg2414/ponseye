@@ -459,8 +459,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitRow > strong { color: #d0d3da; font-size: 14px; }
 .circuitRow > strong.runner { color: var(--green); font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 21px; }
 .circuitPnl { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 14px !important; }
-.circuitOutcome { width: fit-content; display: block; color: #9298a4; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-weight: 800; }
+.circuitOutcome { width: fit-content; display: grid; gap: 5px; color: #9298a4; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-weight: 800; }
 .circuitOutcome b { color: currentColor; font-size: 20px; line-height: 1; letter-spacing: -.045em; }
+.circuitOutcome small { color: #7f8794; font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
 .circuitOutcome.win { color: var(--green); text-shadow: 0 0 13px rgba(154,255,79,.22); }
 .circuitOutcome.win b { font-size: 27px; }
 .circuitOutcome.loss { color: #ff718c; }

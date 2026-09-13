@@ -12,16 +12,15 @@ export const metadata: Metadata = {
 };
 
 const evidenceScore = [
-  "50 or more trades",
-  "15 or more unique traders",
-  "Buy pressure at least 58%",
-  "3 or more first minute buyers",
-  "30 or more holders",
-  "Holder count rising over 5 minutes",
-  "Top 10 holders at or below 70%",
-  "Creator balance at or below 5%",
-  "Price at least 1.20x its first price",
-  "Price holding at least 60% of peak",
+  "12 or more trades · 15 points",
+  "12 or more unique traders · 15 points",
+  "Buy pressure at least 65% · 10 points",
+  "8 or more first minute buyers · 15 points",
+  "Price at least 0.75x its first price · 20 points",
+  "Price holding at least 70% of peak · 15 points",
+  "Top 10 holders at or below 90% · 10 points",
+  "Market cap at least $5,000 · 25 points",
+  "First minute buyers at least 50% of traders · 25 points",
 ];
 
 function count(value: number) {
@@ -83,14 +82,12 @@ export default async function RulesPage() {
           <header><span>02</span><div><small>Minimum Lab population</small><h2>Surveillance</h2></div><strong>{count(live.counts.surveillance)}</strong></header>
           <p>Once a token reaches Surveillance it stays under watch. It does not fall back to Sighted.</p>
           <div className={styles.gate}>
-            <h3>Normal route to Acquired</h3>
+            <h3>Strict route to Acquired</h3>
             <ul>
-              <li>Sighted timing, freshness and $10k gate still pass</li>
-              <li>At least 30 trades</li>
-              <li>At least 10 unique traders</li>
+              <li>Scored at the first Surveillance checkpoint</li>
+              <li>At least 90% of available weighted evidence</li>
+              <li>Top 10 holders no higher than 90% when known</li>
               <li>No creator sells</li>
-              <li>Price holds at least 50% of peak</li>
-              <li>At least 8 of 10 evidence points</li>
             </ul>
           </div>
           <footer>Not all passed <b>Stay in Surveillance</b></footer>
@@ -104,24 +101,25 @@ export default async function RulesPage() {
           <div className={styles.gate}>
             <h3>Live exit model</h3>
             <ul>
-              <li>Close at 3.00x entry for the target</li>
-              <li>Close at 0.90x entry for the stop</li>
-              <li>Peak price continues updating while open</li>
-              <li>First qualifying trade after entry closes it</li>
+              <li>Sell 20% of the original position at 10x</li>
+              <li>Sell 20% at 20x</li>
+              <li>Sell 50% at 50x</li>
+              <li>Sell the final 10% at 100x</li>
+              <li>No stop loss</li>
             </ul>
           </div>
-          <footer>Position result <b>Target or Stop</b></footer>
+          <footer>Position result <b>Four staged exits</b></footer>
         </article>
       </section>
 
       <section className={styles.branches}>
         <article>
-          <span className={styles.branchLabel}>Fast route</span>
-          <h2>Sighted or Surveillance → Acquired</h2>
-          <p>The fast route bypasses the holder score when all of these stronger signals pass inside the same live entry window.</p>
+          <span className={styles.branchLabel}>Quiet Peak route</span>
+          <h2>Surveillance → Acquired</h2>
+          <p>The secondary route captures quiet tokens making a fresh peak without a late burst of buyers.</p>
           <ul>
-            <li>Market cap at least $30,000</li><li>50 trades</li><li>15 unique traders</li><li>58% buy pressure</li>
-            <li>No creator sells</li><li>3 first minute buyers</li><li>Price at least 1.20x first price</li><li>At least 60% of peak held</li>
+            <li>At least 50% weighted evidence</li><li>Holding 100% of its peak</li><li>No more than 2 buys in the final 20 seconds</li>
+            <li>Top 10 holders no higher than 90% when known</li><li>No creator sells</li>
           </ul>
         </article>
 
@@ -134,7 +132,7 @@ export default async function RulesPage() {
       </section>
 
       <section className={styles.score}>
-        <header><div><small>Normal acquisition route</small><h2>Evidence score</h2></div><strong>8 / 10 required</strong></header>
+        <header><div><small>Strict acquisition route</small><h2>Weighted evidence score</h2></div><strong>90% required</strong></header>
         <ol>{evidenceScore.map((rule, index) => <li key={rule}><span>{String(index + 1).padStart(2, "0")}</span>{rule}</li>)}</ol>
       </section>
 

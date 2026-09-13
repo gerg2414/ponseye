@@ -55,6 +55,15 @@ export type Launch = {
   exit_reason?: "target" | "stop" | null;
   target_multiple?: number | null;
   position_status?: "open" | "closed" | null;
+  position_size_usd?: number | null;
+  remaining_pct?: number | null;
+  realised_return_multiple?: number | null;
+  position_value_multiple?: number | null;
+  strategy_version?: string | null;
+  hit_10x_at?: string | null;
+  hit_20x_at?: string | null;
+  hit_50x_at?: string | null;
+  hit_100x_at?: string | null;
   sparkline_prices?: number[];
 };
 
@@ -144,6 +153,14 @@ type PositionRecord = {
   target_multiple: number | string;
   position_status: "open" | "closed";
   closed_at: string | null;
+  position_size_usd: number | string;
+  remaining_pct: number | string;
+  realised_return_multiple: number | string;
+  strategy_version: string;
+  hit_10x_at: string | null;
+  hit_20x_at: string | null;
+  hit_50x_at: string | null;
+  hit_100x_at: string | null;
 };
 
 type ResearchStateRecord = {
@@ -215,7 +232,7 @@ async function loadDashboardData() {
         .order("block_time", { ascending: false })
         .limit(1_000),
       db.from("acquired_positions")
-        .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at")
+        .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at,position_size_usd,remaining_pct,realised_return_multiple,strategy_version,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at")
         .in("token_address", acquiredAddresses),
     ]);
 
@@ -235,6 +252,18 @@ async function loadDashboardData() {
       launch.target_multiple = Number(position.target_multiple);
       launch.position_status = position.position_status;
       launch.closed_at = position.closed_at;
+      launch.position_size_usd = Number(position.position_size_usd);
+      launch.remaining_pct = Number(position.remaining_pct);
+      launch.realised_return_multiple = Number(position.realised_return_multiple);
+      launch.strategy_version = position.strategy_version;
+      launch.hit_10x_at = position.hit_10x_at;
+      launch.hit_20x_at = position.hit_20x_at;
+      launch.hit_50x_at = position.hit_50x_at;
+      launch.hit_100x_at = position.hit_100x_at;
+      const priceMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
+        ? launch.market_cap_usd / launch.entry_market_cap_usd
+        : 1;
+      launch.position_value_multiple = Number(position.realised_return_multiple) + Number(position.remaining_pct) * priceMultiple / 100;
     }
     const pointsByAddress = new Map<string, Array<{ time: number; price: number }>>();
     const addPoint = (tokenAddress: string, blockTime: string, price: number) => {
@@ -327,7 +356,7 @@ export async function getLaunchDetail(tokenAddress: string) {
 
   const [positionResult, researchStateResult] = await Promise.all([
     db.from("acquired_positions")
-      .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at")
+      .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at,position_size_usd,remaining_pct,realised_return_multiple,strategy_version,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at")
       .eq("token_address", tokenAddress)
       .maybeSingle(),
     db.from("launch_metrics")
@@ -364,6 +393,19 @@ export async function getLaunchDetail(tokenAddress: string) {
       target_multiple: Number(position.target_multiple),
       position_status: position.position_status,
       closed_at: position.closed_at,
+      position_size_usd: Number(position.position_size_usd),
+      remaining_pct: Number(position.remaining_pct),
+      realised_return_multiple: Number(position.realised_return_multiple),
+      strategy_version: position.strategy_version,
+      hit_10x_at: position.hit_10x_at,
+      hit_20x_at: position.hit_20x_at,
+      hit_50x_at: position.hit_50x_at,
+      hit_100x_at: position.hit_100x_at,
+      position_value_multiple: Number(position.realised_return_multiple) + Number(position.remaining_pct) * (
+        Number(position.entry_market_cap_usd) > 0 && Number(payload.launch.market_cap_usd) > 0
+          ? Number(payload.launch.market_cap_usd) / Number(position.entry_market_cap_usd)
+          : 1
+      ) / 100,
     } : {}),
   } as LaunchRecord;
   return {

@@ -41,6 +41,15 @@ export type LabToken = {
   target_multiple?: number | null;
   stop_multiple?: number | null;
   exit_reason?: "target" | "stop" | null;
+  strategy_version?: string | null;
+  position_size_usd?: number | null;
+  remaining_pct?: number | null;
+  realised_return_multiple?: number | null;
+  position_value_multiple?: number | null;
+  hit_10x_at?: string | null;
+  hit_20x_at?: string | null;
+  hit_50x_at?: string | null;
+  hit_100x_at?: string | null;
   pre_target_low_multiples: Record<string, number | null>;
   post_2x_pre_target_low_multiples: Record<string, number | null>;
 };
@@ -181,7 +190,15 @@ type CapitalPosition = {
   exit_market_cap_usd: number | string | null;
   peak_price_usd: number | string | null;
   target_multiple: number | string;
-  stop_multiple: number | string;
+  stop_multiple: number | string | null;
+  strategy_version: string;
+  position_size_usd: number | string;
+  remaining_pct: number | string;
+  realised_return_multiple: number | string;
+  hit_10x_at: string | null;
+  hit_20x_at: string | null;
+  hit_50x_at: string | null;
+  hit_100x_at: string | null;
   position_status: "open" | "closed";
   closed_at: string | null;
   exit_reason: "target" | "stop" | null;
@@ -206,7 +223,7 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
   const db = createClient(url, key, { auth: { persistSession: false }, db: { retry: false } });
   const [labTokens, positionsResult, launchesResult, metricsResult] = await Promise.all([
     getPonsEyeLabData(),
-    db.from("acquired_positions").select("token_address,acquired_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,peak_price_usd,target_multiple,stop_multiple,position_status,closed_at,exit_reason"),
+    db.from("acquired_positions").select("token_address,acquired_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,peak_price_usd,target_multiple,stop_multiple,strategy_version,position_size_usd,remaining_pct,realised_return_multiple,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at,position_status,closed_at,exit_reason"),
     db.from("launches").select("token_address,name,symbol,image_url,launched_at,status"),
     db.from("launch_metrics").select("token_address,price_usd"),
   ]);
@@ -233,6 +250,10 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
     const stopMultiple = numberOrNull(position.stop_multiple);
     const liveMultiple = entryPrice && currentPrice ? currentPrice / entryPrice : null;
     const peakMultiple = entryPrice && peakPrice ? peakPrice / entryPrice : null;
+    const remainingPct = numberOrNull(position.remaining_pct) ?? 100;
+    const realisedReturnMultiple = numberOrNull(position.realised_return_multiple) ?? 0;
+    const markMultiple = liveMultiple ?? prior?.final_multiple ?? 1;
+    const positionValueMultiple = realisedReturnMultiple + (remainingPct / 100) * markMultiple;
 
     return {
       token_address: position.token_address,
@@ -266,9 +287,7 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
       outcome_scope: prior?.outcome_scope ?? "full_market",
       future_peak_multiple: peakMultiple ?? prior?.future_peak_multiple ?? null,
       future_low_multiple: prior?.future_low_multiple ?? null,
-      final_multiple: position.position_status === "closed" && entryMarketCap && exitMarketCap
-        ? exitMarketCap / entryMarketCap
-        : liveMultiple ?? prior?.final_multiple ?? null,
+      final_multiple: positionValueMultiple,
       closed_at: position.closed_at,
       position_status: position.position_status,
       entry_market_cap_usd: entryMarketCap,
@@ -276,6 +295,15 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
       target_multiple: targetMultiple,
       stop_multiple: stopMultiple,
       exit_reason: position.exit_reason,
+      strategy_version: position.strategy_version,
+      position_size_usd: numberOrNull(position.position_size_usd),
+      remaining_pct: remainingPct,
+      realised_return_multiple: realisedReturnMultiple,
+      position_value_multiple: positionValueMultiple,
+      hit_10x_at: position.hit_10x_at,
+      hit_20x_at: position.hit_20x_at,
+      hit_50x_at: position.hit_50x_at,
+      hit_100x_at: position.hit_100x_at,
       pre_target_low_multiples: prior?.pre_target_low_multiples ?? {},
       post_2x_pre_target_low_multiples: prior?.post_2x_pre_target_low_multiples ?? {},
     } satisfies LabToken;
@@ -284,7 +312,7 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
 
 const getCachedCapitalCircuitData = unstable_cache(
   loadCapitalCircuitData,
-  ["ponseye-capital-circuit-v1"],
+  ["ponseye-capital-circuit-v2"],
   { revalidate: 5 },
 );
 

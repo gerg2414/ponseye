@@ -15,8 +15,6 @@ type Period = "1d" | "7d" | "30d" | "all";
 
 const startingEquity = 1_000;
 const positionSize = 25;
-const targetMultiple = 3;
-const stopMultiple = 0.9;
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -55,10 +53,24 @@ function smoothPath(points: Array<{ x: number; y: number }>) {
 }
 
 function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number; label: string; tone: "loss" | "win" | "open" } {
+  if (token.strategy_version === "strict-quiet-staggered-v1") {
+    const exitMultiple = Math.max(0, token.position_value_multiple ?? token.final_multiple ?? 1);
+    const latestStage = token.hit_100x_at ? "100x complete"
+      : token.hit_50x_at ? "50x stage hit"
+      : token.hit_20x_at ? "20x stage hit"
+      : token.hit_10x_at ? "10x stage hit"
+      : "Live";
+    return {
+      closed: token.position_status === "closed",
+      exitMultiple,
+      label: latestStage,
+      tone: token.position_status === "closed" ? "win" : "open",
+    };
+  }
   if (token.position_status === "closed") {
     const exitMultiple = token.entry_market_cap_usd && token.exit_market_cap_usd
       ? token.exit_market_cap_usd / token.entry_market_cap_usd
-      : token.final_multiple ?? (token.exit_reason === "stop" ? stopMultiple : targetMultiple);
+      : token.final_multiple ?? (token.exit_reason === "stop" ? 0.9 : 3);
     return {
       closed: true,
       exitMultiple,
@@ -74,12 +86,12 @@ function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number;
       tone: "open",
     };
   }
-  const lowBeforeTarget = token.pre_target_low_multiples[String(targetMultiple)];
-  if (lowBeforeTarget != null && lowBeforeTarget <= stopMultiple) {
-    return { closed: true, exitMultiple: stopMultiple, label: "Stopped", tone: "loss" };
+  const lowBeforeTarget = token.pre_target_low_multiples["3"];
+  if (lowBeforeTarget != null && lowBeforeTarget <= 0.9) {
+    return { closed: true, exitMultiple: 0.9, label: "Stopped", tone: "loss" };
   }
-  if ((token.future_peak_multiple ?? 0) >= targetMultiple) {
-    return { closed: true, exitMultiple: targetMultiple, label: "Target hit", tone: "win" };
+  if ((token.future_peak_multiple ?? 0) >= 3) {
+    return { closed: true, exitMultiple: 3, label: "Target hit", tone: "win" };
   }
   return {
     closed: false,
@@ -157,7 +169,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
     .sort((a, b) => new Date(a.signal_at).getTime() - new Date(b.signal_at).getTime());
   const outcomes = tokens.map((token) => {
     const outcome = modelOutcome(token);
-    return { token, outcome, pnlUsd: positionSize * (outcome.exitMultiple - 1) };
+    return { token, outcome, pnlUsd: (token.position_size_usd ?? positionSize) * (outcome.exitMultiple - 1) };
   });
 
   let balance = startingEquity;
@@ -169,10 +181,10 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
     equityDates.push(item.token.signal_at);
   }
 
-  const capitalDeployed = tokens.length * positionSize;
+  const capitalDeployed = tokens.reduce((total, token) => total + (token.position_size_usd ?? positionSize), 0);
   const pnl = balance - startingEquity;
   const roi = capitalDeployed ? (pnl / capitalDeployed) * 100 : 0;
-  const winners = outcomes.filter((item) => item.outcome.closed && item.outcome.exitMultiple > 1).length;
+  const winners = outcomes.filter((item) => item.outcome.exitMultiple > 1).length;
   const runners = outcomes.filter((item) => (item.token.future_peak_multiple ?? 0) >= 2);
   const closed = outcomes.filter((item) => item.outcome.closed);
   const open = outcomes.filter((item) => !item.outcome.closed);
@@ -211,7 +223,7 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
       <section className="circuitStats">
         <article><span>Net return</span><strong className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{money(pnl)}</strong><small>{roi.toFixed(1)}% on capital deployed</small></article>
         <article><span>Acquired</span><strong>{tokens.length}</strong><small>{money(capitalDeployed)} deployed</small></article>
-        <article><span>Winning exits</span><strong>{tokens.length ? ((winners / tokens.length) * 100).toFixed(1) : "0.0"}%</strong><small>{winners} profitable outcomes</small></article>
+        <article><span>Profitable positions</span><strong>{tokens.length ? ((winners / tokens.length) * 100).toFixed(1) : "0.0"}%</strong><small>{winners} currently profitable</small></article>
         <article><span>2x+ runners</span><strong>{runners.length}</strong><small>{tokens.length ? ((runners.length / tokens.length) * 100).toFixed(1) : "0.0"}% of acquired</small></article>
         <article className="best"><span>Best runner</span><strong>{multiple(bestRunner)}</strong><small>Peak after acquisition</small></article>
       </section>

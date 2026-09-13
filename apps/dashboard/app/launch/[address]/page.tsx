@@ -164,11 +164,12 @@ export default async function LaunchPage({ params, searchParams }: {
   const entryAt = requestedEntryAt ?? launch.acquired_at ?? (launch.research_state === "target_locked" ? launch.research_state_at : null);
   const closed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const currentMarketCap = closed ? launch.exit_market_cap_usd ?? launch.market_cap_usd ?? null : launch.market_cap_usd ?? null;
-  const gainMultiple = entryMarketCap && currentMarketCap ? currentMarketCap / entryMarketCap : null;
+  const priceGainMultiple = entryMarketCap && currentMarketCap ? currentMarketCap / entryMarketCap : null;
+  const gainMultiple = launch.position_value_multiple ?? priceGainMultiple;
   const peakMultiple = entryMarketCap && launch.ath_market_cap_usd ? launch.ath_market_cap_usd / entryMarketCap : null;
   const acquired = Boolean(entryAt && entryMarketCap && entryMarketCap > 0);
   const gainTone = gainMultiple != null && gainMultiple < 1 ? "negative" : "positive";
-  const positionSizeUsd = 25;
+  const positionSizeUsd = launch.position_size_usd ?? 25;
   const positionValueUsd = gainMultiple == null ? null : positionSizeUsd * gainMultiple;
   const pnlUsd = positionValueUsd == null ? null : positionValueUsd - positionSizeUsd;
   const roiPct = gainMultiple == null ? null : (gainMultiple - 1) * 100;

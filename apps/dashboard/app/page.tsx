@@ -43,19 +43,31 @@ function targetLockScore(launch: Launch, mode: "sighted" | "surveillance" | "acq
     return Math.min(49, Math.round(tradeProgress + traderProgress + earlyProgress + pressureProgress + creatorProgress));
   }
 
-  const tradeDepth = Math.min(1, launch.trade_count / 30) * 15;
-  const traderDepth = Math.min(1, launch.unique_traders / 15) * 15;
-  const pressure = Math.min(1, Math.max(0, (launch.buy_pressure_pct ?? 0) / 60)) * 15;
-  const creatorClear = launch.creator_sells === 0 ? 10 : 0;
-  const earlyBuyers = Math.min(1, launch.first_minute_buyers / 6) * 15;
-  const momentum = Math.min(1, (launch.peak_multiple ?? 0) / 1.2) * 10;
-  const peakHeld = launch.drawdown_from_peak_pct != null && launch.drawdown_from_peak_pct <= 40 ? 10 : 0;
-  const holderSpread = launch.top_10_holder_pct != null && launch.top_10_holder_pct <= 70 ? 5 : 0;
-  const creatorBalance = launch.creator_balance_pct != null && launch.creator_balance_pct <= 5 ? 5 : 0;
-  const score = tradeDepth + traderDepth + pressure + creatorClear + earlyBuyers + momentum + peakHeld + holderSpread + creatorBalance;
+  const peakHoldPct = launch.drawdown_from_peak_pct == null ? null : 100 - launch.drawdown_from_peak_pct;
+  const momentumMultiple = launch.peak_multiple != null && peakHoldPct != null
+    ? launch.peak_multiple * peakHoldPct / 100
+    : null;
+  const earlyBuyerShare = launch.unique_traders > 0
+    ? launch.first_minute_buyers * 100 / launch.unique_traders
+    : null;
+  let availableWeight = 105;
+  if (momentumMultiple != null) availableWeight += 20;
+  if (peakHoldPct != null) availableWeight += 15;
+  if (launch.top_10_holder_pct != null) availableWeight += 10;
+  const passedWeight =
+    (launch.trade_count >= 12 ? 15 : 0) +
+    (launch.unique_traders >= 12 ? 15 : 0) +
+    ((launch.buy_pressure_pct ?? 0) >= 65 ? 10 : 0) +
+    (launch.first_minute_buyers >= 8 ? 15 : 0) +
+    (momentumMultiple != null && momentumMultiple >= .75 ? 20 : 0) +
+    (peakHoldPct != null && peakHoldPct >= 70 ? 15 : 0) +
+    (launch.top_10_holder_pct != null && launch.top_10_holder_pct <= 90 ? 10 : 0) +
+    ((launch.market_cap_usd ?? 0) >= 5_000 ? 25 : 0) +
+    (earlyBuyerShare != null && earlyBuyerShare >= 50 ? 25 : 0);
+  const score = availableWeight ? passedWeight * 100 / availableWeight : 0;
 
   const rawScore = Math.min(99, Math.round(score));
-  if (mode === "surveillance") return Math.max(50, rawScore);
+  if (mode === "surveillance") return rawScore;
   return rawScore;
 }
 
@@ -93,9 +105,10 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
   const valuationMarketCap = positionClosed ? launch.exit_market_cap_usd : launch.market_cap_usd;
   const usdMarketCap = valuationMarketCap ? quoteValue(valuationMarketCap, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
   const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
-  const gainMultiple = launch.entry_market_cap_usd && valuationMarketCap
+  const priceGainMultiple = launch.entry_market_cap_usd && valuationMarketCap
     ? valuationMarketCap / launch.entry_market_cap_usd
     : null;
+  const gainMultiple = launch.position_value_multiple ?? priceGainMultiple;
   const positionLoss = gainMultiple != null && gainMultiple < 1;
   const positionGradientId = `position-fill-${launch.token_address.replace(/[^a-z0-9-]/gi, "")}`;
   const filledSegments = Math.ceil(lockScore / 6.25);
