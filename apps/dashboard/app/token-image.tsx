@@ -4,8 +4,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { imageCandidates } from "../lib/images";
 
-const candidateDelays = [0, 120, 320, 650, 1_000, 1_400, 1_900, 2_500];
-
 export function TokenImage({
   src,
   alt,
@@ -20,7 +18,7 @@ export function TokenImage({
   const candidates = useMemo(() => imageCandidates(src), [src]);
   const host = useRef<HTMLSpanElement>(null);
   const [shouldLoad, setShouldLoad] = useState(priority);
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
+  const [candidateIndex, setCandidateIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -46,38 +44,12 @@ export function TokenImage({
   }, [priority, src]);
 
   useEffect(() => {
-    setResolvedSrc(null);
+    setCandidateIndex(0);
     setLoaded(false);
-    if (!shouldLoad || !candidates.length) return;
+  }, [candidates]);
 
-    let active = true;
-    const timers: Array<ReturnType<typeof setTimeout>> = [];
-    const loaders: HTMLImageElement[] = [];
-    const start = (candidate: string) => {
-      if (!active) return;
-      const loader = new window.Image();
-      loader.decoding = "async";
-      loader.onload = () => {
-        if (active && loader.naturalWidth > 0) setResolvedSrc((current) => current ?? candidate);
-      };
-      loader.src = candidate;
-      loaders.push(loader);
-    };
-
-    candidates.forEach((candidate, index) => {
-      if (index === 0) start(candidate);
-      else timers.push(setTimeout(() => start(candidate), candidateDelays[index] ?? index * 900));
-    });
-
-    return () => {
-      active = false;
-      timers.forEach(clearTimeout);
-      loaders.forEach((loader) => {
-        loader.onload = null;
-        loader.onerror = null;
-      });
-    };
-  }, [candidates, shouldLoad]);
+  const resolvedSrc = shouldLoad ? candidates[candidateIndex] ?? null : null;
+  const localProxy = resolvedSrc?.startsWith("/") ?? false;
 
   return (
     <span ref={host} className="tokenImageLoader">
@@ -90,10 +62,14 @@ export function TokenImage({
           width={size}
           height={size}
           priority={priority}
-          unoptimized
+          unoptimized={!localProxy}
           sizes={`${size}px`}
           style={{ opacity: loaded ? 1 : 0, transition: "opacity 120ms ease-out" }}
           onLoad={() => setLoaded(true)}
+          onError={() => {
+            setLoaded(false);
+            setCandidateIndex((current) => current + 1);
+          }}
         />
       ) : null}
     </span>
