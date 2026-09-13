@@ -53,9 +53,11 @@ function smoothPath(points: Array<{ x: number; y: number }>) {
 }
 
 function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number; label: string; tone: "loss" | "win" | "open" } {
-  if (token.strategy_version === "strict-quiet-staggered-v1") {
+  if (token.strategy_version?.startsWith("strict-quiet-staggered")) {
     const exitMultiple = Math.max(0, token.position_value_multiple ?? token.final_multiple ?? 1);
-    const latestStage = token.hit_100x_at ? "100x complete"
+    const latestStage = token.exit_reason === "failure_8m" ? "8 min protection"
+      : token.exit_reason === "post_10x_below_3x" ? "10x protection"
+      : token.hit_100x_at ? "100x complete"
       : token.hit_50x_at ? "50x stage hit"
       : token.hit_20x_at ? "20x stage hit"
       : token.hit_10x_at ? "10x stage hit"
@@ -64,7 +66,7 @@ function modelOutcome(token: LabToken): { closed: boolean; exitMultiple: number;
       closed: token.position_status === "closed",
       exitMultiple,
       label: latestStage,
-      tone: token.position_status === "closed" ? "win" : "open",
+      tone: token.position_status === "closed" ? (exitMultiple >= 1 ? "win" : "loss") : "open",
     };
   }
   if (token.position_status === "closed") {

@@ -183,11 +183,17 @@ export default async function LaunchPage({ params, searchParams }: {
     ...(telegramUrl ? [{ kind: "telegram" as const, label: "Telegram", href: telegramUrl }] : []),
     ...(discordUrl ? [{ kind: "discord" as const, label: "Discord", href: discordUrl }] : []),
   ];
-  const stageExits: StageExit[] = launch.strategy_version === "strict-quiet-staggered-v1" ? [
+  const protectionExitMultiple = launch.entry_market_cap_usd && launch.exit_market_cap_usd
+    ? launch.exit_market_cap_usd / launch.entry_market_cap_usd
+    : null;
+  const stageExits: StageExit[] = launch.strategy_version?.startsWith("strict-quiet-staggered") ? [
     { at: launch.hit_10x_at ?? null, multiple: 10, soldPct: 20 },
     { at: launch.hit_20x_at ?? null, multiple: 20, soldPct: 20 },
     { at: launch.hit_50x_at ?? null, multiple: 50, soldPct: 50 },
     { at: launch.hit_100x_at ?? null, multiple: 100, soldPct: 10 },
+    ...(launch.exit_reason === "post_10x_below_3x" && launch.closed_at && protectionExitMultiple
+      ? [{ at: launch.closed_at, multiple: protectionExitMultiple, soldPct: 80 }]
+      : []),
   ].filter((exit) => exit.at) : [];
 
   return (
@@ -241,7 +247,7 @@ export default async function LaunchPage({ params, searchParams }: {
             <div><strong>{launch.symbol ? `$${launch.symbol.replace(/^\$/, "")}` : "Token"}</strong></div>
             <div className="positionLegend" aria-label="Position chart markers">
               <span className="buy"><i>↑</i> Ponseye buy</span>
-              {stageExits.length ? <span className="exit"><i>↓</i> Staged sells</span> : null}
+              {stageExits.length ? <span className="exit"><i>↓</i> {launch.exit_reason === "post_10x_below_3x" ? "Protection exit" : "Staged sells"}</span> : null}
               {closed && !stageExits.length ? <span className="exit"><i>↓</i> Position closed</span> : <span className="tracking"><i /> {closed ? "Closed" : "Tracking live"}</span>}
             </div>
           </header>

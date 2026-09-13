@@ -40,7 +40,7 @@ export type LabToken = {
   exit_market_cap_usd?: number | null;
   target_multiple?: number | null;
   stop_multiple?: number | null;
-  exit_reason?: "target" | "stop" | null;
+  exit_reason?: "target" | "stop" | "failure_8m" | "post_10x_below_3x" | null;
   strategy_version?: string | null;
   position_size_usd?: number | null;
   remaining_pct?: number | null;
@@ -201,7 +201,7 @@ type CapitalPosition = {
   hit_100x_at: string | null;
   position_status: "open" | "closed";
   closed_at: string | null;
-  exit_reason: "target" | "stop" | null;
+  exit_reason: "target" | "stop" | "failure_8m" | "post_10x_below_3x" | null;
 };
 
 type CapitalLaunch = {
