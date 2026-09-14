@@ -1391,11 +1391,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .gmgnChartPanel > header strong { color: #e9ebef; font-size: 17px; }
 .gmgnChartPanel > header > span { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 10px; text-transform: uppercase; }
 .gmgnChartPanel > header > span i { width: 6px; height: 6px; background: var(--green); box-shadow: 0 0 8px rgba(154,255,79,.7); }
-.gmgnChartCanvas { width: 100%; height: 520px; }
-.gmgnChartWaiting { min-height: 520px; display: grid; place-content: center; justify-items: center; gap: 8px; color: #777e8b; text-align: center; }
-.gmgnChartWaiting span { color: var(--purple); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
-.gmgnChartWaiting strong { color: #e3e5ea; font-size: 19px; }
-.gmgnChartWaiting small { font-size: 11px; }
+.gmgnEmbedFrame { display: block; width: 100%; height: 620px; border: 0; background: #090b0f; }
 .gmgnTokenFoot { margin-top: 16px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid var(--line); background: #0c0e12; }
 .gmgnTokenFoot strong { color: #d9dce3; font-family: "SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size: 15px; }
 @media (max-width: 900px) {
@@ -1410,7 +1406,7 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
   .gmgnTokenStats article:nth-child(3) { border-right: 1px solid var(--line); }
   .gmgnTokenStats article:nth-child(2n) { border-right: 0; }
   .gmgnTokenStats article:nth-child(-n+4) { border-bottom: 1px solid var(--line); }
-  .gmgnChartCanvas,.gmgnChartWaiting { height: 420px; min-height: 420px; }
+  .gmgnEmbedFrame { height: 500px; }
   .gmgnTokenFoot { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .gmgnTokenFoot article:nth-child(2) { border-right: 0; }
   .gmgnTokenFoot article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }

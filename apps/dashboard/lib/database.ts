@@ -84,15 +84,6 @@ export type BitqueryMigrationTestResult = {
   metricsReady: number;
 };
 
-export type GmgnChartCandle = {
-  candle_at: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number | null;
-};
-
 // Keep this as a literal so Supabase can infer the selected row shape at build time.
 const columns = "token_address,name,symbol,image_url,status,launched_at,graduated_at,market_cap_usd,ath_market_cap_usd,peak_multiple,trade_count,buys,sells,unique_traders,buy_pressure_pct,volume_usd,holder_count";
 
@@ -241,25 +232,12 @@ export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestR
 
 export async function getBitqueryMigrationToken(tokenAddress: string) {
   const db = databaseClient();
-  const [tokenResult, candleResult] = await Promise.all([
-    db.from("bitquery_migration_test")
-      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
-      .eq("token_address", tokenAddress)
-      .maybeSingle(),
-    db.from("bitquery_migration_test_candles")
-      .select("candle_at,open,high,low,close,volume")
-      .eq("token_address", tokenAddress)
-      .eq("resolution", "1m")
-      .order("candle_at", { ascending: true })
-      .limit(100),
-  ]);
+  const tokenResult = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
+    .eq("token_address", tokenAddress)
+    .maybeSingle();
   if (tokenResult.error) throw new Error(tokenResult.error.message);
-  if (candleResult.error) throw new Error(candleResult.error.message);
   if (!tokenResult.data) return null;
-
-  await db.from("bitquery_migration_test")
-    .update({ gmgn_chart_requested_at: new Date().toISOString() })
-    .eq("token_address", tokenAddress);
 
   const token = {
     ...tokenResult.data,
@@ -274,13 +252,5 @@ export async function getBitqueryMigrationToken(tokenAddress: string) {
     sell_volume_usd: numberOrNull(tokenResult.data.sell_volume_usd),
     unique_traders: Number(tokenResult.data.unique_traders ?? 0),
   } as BitqueryMigrationTestRow;
-  const candles = (candleResult.data ?? []).map((candle) => ({
-    candle_at: candle.candle_at,
-    open: Number(candle.open),
-    high: Number(candle.high),
-    low: Number(candle.low),
-    close: Number(candle.close),
-    volume: numberOrNull(candle.volume),
-  })) as GmgnChartCandle[];
-  return { token, candles };
+  return { token };
 }

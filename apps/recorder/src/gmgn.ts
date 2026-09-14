@@ -95,6 +95,17 @@ export async function fetchTokenInfo(tokenAddress: string) {
 }
 
 export async function fetchOneMinuteCandles(tokenAddress: string, from: Date, to: Date) {
+  const candles = new Map<string, GmgnCandle>();
+  const windowMs = 95 * 60_000;
+  for (let windowStart = from.getTime(); windowStart < to.getTime(); windowStart += windowMs) {
+    const windowEnd = Math.min(to.getTime(), windowStart + windowMs);
+    const rows = await fetchOneMinuteCandleWindow(tokenAddress, new Date(windowStart), new Date(windowEnd));
+    for (const candle of rows) candles.set(candle.candleAt, candle);
+  }
+  return [...candles.values()].sort((a, b) => Date.parse(a.candleAt) - Date.parse(b.candleAt));
+}
+
+async function fetchOneMinuteCandleWindow(tokenAddress: string, from: Date, to: Date) {
   const response = await runRawJson([
     "market", "kline",
     "--chain", "robinhood",

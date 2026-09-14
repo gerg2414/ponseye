@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
-import { fetchOneMinuteCandles } from "./gmgn.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -57,9 +56,13 @@ type MigrationPayload = {
     EVM?: {
       Graduations?: GraduationEvent[];
       Registrations?: RegistrationEvent[];
-      Launches?: LaunchCall[];
     };
   };
+  errors?: Array<{ message?: string }>;
+};
+
+type LaunchPayload = {
+  data?: { EVM?: { Launches?: LaunchCall[] } };
   errors?: Array<{ message?: string }>;
 };
 
@@ -232,6 +235,15 @@ function migrationQuery(since: string, till: string) {
           Transaction { Hash }
           LogHeader { Data }
         }
+      }
+    }
+  `;
+}
+
+function launchMetadataQuery(since: string, till: string) {
+  return `
+    query PonsLaunchMetadataTest {
+      EVM(network: robinhood) {
         Launches: Calls(
           limit: {count: 1000}
           orderBy: {ascending: Block_Time}
@@ -313,36 +325,6 @@ async function saveMigrations(payload: MigrationPayload) {
     if (decoded.tokenAddress) registrations.set(decoded.tokenAddress, row);
   }
   const launches = new Map<string, ReturnType<typeof decodeLaunch>>();
-  const launchRows: Array<Record<string, unknown>> = [];
-  for (const call of payload.data?.EVM?.Launches ?? []) {
-    const decoded = decodeLaunch(call);
-    if (!decoded) continue;
-    launches.set(decoded.tokenAddress, decoded);
-    launchRows.push({
-      token_address: decoded.tokenAddress,
-      launched_at: call.Block?.Time ?? null,
-      name: decoded.name,
-      symbol: decoded.symbol,
-      image_url: decoded.imageUrl,
-      description: decoded.description,
-      twitter_url: decoded.twitterUrl,
-      telegram_url: decoded.telegramUrl,
-      discord_url: decoded.discordUrl,
-      website_url: decoded.websiteUrl,
-      farcaster_url: decoded.farcasterUrl,
-      creator_address: decoded.creatorFeeRecipient,
-      creator_tax_bps: decoded.creatorTaxBps,
-      buyback_enabled: decoded.buybackEnabled,
-      raw_call: call,
-      updated_at: new Date().toISOString(),
-    });
-  }
-  if (launchRows.length) {
-    const { error } = await db.from("bitquery_launch_metadata_test")
-      .upsert(launchRows, { onConflict: "token_address" });
-    if (error) throw new Error(`Save Bitquery launch metadata: ${error.message}`);
-  }
-
   const graduationAddresses = graduations
     .map((graduation) => String(argumentMap(graduation.Arguments).token ?? "").toLowerCase())
     .filter((address) => /^0x[0-9a-f]{40}$/.test(address));
@@ -352,23 +334,21 @@ async function saveMigrations(payload: MigrationPayload) {
       .in("token_address", graduationAddresses);
     if (error) throw new Error(`Read Bitquery launch metadata: ${error.message}`);
     for (const row of data ?? []) {
-      if (!launches.has(row.token_address)) {
-        launches.set(row.token_address, {
-          tokenAddress: row.token_address,
-          name: row.name,
-          symbol: row.symbol,
-          imageUrl: row.image_url,
-          description: row.description,
-          twitterUrl: row.twitter_url,
-          telegramUrl: row.telegram_url,
-          discordUrl: row.discord_url,
-          websiteUrl: row.website_url,
-          farcasterUrl: row.farcaster_url,
-          creatorFeeRecipient: row.creator_address,
-          creatorTaxBps: row.creator_tax_bps,
-          buybackEnabled: row.buyback_enabled,
-        });
-      }
+      launches.set(row.token_address, {
+        tokenAddress: row.token_address,
+        name: row.name,
+        symbol: row.symbol,
+        imageUrl: row.image_url,
+        description: row.description,
+        twitterUrl: row.twitter_url,
+        telegramUrl: row.telegram_url,
+        discordUrl: row.discord_url,
+        websiteUrl: row.website_url,
+        farcasterUrl: row.farcaster_url,
+        creatorFeeRecipient: row.creator_address,
+        creatorTaxBps: row.creator_tax_bps,
+        buybackEnabled: row.buyback_enabled,
+      });
     }
   }
 
@@ -417,6 +397,38 @@ async function saveMigrations(payload: MigrationPayload) {
   return rows.length;
 }
 
+async function saveLaunchMetadata(payload: LaunchPayload) {
+  const launchRows: Array<Record<string, unknown>> = [];
+  for (const call of payload.data?.EVM?.Launches ?? []) {
+    const decoded = decodeLaunch(call);
+    if (!decoded) continue;
+    launchRows.push({
+      token_address: decoded.tokenAddress,
+      launched_at: call.Block?.Time ?? null,
+      name: decoded.name,
+      symbol: decoded.symbol,
+      image_url: decoded.imageUrl,
+      description: decoded.description,
+      twitter_url: decoded.twitterUrl,
+      telegram_url: decoded.telegramUrl,
+      discord_url: decoded.discordUrl,
+      website_url: decoded.websiteUrl,
+      farcaster_url: decoded.farcasterUrl,
+      creator_address: decoded.creatorFeeRecipient,
+      creator_tax_bps: decoded.creatorTaxBps,
+      buyback_enabled: decoded.buybackEnabled,
+      raw_call: call,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  if (launchRows.length) {
+    const { error } = await db.from("bitquery_launch_metadata_test")
+      .upsert(launchRows, { onConflict: "token_address" });
+    if (error) throw new Error(`Save Bitquery launch metadata: ${error.message}`);
+  }
+  return launchRows.length;
+}
+
 async function nextMetricsCandidate() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
@@ -429,49 +441,6 @@ async function nextMetricsCandidate() {
     .maybeSingle();
   if (error) throw new Error(`Choose Bitquery market candidate: ${error.message}`);
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
-}
-
-async function nextChartCandidate() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,gmgn_chart_requested_at,gmgn_chart_updated_at")
-    .gte("migrated_at", cutoff)
-    .order("gmgn_chart_requested_at", { ascending: false, nullsFirst: false })
-    .order("gmgn_chart_updated_at", { ascending: true, nullsFirst: true })
-    .order("migrated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(`Choose GMGN chart candidate: ${error.message}`);
-  return data as {
-    token_address: string;
-    migrated_at: string;
-    gmgn_chart_requested_at: string | null;
-    gmgn_chart_updated_at: string | null;
-  } | null;
-}
-
-async function updateChart(candidate: { token_address: string; migrated_at: string }) {
-  const to = new Date();
-  const from = new Date(Math.max(Date.parse(candidate.migrated_at), to.getTime() - 100 * 60_000));
-  const candles = await fetchOneMinuteCandles(candidate.token_address, from, to);
-  if (candles.length) {
-    const { error } = await db.from("bitquery_migration_test_candles").upsert(candles.map((candle) => ({
-      token_address: candidate.token_address,
-      resolution: "1m",
-      candle_at: candle.candleAt,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-      volume: candle.volume,
-    })), { onConflict: "token_address,resolution,candle_at" });
-    if (error) throw new Error(`Save GMGN chart candles: ${error.message}`);
-  }
-  const { error } = await db.from("bitquery_migration_test").update({
-    gmgn_chart_requested_at: null,
-    gmgn_chart_updated_at: new Date().toISOString(),
-  }).eq("token_address", candidate.token_address);
-  if (error) throw new Error(`Mark GMGN chart update: ${error.message}`);
 }
 
 async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
@@ -525,24 +494,15 @@ export async function runBitqueryMigrationTest() {
   if (!config.BITQUERY_MIGRATION_TEST_ENABLED) return;
   await setStatus("connecting", "Backfilling PONS migrations from the last 24 hours");
   let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
+  let launchCursor = new Date(Date.now() - 24 * 60 * 60_000);
   let nextMigrationPoll = 0;
+  let nextLaunchPoll = 0;
+  let nextMetadataSync = 0;
   let nextMetricsPoll = 0;
-  let nextChartPoll = 0;
-  let chartWorkerRunning = false;
 
   while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
     const now = Date.now();
     try {
-      if (now >= nextChartPoll && !chartWorkerRunning) {
-        chartWorkerRunning = true;
-        void nextChartCandidate()
-          .then((candidate) => candidate ? updateChart(candidate) : undefined)
-          .catch((error) => console.warn("GMGN chart backfill failed", error))
-          .finally(() => {
-            chartWorkerRunning = false;
-            nextChartPoll = Date.now() + 1_100;
-          });
-      }
       if (now >= nextMigrationPoll) {
         const till = new Date();
         const payload = await queryBitquery<MigrationPayload>(migrationQuery(migrationCursor.toISOString(), till.toISOString()));
@@ -550,6 +510,25 @@ export async function runBitqueryMigrationTest() {
         migrationCursor = new Date(till.getTime() - 60_000);
         nextMigrationPoll = Date.now() + config.BITQUERY_MIGRATION_POLL_MS;
         await setStatus("connected", `${count} migration events received in latest scan`);
+        continue;
+      }
+
+      if (now >= nextLaunchPoll) {
+        const current = new Date();
+        const windowMs = 30 * 60_000;
+        const caughtUp = current.getTime() - launchCursor.getTime() <= windowMs;
+        const till = caughtUp
+          ? current
+          : new Date(Math.min(current.getTime(), launchCursor.getTime() + windowMs));
+        const payload = await queryBitquery<LaunchPayload>(launchMetadataQuery(launchCursor.toISOString(), till.toISOString()));
+        await saveLaunchMetadata(payload);
+        launchCursor = caughtUp ? new Date(till.getTime() - 60_000) : till;
+        if (now >= nextMetadataSync) {
+          const { error } = await db.rpc("sync_bitquery_migration_metadata");
+          if (error) throw new Error(`Sync Bitquery migration metadata: ${error.message}`);
+          nextMetadataSync = Date.now() + 15_000;
+        }
+        nextLaunchPoll = Date.now() + 1_100;
         continue;
       }
 

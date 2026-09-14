@@ -5,7 +5,6 @@ import { AutoRefresh } from "../../../auto-refresh";
 import { TokenImage } from "../../../token-image";
 import { LabHeader } from "../../lab-header";
 import { DatabaseCopyAddress } from "../../database/database-copy-address";
-import { GmgnChart } from "./gmgn-chart";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "GMGN Token Chart | PonsEye Lab", description: "GMGN one minute market chart for a migrated PONS token." };
@@ -25,7 +24,7 @@ export default async function BitqueryMigrationTokenPage({ params }: { params: P
   if (!/^0x[0-9a-f]{40}$/i.test(address)) notFound();
   const detail = await getBitqueryMigrationToken(address.toLowerCase());
   if (!detail) notFound();
-  const { token, candles } = detail;
+  const { token } = detail;
   const peak = token.migration_market_cap_usd && token.ath_market_cap_usd ? token.ath_market_cap_usd / token.migration_market_cap_usd : null;
 
   return (
@@ -49,8 +48,14 @@ export default async function BitqueryMigrationTokenPage({ params }: { params: P
         <article><small>Sells</small><strong className="sellValue">{token.sells.toLocaleString("en-GB")}</strong></article>
       </section>
       <section className="gmgnChartPanel">
-        <header><div><small>GMGN market data</small><strong>1 minute market cap</strong></div><span><i />{candles.length ? `${candles.length} candles` : "Requested"}</span></header>
-        <GmgnChart candles={candles} />
+        <header><div><small>Live GMGN chart</small><strong>Full token history</strong></div><span><i />GMGN</span></header>
+        <iframe
+          className="gmgnEmbedFrame"
+          src={`https://www.gmgn.cc/kline/robinhood/${token.token_address}?theme=dark&interval=1`}
+          title={`${token.name ?? token.symbol ?? "Token"} GMGN chart`}
+          loading="eager"
+          allowFullScreen
+        />
       </section>
       <section className="gmgnTokenFoot">
         <article><small>Migrated</small><strong>{time(token.migrated_at)}</strong></article>
