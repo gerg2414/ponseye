@@ -85,12 +85,23 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
           return (
             <article className="circuitRow" key={token.token_address}>
               <div className="circuitToken">
-                <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={48} />
-                <span>
-                  <strong>{token.name ?? "Metadata pending"}</strong>
-                  <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small>
-                  <small className="circuitAcquiredMobile">Acquired {acquiredDate(token.signal_at)}</small>
-                </span>
+                {/* Straight through to the chart, so a position can be checked
+                    against what actually happened without copying addresses. */}
+                <a
+                  className="circuitTokenLink"
+                  href={`https://gmgn.ai/robinhood/token/${token.token_address}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={token.token_address}
+                >
+                  <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={48} />
+                  <span>
+                    <strong>{token.name ?? "Metadata pending"}</strong>
+                    <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small>
+                    <small className="circuitAcquiredMobile">Acquired {acquiredDate(token.signal_at)}</small>
+                    <em className="circuitOpenChart">Open GMGN ↗</em>
+                  </span>
+                </a>
               </div>
               <time dateTime={token.signal_at}>{acquiredDate(token.signal_at)}</time>
               <strong>{compactMoney(token.signal_market_cap_usd)}</strong>
