@@ -48,7 +48,7 @@ export default async function BitqueryMigrationTokenPage({ params }: { params: P
         <article><small>Sells</small><strong className="sellValue">{token.sells.toLocaleString("en-GB")}</strong></article>
       </section>
       <section className="gmgnChartPanel">
-        <header><div><small>Live GMGN chart</small><strong>Full token history</strong></div><span><i />GMGN</span></header>
+        <header><div><small>Live GMGN chart</small><strong>Full token history</strong></div><span><i />Migrated {time(token.migrated_at)}</span></header>
         <iframe
           className="gmgnEmbedFrame"
           src={`https://www.gmgn.cc/kline/robinhood/${token.token_address}?theme=dark&interval=1`}

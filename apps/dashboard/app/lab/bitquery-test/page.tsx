@@ -4,6 +4,7 @@ import { AutoRefresh } from "../../auto-refresh";
 import { LabHeader } from "../lab-header";
 import { DatabaseCopyAddress } from "../database/database-copy-address";
 import { TokenImage } from "../../token-image";
+import { ClickableTokenRow } from "./clickable-token-row";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,7 @@ export default async function BitqueryMigrationTestPage({
             </thead>
             <tbody>
               {shown.map((token, index) => (
-                <tr key={token.token_address}>
+                <ClickableTokenRow key={token.token_address} href={`/lab/bitquery-test/${token.token_address}`}>
                   <td>
                     <div className="bitqueryTokenName">
                       <a className="bitqueryTokenLink" href={`/lab/bitquery-test/${token.token_address}`}>
@@ -173,7 +174,7 @@ export default async function BitqueryMigrationTestPage({
                       </dl>
                     </details>
                   </td>
-                </tr>
+                </ClickableTokenRow>
               ))}
               {!shown.length ? <tr><td className="databaseEmpty" colSpan={11}>No migrations match these filters.</td></tr> : null}
             </tbody>

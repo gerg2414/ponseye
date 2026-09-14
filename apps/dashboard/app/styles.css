@@ -1451,6 +1451,9 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .bitqueryTokenLink:hover strong { color: var(--green); }
 .bitqueryTokenName .databaseActions { position: absolute; top: 0; right: 0; }
 .bitqueryTestLedger tbody td { padding-top: 16px; padding-bottom: 16px; font-size: 14px; }
+.bitqueryTestLedger .clickableTokenRow { cursor: pointer; }
+.bitqueryTestLedger .clickableTokenRow:hover td { background: rgba(154,255,79,.035); }
+.bitqueryTestLedger .clickableTokenRow:focus-visible { outline: 1px solid var(--green); outline-offset: -1px; }
 .bitqueryTestLedger tbody td > strong { font-size: 18px; }
 .bitqueryTestLedger .peakValue { font-size: 20px; }
 .bitqueryTestLedger .buyValue { color: var(--green); }
