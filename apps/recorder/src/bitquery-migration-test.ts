@@ -74,6 +74,7 @@ type MarketPayload = {
 type LiveMetricsCandidate = {
   token_address: string;
   migrated_at: string;
+  transaction_hash: string;
   ath_price_usd: number | string | null;
 };
 
@@ -498,10 +499,10 @@ async function nextMetricsCandidate() {
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
 }
 
-async function nextLiveMetricsCandidates(limit = 50) {
+async function nextLiveMetricsCandidates(limit = 150) {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,ath_price_usd")
+    .select("token_address,migrated_at,transaction_hash,ath_price_usd")
     .gte("migrated_at", cutoff)
     .order("trade_flow_updated_at", { ascending: true, nullsFirst: true })
     .order("migrated_at", { ascending: false })
@@ -516,7 +517,7 @@ async function updateLiveMetrics(candidates: LiveMetricsCandidate[]) {
   const trading = payload.data?.Trading ?? {};
   const updatedAt = new Date().toISOString();
 
-  await Promise.all(candidates.map(async (candidate, index) => {
+  const updates = candidates.map((candidate, index) => {
     const rows = (trading[`Token${index}`] ?? []) as MarketRow[];
     const flowRows = (trading[`Flow${index}`] ?? []) as TradeFlowRow[];
     const last = rows[0];
@@ -532,7 +533,10 @@ async function updateLiveMetrics(candidates: LiveMetricsCandidate[]) {
     const tokenName = last?.Token?.Name;
     const tokenSymbol = last?.Token?.Symbol;
 
-    const { error } = await db.from("bitquery_migration_test").update({
+    return {
+      token_address: candidate.token_address,
+      migrated_at: candidate.migrated_at,
+      transaction_hash: candidate.transaction_hash,
       ...(tokenName ? { name: tokenName } : {}),
       ...(tokenSymbol ? { symbol: tokenSymbol } : {}),
       ...(currentPrice == null ? {} : {
@@ -552,9 +556,11 @@ async function updateLiveMetrics(candidates: LiveMetricsCandidate[]) {
       unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
       trade_flow_updated_at: updatedAt,
       ...(last?.Block.Time ? { latest_trade_at: last.Block.Time } : {}),
-    }).eq("token_address", candidate.token_address);
-    if (error) throw new Error(`Save live Bitquery metrics for ${candidate.token_address}: ${error.message}`);
-  }));
+    };
+  });
+  const { error } = await db.from("bitquery_migration_test")
+    .upsert(updates, { onConflict: "token_address" });
+  if (error) throw new Error(`Save live Bitquery metrics batch: ${error.message}`);
 }
 
 async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
@@ -649,7 +655,9 @@ export async function runBitqueryMigrationTest() {
 
       if (now >= nextLiveMetricsPoll) {
         const candidates = await nextLiveMetricsCandidates();
-        await updateLiveMetrics(candidates);
+        const batches = Array.from({ length: Math.ceil(candidates.length / 50) }, (_, index) =>
+          candidates.slice(index * 50, (index + 1) * 50));
+        await Promise.all(batches.map((batch) => updateLiveMetrics(batch)));
         nextLiveMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS;
       }
 
