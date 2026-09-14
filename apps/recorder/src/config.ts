@@ -17,6 +17,12 @@ const schema = z.object({
   // How long a token keeps receiving live price and trade-flow updates after it
   // migrates. Rows older than this stay in the table as historical record.
   BITQUERY_TRACKING_WINDOW_HOURS: z.coerce.number().int().min(1).max(720).default(48),
+
+  // Bitquery rejects a query outright once an account has too many in flight
+  // ("access restricted by session limit"), and every rejection leaves a row
+  // unmeasured. One request at a time is the setting that stops that happening.
+  BITQUERY_MAX_CONCURRENT_QUERIES: z.coerce.number().int().min(1).max(8).default(1),
+  BITQUERY_MIN_REQUEST_INTERVAL_MS: z.coerce.number().int().min(0).max(10_000).default(120),
 }).superRefine((value, ctx) => {
   // Credentials are optional so the recorder can boot disabled, but if it is
   // switched on without them every query fails one at a time at runtime instead

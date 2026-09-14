@@ -11,6 +11,36 @@ export type GraphQLPayload<T> = {
 let accessToken: string | null = null;
 let accessTokenExpiresAt = 0;
 
+// Bitquery limits how many queries one account may have in flight and rejects
+// the excess with "access restricted by session limit". A rejection is not just
+// a retry, it leaves whatever the caller was measuring unmeasured, so every
+// request in this process goes through one queue rather than relying on each
+// caller to restrain itself.
+const pendingRequests: Array<() => void> = [];
+let activeRequests = 0;
+let lastRequestStartedAt = 0;
+
+async function acquireRequestSlot() {
+  if (activeRequests >= config.BITQUERY_MAX_CONCURRENT_QUERIES) {
+    await new Promise<void>((resolve) => pendingRequests.push(resolve));
+  }
+  activeRequests += 1;
+
+  const wait = lastRequestStartedAt + config.BITQUERY_MIN_REQUEST_INTERVAL_MS - Date.now();
+  if (wait > 0) await delay(wait);
+  lastRequestStartedAt = Date.now();
+}
+
+function releaseRequestSlot() {
+  activeRequests -= 1;
+  pendingRequests.shift()?.();
+}
+
+/** True for the errors that mean "you asked for too much at once", not "this is wrong". */
+function isThrottleMessage(message: string) {
+  return /session limit|too many concurrent|rate limit|too many requests/i.test(message);
+}
+
 export function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -77,40 +107,51 @@ export async function queryBitquery<T>(query: string, attempts = 3): Promise<T> 
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      const token = await getAccessToken();
-      const response = await fetch("https://streaming.bitquery.io/graphql", {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ query }),
-        signal: AbortSignal.timeout(45_000),
-      });
+      // The slot is released as soon as the request finishes, before any
+      // backoff, so a waiting request is not blocked by another one sleeping.
+      await acquireRequestSlot();
+      try {
+        const token = await getAccessToken();
+        const response = await fetch("https://streaming.bitquery.io/graphql", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ query }),
+          signal: AbortSignal.timeout(45_000),
+        });
 
-      if (response.status === 401 || response.status === 403) {
-        invalidateAccessToken();
-        throw new BitqueryAuthError(`Bitquery rejected credentials with ${response.status}`);
-      }
-      if (response.status === 429 || response.status >= 500) {
-        throw new Error(`Bitquery query failed with ${response.status}`);
-      }
-      if (!response.ok) {
-        // A 4xx that is not auth or rate limiting is our own malformed query.
-        // Retrying cannot help, so surface it immediately.
-        throw Object.assign(new Error(`Bitquery query failed with ${response.status}`), { fatal: true });
-      }
+        if (response.status === 401 || response.status === 403) {
+          invalidateAccessToken();
+          throw new BitqueryAuthError(`Bitquery rejected credentials with ${response.status}`);
+        }
+        if (response.status === 429 || response.status >= 500) {
+          throw Object.assign(new Error(`Bitquery query failed with ${response.status}`), { throttled: response.status === 429 });
+        }
+        if (!response.ok) {
+          // A 4xx that is not auth or rate limiting is our own malformed query.
+          // Retrying cannot help, so surface it immediately.
+          throw Object.assign(new Error(`Bitquery query failed with ${response.status}`), { fatal: true });
+        }
 
-      const payload = await response.json() as GraphQLPayload<T>;
-      if (payload.errors?.length) {
-        const message = payload.errors.map((error) => error.message ?? "Unknown Bitquery error").join("; ");
-        if (payload.data == null) throw new Error(message);
-        console.warn(`Bitquery returned a partial result: ${message}`);
+        const payload = await response.json() as GraphQLPayload<T>;
+        if (payload.errors?.length) {
+          const message = payload.errors.map((error) => error.message ?? "Unknown Bitquery error").join("; ");
+          // A throttle arrives as a 200 with an error body, so it has to be
+          // recognised here or it looks like a permanent failure.
+          if (isThrottleMessage(message)) throw Object.assign(new Error(message), { throttled: true });
+          if (payload.data == null) throw new Error(message);
+          console.warn(`Bitquery returned a partial result: ${message}`);
+        }
+        return (payload.data ?? {}) as T;
+      } finally {
+        releaseRequestSlot();
       }
-      return (payload.data ?? {}) as T;
     } catch (error) {
       lastError = error;
       if ((error as { fatal?: boolean }).fatal) break;
       if (attempt === attempts - 1) break;
-      // Back off 1s, 2s, 4s so a rate limit or blip does not stall the stage.
-      await delay(1_000 * 2 ** attempt);
+      // Back off 1s, 2s, 4s, and longer when told we are asking for too much.
+      const base = (error as { throttled?: boolean }).throttled ? 3_000 : 1_000;
+      await delay(base * 2 ** attempt);
     }
   }
 
