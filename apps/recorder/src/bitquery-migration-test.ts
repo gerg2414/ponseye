@@ -248,6 +248,7 @@ async function nextMetricsCandidate() {
     .select("token_address,migrated_at,metrics_updated_at")
     .gte("migrated_at", cutoff)
     .order("metrics_updated_at", { ascending: true, nullsFirst: true })
+    .order("migrated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`Choose Bitquery market candidate: ${error.message}`);
