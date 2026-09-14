@@ -65,6 +65,7 @@ export default async function BitqueryMigrationTestPage({
       ? token.ath_market_cap_usd / token.migration_market_cap_usd
       : 0;
     if (readyOnly && !token.metrics_updated_at) return false;
+    if (sort === "ath" && !token.ath_market_cap_usd) return false;
     if ((token.ath_market_cap_usd ?? 0) < minAth) return false;
     return peakMultiple >= minMultiple;
   }).sort((a, b) => {
@@ -135,9 +136,9 @@ export default async function BitqueryMigrationTestPage({
                 <tr key={token.token_address}>
                   <td>
                     <div className="bitqueryTokenName">
-                      <a className="bitqueryTokenLink" href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer">
+                      <a className="bitqueryTokenLink" href={`/lab/bitquery-test/${token.token_address}`}>
                         <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={52} priority={index < 8} />
-                        <span><strong>{token.name ?? "Metadata pending"}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : shortAddress(token.token_address)}</small><em>Open GMGN chart</em></span>
+                        <span><strong>{token.name ?? shortAddress(token.token_address)}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "Token metadata unavailable"}</small><em>View GMGN chart</em></span>
                       </a>
                       <div className="databaseActions"><DatabaseCopyAddress address={token.token_address} /></div>
                     </div>
