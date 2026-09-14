@@ -41,6 +41,34 @@ export type RecorderControlState = {
   feeds: RecorderFeed[];
 };
 
+export type BitqueryMigrationTestRow = {
+  token_address: string;
+  migrated_at: string;
+  block_number: string | null;
+  transaction_hash: string;
+  position_id: string | null;
+  token_amount_raw: string | null;
+  pair_token_amount_raw: string | null;
+  quote_token_address: string | null;
+  creator_address: string | null;
+  name: string | null;
+  symbol: string | null;
+  migration_market_cap_usd: number | null;
+  current_market_cap_usd: number | null;
+  ath_market_cap_usd: number | null;
+  volume_usd: number | null;
+  trade_count: number;
+  latest_trade_at: string | null;
+  metrics_updated_at: string | null;
+  first_seen_at: string;
+};
+
+export type BitqueryMigrationTestResult = {
+  migrations: BitqueryMigrationTestRow[];
+  status: RecorderFeed | null;
+  metricsReady: number;
+};
+
 // Keep this as a literal so Supabase can infer the selected row shape at build time.
 const columns = "token_address,name,symbol,image_url,status,launched_at,graduated_at,market_cap_usd,ath_market_cap_usd,peak_multiple,trade_count,buys,sells,unique_traders,buy_pressure_pct,volume_usd,holder_count";
 
@@ -148,5 +176,36 @@ export async function getTokenDatabase({
   return {
     tokens,
     filteredCount: countResult.count ?? 0,
+  };
+}
+
+export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestResult> {
+  const db = databaseClient();
+  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const [migrationResult, statusResult] = await Promise.all([
+    db.from("bitquery_migration_test")
+      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,latest_trade_at,metrics_updated_at,first_seen_at")
+      .gte("migrated_at", since)
+      .order("migrated_at", { ascending: false }),
+    db.from("stream_status")
+      .select("feed,status,message,last_seen_at")
+      .eq("feed", "bitquery_migration_test")
+      .maybeSingle(),
+  ]);
+  if (migrationResult.error) throw new Error(migrationResult.error.message);
+  if (statusResult.error) throw new Error(statusResult.error.message);
+
+  const migrations = (migrationResult.data ?? []).map((row) => ({
+    ...row,
+    migration_market_cap_usd: numberOrNull(row.migration_market_cap_usd),
+    current_market_cap_usd: numberOrNull(row.current_market_cap_usd),
+    ath_market_cap_usd: numberOrNull(row.ath_market_cap_usd),
+    volume_usd: numberOrNull(row.volume_usd),
+    trade_count: Number(row.trade_count ?? 0),
+  })) as BitqueryMigrationTestRow[];
+  return {
+    migrations,
+    status: statusResult.data as RecorderFeed | null,
+    metricsReady: migrations.filter((row) => row.metrics_updated_at != null).length,
   };
 }

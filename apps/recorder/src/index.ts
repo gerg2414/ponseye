@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { config } from "./config.js";
+import { runBitqueryMigrationTest } from "./bitquery-migration-test.js";
 import { fetchOneMinuteCandles, fetchPonsTrenches } from "./gmgn.js";
 import { getNextCandleCandidate, getRecorderEnabled, saveCandles, saveTrenches, setGmgnStatus } from "./gmgn-store.js";
 
@@ -116,6 +117,10 @@ async function main() {
       traffic,
     }));
   }).listen(config.PORT, "0.0.0.0", () => console.log(`GMGN recorder health server listening on ${config.PORT}`));
+
+  void runBitqueryMigrationTest().catch((error) => {
+    console.error("Bitquery migration test stopped", error);
+  });
 
   while (true) {
     try {
