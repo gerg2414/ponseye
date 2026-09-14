@@ -10,7 +10,7 @@ import { TokenImage } from "./token-image";
 
 export const dynamic = "force-dynamic";
 
-const currentFeeds = new Set(["gmgn_trenches"]);
+const currentFeeds = new Set(["bitquery_migration_test"]);
 const targetMeterColours = [
   "#552a94", "#6230a8", "#7036bc", "#7e3ccf",
   "#8c43e1", "#9a49ef", "#aa4ff1", "#ba54e8",

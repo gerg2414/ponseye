@@ -178,98 +178,128 @@ const emptyData = {
   dataConnected: false,
 };
 
+/**
+ * The three lanes, fed from the live migration funnel.
+ *
+ * The lane names on the page predate the Bitquery pipeline and are kept, since
+ * they already carry the animation and layout: sighted is a fresh migration
+ * still being measured, under_watch is one whose largest holder cleared 15% at
+ * a minute and is awaiting the five minute confirmation, target_locked is one
+ * that cleared both checks while the entry window is still open.
+ */
+type FunnelRow = {
+  token_address: string;
+  symbol: string | null;
+  name: string | null;
+  image_url: string | null;
+  migrated_at: string;
+  age_seconds: number | string | null;
+  migration_market_cap_usd: number | string | null;
+  current_market_cap_usd: number | string | null;
+  ath_market_cap_usd: number | string | null;
+  peak_multiple: number | string | null;
+  top1_at_1m: number | string | null;
+  holders_at_1m: number | string | null;
+  top10_at_1m: number | string | null;
+  top1_growth_pp: number | string | null;
+  stage: "sighted" | "surveilling" | "acquired" | "passed";
+  reason: string | null;
+};
+
+const STAGE_TO_LANE = {
+  sighted: "sighted",
+  surveilling: "under_watch",
+  acquired: "target_locked",
+} as const;
+
+function toNumber(value: unknown) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 async function loadDashboardData() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) throw new Error("Dashboard database environment is missing");
 
-  const db = createClient(url, key, {
-    auth: { persistSession: false },
-    db: { retry: false },
+  const db = createClient(url, key, { auth: { persistSession: false } });
+
+  const [funnelResult, flowResult, statusResult, totalsResult] = await Promise.all([
+    db.from("ponseye_funnel")
+      .select("*")
+      .in("stage", ["sighted", "surveilling", "acquired"])
+      .order("migrated_at", { ascending: false })
+      .limit(200)
+      .abortSignal(AbortSignal.timeout(20_000)),
+    // Trade flow is on the migration table rather than the funnel view.
+    db.from("bitquery_migration_test")
+      .select("token_address,trade_count,unique_traders,buys,sells")
+      .gte("migrated_at", new Date(Date.now() - 2 * 60 * 60_000).toISOString()),
+    db.from("stream_status").select("feed,status,last_seen_at"),
+    db.from("bitquery_migration_test").select("token_address", { count: "exact", head: true }),
+  ]);
+
+  if (funnelResult.error) throw new Error(funnelResult.error.message);
+
+  const flow = new Map(((flowResult.data ?? []) as Array<Record<string, unknown>>)
+    .map((row) => [row.token_address as string, row]));
+
+  const launches = ((funnelResult.data ?? []) as unknown as FunnelRow[]).map((row) => {
+    const trade = flow.get(row.token_address);
+    const buys = Number(trade?.buys ?? 0);
+    const sells = Number(trade?.sells ?? 0);
+    const current = toNumber(row.current_market_cap_usd);
+    const peak = toNumber(row.ath_market_cap_usd);
+
+    return {
+      token_address: row.token_address,
+      name: row.name,
+      symbol: row.symbol,
+      image_url: row.image_url,
+      // The lanes were built around launches; a migration is the equivalent
+      // event here, so its timestamp drives the age and ordering.
+      launched_at: row.migrated_at,
+      research_state: STAGE_TO_LANE[row.stage as keyof typeof STAGE_TO_LANE] ?? "sighted",
+      research_state_at: row.migrated_at,
+      research_reasons: row.reason ? [row.reason] : [],
+      market_cap_usd: current,
+      ath_market_cap_usd: peak,
+      entry_market_cap_usd: toNumber(row.migration_market_cap_usd),
+      peak_multiple: toNumber(row.peak_multiple),
+      drawdown_from_peak_pct: peak && current && peak > 0 ? (1 - current / peak) * 100 : null,
+      trade_count: Number(trade?.trade_count ?? 0),
+      unique_traders: Number(trade?.unique_traders ?? 0),
+      buy_pressure_pct: buys + sells > 0 ? (buys / (buys + sells)) * 100 : null,
+      // The lane cards show holder concentration in place of the old curve
+      // metrics, which is what the entry filter actually turns on.
+      largest_holder_pct: toNumber(row.top1_at_1m),
+      top_10_holder_pct: toNumber(row.top10_at_1m),
+      holder_count: toNumber(row.holders_at_1m),
+      first_minute_buyers: Number(toNumber(row.holders_at_1m) ?? 0),
+      sparkline_prices: [],
+    } as unknown as Launch;
   });
-  const dashboardResult = await db
-    .rpc("get_dashboard_home", { p_limit: 200 })
-    .abortSignal(AbortSignal.timeout(20_000));
 
-  if (dashboardResult.error || !dashboardResult.data) {
-    throw new Error(dashboardResult.error?.message ?? "No dashboard data returned");
-  }
-
-  const payload = dashboardResult.data as DashboardPayload;
-
-  const launches = (payload.launches ?? []).map((launch) => ({
-    ...launch,
-    progress_pct: launch.progress_pct == null ? null : Number(launch.progress_pct),
-    peak_multiple: launch.peak_multiple == null ? null : Number(launch.peak_multiple),
-    drawdown_from_peak_pct: launch.drawdown_from_peak_pct == null ? null : Number(launch.drawdown_from_peak_pct),
-    buy_pressure_pct: launch.buy_pressure_pct == null ? null : Number(launch.buy_pressure_pct),
-    largest_holder_pct: launch.largest_holder_pct == null ? null : Number(launch.largest_holder_pct),
-    top_10_holder_pct: launch.top_10_holder_pct == null ? null : Number(launch.top_10_holder_pct),
-    top_100_holder_pct: launch.top_100_holder_pct == null ? null : Number(launch.top_100_holder_pct),
-    creator_balance_pct: launch.creator_balance_pct == null ? null : Number(launch.creator_balance_pct),
-    price_usd: launch.price_usd == null ? null : Number(launch.price_usd),
-    volume_usd: launch.volume_usd == null ? null : Number(launch.volume_usd),
-    market_cap_usd: launch.market_cap_usd == null ? null : Number(launch.market_cap_usd),
-    ath_market_cap_usd: launch.ath_market_cap_usd == null ? null : Number(launch.ath_market_cap_usd),
-    entry_market_cap_usd: launch.entry_market_cap_usd == null ? null : Number(launch.entry_market_cap_usd),
-    sparkline_prices: [],
-  })) as Launch[];
-
-  const acquiredAddresses = launches
-    .filter((launch) => launch.research_state === "target_locked")
-    .map((launch) => launch.token_address);
-
-  if (acquiredAddresses.length) {
-    const positionsResult = await db.from("acquired_positions")
-      .select("token_address,acquired_at,entry_market_cap_usd,exit_market_cap_usd,exit_price_usd,exit_reason,target_multiple,position_status,closed_at,position_size_usd,remaining_pct,realised_return_multiple,strategy_version,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at")
-      .in("token_address", acquiredAddresses);
-
-    if (positionsResult.error) console.error("[dashboard] position request failed", positionsResult.error.message);
-
-    const launchesByAddress = new Map(launches.map((launch) => [launch.token_address, launch]));
-    for (const position of (positionsResult.data ?? []) as PositionRecord[]) {
-      const launch = launchesByAddress.get(position.token_address);
-      if (!launch) continue;
-      launch.acquired_at = position.acquired_at;
-      launch.entry_market_cap_usd = position.entry_market_cap_usd == null ? null : Number(position.entry_market_cap_usd);
-      launch.exit_market_cap_usd = position.exit_market_cap_usd == null ? null : Number(position.exit_market_cap_usd);
-      launch.exit_price_usd = position.exit_price_usd == null ? null : Number(position.exit_price_usd);
-      launch.exit_reason = position.exit_reason;
-      launch.target_multiple = Number(position.target_multiple);
-      launch.position_status = position.position_status;
-      launch.closed_at = position.closed_at;
-      launch.position_size_usd = Number(position.position_size_usd);
-      launch.remaining_pct = Number(position.remaining_pct);
-      launch.realised_return_multiple = Number(position.realised_return_multiple);
-      launch.strategy_version = position.strategy_version;
-      launch.hit_10x_at = position.hit_10x_at;
-      launch.hit_20x_at = position.hit_20x_at;
-      launch.hit_50x_at = position.hit_50x_at;
-      launch.hit_100x_at = position.hit_100x_at;
-      const priceMultiple = launch.entry_market_cap_usd && launch.market_cap_usd
-        ? launch.market_cap_usd / launch.entry_market_cap_usd
-        : 1;
-      launch.position_value_multiple = Number(position.realised_return_multiple) + Number(position.remaining_pct) * priceMultiple / 100;
-    }
+  const counts = { sighted: 0, under_watch: 0, target_locked: 0 };
+  for (const launch of launches) {
+    const state = launch.research_state as keyof typeof counts;
+    if (state in counts) counts[state] += 1;
   }
 
   return {
     launches,
-    streams: payload.streams ?? [],
-    researchCounts: {
-      sighted: Number(payload.researchCounts?.sighted ?? 0),
-      under_watch: Number(payload.researchCounts?.under_watch ?? 0),
-      target_locked: Number(payload.researchCounts?.target_locked ?? 0),
-    },
-    launchCount: Number(payload.launchCount ?? 0),
-    tradeCount: Number(payload.tradeCount ?? 0),
-    dataConnected: true,
+    streams: (statusResult.data ?? []) as StreamStatus[],
+    researchCounts: counts,
+    launchCount: totalsResult.count ?? 0,
+    tradeCount: launches.reduce((total, launch) => total + (launch.trade_count ?? 0), 0),
+    dataConnected: (statusResult.data ?? []).some((row) => (row as { status?: string }).status === "connected"),
   };
 }
 
 const getCachedDashboardData = unstable_cache(
   loadDashboardData,
-  ["dashboard-home-v3"],
+  ["dashboard-home-funnel-v1"],
   { revalidate: 5 },
 );
 
