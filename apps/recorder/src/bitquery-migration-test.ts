@@ -368,14 +368,15 @@ async function saveMigrations(payload: MigrationPayload) {
 async function nextMetricsCandidate() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,metrics_updated_at,metadata_updated_at")
+    .select("token_address,migrated_at,metrics_updated_at,metadata_updated_at,trade_flow_updated_at")
     .gte("migrated_at", cutoff)
+    .order("trade_flow_updated_at", { ascending: true, nullsFirst: true })
     .order("metrics_updated_at", { ascending: true, nullsFirst: true })
     .order("migrated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`Choose Bitquery market candidate: ${error.message}`);
-  return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null } | null;
+  return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
 }
 
 async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
@@ -436,6 +437,7 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
     buy_volume_usd: number(flow?.buyVolume),
     sell_volume_usd: number(flow?.sellVolume),
     unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
+    trade_flow_updated_at: new Date().toISOString(),
     latest_trade_at: last.Block.Time,
     metrics_updated_at: new Date().toISOString(),
     raw_market: payload,
