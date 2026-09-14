@@ -379,6 +379,37 @@ async function nextMetricsCandidate() {
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
 }
 
+async function nextMetadataCandidate() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address")
+    .gte("migrated_at", cutoff)
+    .is("metadata_updated_at", null)
+    .order("migrated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Choose token metadata candidate: ${error.message}`);
+  return data as { token_address: string } | null;
+}
+
+async function updateMetadata(tokenAddress: string) {
+  const info = await fetchTokenInfo(tokenAddress);
+  const link = object(info.link);
+  const { error } = await db.from("bitquery_migration_test").update({
+    name: info.name ?? null,
+    symbol: info.symbol ?? null,
+    image_url: info.logo ?? null,
+    description: link.description ?? null,
+    twitter_url: link.twitter_username ? `https://x.com/${String(link.twitter_username).replace(/^@/, "")}` : null,
+    telegram_url: link.telegram ?? null,
+    discord_url: link.discord ?? null,
+    website_url: link.website ?? null,
+    metadata_updated_at: new Date().toISOString(),
+    metadata_source: "gmgn_token_info",
+  }).eq("token_address", tokenAddress);
+  if (error) throw new Error(`Save token metadata: ${error.message}`);
+}
+
 async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
   const payload = await queryBitquery<MarketPayload>(marketQuery(candidate.token_address, candidate.migrated_at));
   const rows = payload.data?.Trading?.Tokens ?? [];
@@ -400,27 +431,6 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
   const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
   const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
   const flow = payload.data?.Trading?.Flow?.[0];
-  let gmgnMetadata: Record<string, unknown> = {};
-  if (!candidate.metadata_updated_at) {
-    try {
-      const info = await fetchTokenInfo(candidate.token_address);
-      const link = object(info.link);
-      gmgnMetadata = {
-        name: info.name ?? last.Token?.Name ?? first.Token?.Name ?? null,
-        symbol: info.symbol ?? last.Token?.Symbol ?? first.Token?.Symbol ?? null,
-        image_url: info.logo ?? null,
-        description: link.description ?? null,
-        twitter_url: link.twitter_username ? `https://x.com/${String(link.twitter_username).replace(/^@/, "")}` : null,
-        telegram_url: link.telegram ?? null,
-        discord_url: link.discord ?? null,
-        website_url: link.website ?? null,
-        metadata_updated_at: new Date().toISOString(),
-        metadata_source: "gmgn_token_info",
-      };
-    } catch (error) {
-      console.warn("GMGN metadata fallback failed", candidate.token_address, error);
-    }
-  }
   const { error } = await db.from("bitquery_migration_test").update({
     name: last.Token?.Name ?? first.Token?.Name ?? null,
     symbol: last.Token?.Symbol ?? first.Token?.Symbol ?? null,
@@ -441,7 +451,6 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
     latest_trade_at: last.Block.Time,
     metrics_updated_at: new Date().toISOString(),
     raw_market: payload,
-    ...gmgnMetadata,
   }).eq("token_address", candidate.token_address);
   if (error) throw new Error(`Save Bitquery market metrics: ${error.message}`);
 }
@@ -452,10 +461,22 @@ export async function runBitqueryMigrationTest() {
   let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
   let nextMigrationPoll = 0;
   let nextMetricsPoll = 0;
+  let nextMetadataPoll = 0;
+  let metadataWorkerRunning = false;
 
   while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
     const now = Date.now();
     try {
+      if (now >= nextMetadataPoll && !metadataWorkerRunning) {
+        metadataWorkerRunning = true;
+        void nextMetadataCandidate()
+          .then((candidate) => candidate ? updateMetadata(candidate.token_address) : undefined)
+          .catch((error) => console.warn("Token metadata backfill failed", error))
+          .finally(() => {
+            metadataWorkerRunning = false;
+            nextMetadataPoll = Date.now() + 1_100;
+          });
+      }
       if (now >= nextMigrationPoll) {
         const till = new Date();
         const payload = await queryBitquery<MigrationPayload>(migrationQuery(migrationCursor.toISOString(), till.toISOString()));
