@@ -274,6 +274,53 @@ export async function refreshSnapshotOutcomes({
   return { updated, unchanged };
 }
 
+/**
+ * Tokens with a trusted graduation price and no snapshots at all.
+ *
+ * Distinct from refreshing: refresh extends rows that exist, and without this
+ * a newly graduated token never gets its first row, so the research dataset
+ * quietly stops growing while every other stage looks healthy.
+ */
+export async function tokensMissingSnapshots(limit: number) {
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,migration_market_cap_usd,token_supply")
+    .eq("migration_price_source", "pool_reserves")
+    // Old enough for the widest age to be measurable.
+    .lte("migrated_at", new Date(Date.now() - Math.max(...SNAPSHOT_AGES_SECONDS) * 1_000).toISOString())
+    .order("migrated_at", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`Choose tokens missing snapshots: ${error.message}`);
+  if (!data?.length) return [];
+
+  const have = new Set<string>();
+  for (let index = 0; index < data.length; index += 200) {
+    const chunk = data.slice(index, index + 200).map((row) => row.token_address as string);
+    const { data: rows, error: haveError } = await db.from("bitquery_migration_snapshots")
+      .select("token_address").eq("age_seconds", 60).in("token_address", chunk);
+    if (haveError) throw new Error(`Read existing snapshots: ${haveError.message}`);
+    for (const row of rows ?? []) have.add(row.token_address as string);
+  }
+
+  return (data.filter((row) => !have.has(row.token_address as string)).slice(0, limit)) as SnapshotToken[];
+}
+
+/** Builds the first set of snapshots for tokens that have none. */
+export async function buildMissingSnapshots(limit = 3) {
+  const tokens = await tokensMissingSnapshots(limit);
+  if (!tokens.length) return 0;
+
+  let written = 0;
+  for (const token of tokens) {
+    const rows = buildSnapshots(token, await fetchHistory(token));
+    if (!rows.length) continue;
+    const { error } = await db.from("bitquery_migration_snapshots")
+      .upsert(rows, { onConflict: "token_address,age_seconds" });
+    if (error) throw new Error(`Save snapshots: ${error.message}`);
+    written += rows.length;
+  }
+  return written;
+}
+
 async function snapshotCandidates(limit: number) {
   const { data, error } = await db.from("bitquery_migration_test")
     .select("token_address,migrated_at,migration_market_cap_usd,token_supply")
