@@ -1,0 +1,15 @@
+alter table public.bitquery_migration_test
+  add column if not exists image_url text,
+  add column if not exists description text,
+  add column if not exists twitter_url text,
+  add column if not exists telegram_url text,
+  add column if not exists discord_url text,
+  add column if not exists website_url text,
+  add column if not exists farcaster_url text,
+  add column if not exists creator_tax_bps integer,
+  add column if not exists buyback_enabled boolean,
+  add column if not exists buys integer not null default 0,
+  add column if not exists sells integer not null default 0,
+  add column if not exists buy_volume_usd numeric,
+  add column if not exists sell_volume_usd numeric,
+  add column if not exists unique_traders integer not null default 0;
