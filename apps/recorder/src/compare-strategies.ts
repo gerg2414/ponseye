@@ -39,16 +39,21 @@ for (const token of tokens) {
 }
 console.log(`Loaded ${history.length}\n`);
 
+const L = [{at:2,sell:.5},{at:3,sell:.25},{at:5,sell:.15},{at:10,sell:.1}];
+const base = { ...DEFAULT_RULES, ladder: L, giveUpAfterMinutes: 20, runnerConfirmAt: 5, runnerFallbackBelow: 1.5 };
+
+// The losers fall 50-90% in a single minute, but that candle lands three to
+// twenty minutes after entry: the price drifts first. A stop only has to be
+// above the drift to fill before the gap.
 const variants: Array<{ name: string; rules: StrategyRules }> = [
-  { name: "yours (10/20/50/100)", rules: DEFAULT_RULES },
-  { name: "ladder 2/5/10/20", rules: { ...DEFAULT_RULES, ladder: [{at:2,sell:.4},{at:5,sell:.3},{at:10,sell:.2},{at:20,sell:.1}], runnerConfirmAt: 5, runnerFallbackBelow: 1.5 } },
-  { name: "ladder 2/3/5/10", rules: { ...DEFAULT_RULES, ladder: [{at:2,sell:.5},{at:3,sell:.25},{at:5,sell:.15},{at:10,sell:.1}], runnerConfirmAt: 3, runnerFallbackBelow: 1.2 } },
-  { name: "ladder 3/6/12/25", rules: { ...DEFAULT_RULES, ladder: [{at:3,sell:.4},{at:6,sell:.3},{at:12,sell:.2},{at:25,sell:.1}], runnerConfirmAt: 6, runnerFallbackBelow: 1.5 } },
-  { name: "2/5/10/20, no 8m rule", rules: { ...DEFAULT_RULES, ladder: [{at:2,sell:.4},{at:5,sell:.3},{at:10,sell:.2},{at:20,sell:.1}], runnerConfirmAt: 5, runnerFallbackBelow: 1.5, giveUpAfterMinutes: 999 } },
-  { name: "2/5/10/20, give up at 20m", rules: { ...DEFAULT_RULES, ladder: [{at:2,sell:.4},{at:5,sell:.3},{at:10,sell:.2},{at:20,sell:.1}], runnerConfirmAt: 5, runnerFallbackBelow: 1.5, giveUpAfterMinutes: 20 } },
-  { name: "all out at 2x", rules: { ...DEFAULT_RULES, ladder: [{at:2,sell:1}] } },
-  { name: "all out at 3x", rules: { ...DEFAULT_RULES, ladder: [{at:3,sell:1}] } },
-  { name: "all out at 5x", rules: { ...DEFAULT_RULES, ladder: [{at:5,sell:1}] } },
+  { name: "current (0.5x for 2m)", rules: base },
+  { name: "stop 0.7x for 2m", rules: { ...base, earlyExitBelow: 0.7 } },
+  { name: "stop 0.8x for 2m", rules: { ...base, earlyExitBelow: 0.8 } },
+  { name: "stop 0.8x immediate", rules: { ...base, earlyExitBelow: 0.8, earlyExitConsecutive: 1 } },
+  { name: "stop 0.85x immediate", rules: { ...base, earlyExitBelow: 0.85, earlyExitConsecutive: 1 } },
+  { name: "stop 0.9x immediate", rules: { ...base, earlyExitBelow: 0.9, earlyExitConsecutive: 1 } },
+  { name: "stop 0.7x immediate", rules: { ...base, earlyExitBelow: 0.7, earlyExitConsecutive: 1 } },
+  { name: "stop 0.8x + give up 10m", rules: { ...base, earlyExitBelow: 0.8, earlyExitConsecutive: 1, giveUpAfterMinutes: 10 } },
 ];
 
 console.log("strategy                       trades  avg    median  profit  2x+  <0.5x  best");

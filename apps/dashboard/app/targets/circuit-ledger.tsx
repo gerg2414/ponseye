@@ -71,7 +71,7 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
         <span>Target</span><span>Acquired</span><span>Entry MC</span><span>Position value</span><span>P&amp;L</span><span>Result</span>
       </div>
       <div className="circuitRows">
-        {visible.length ? visible.map(({ token, outcome, pnlUsd }) => {
+        {visible.length ? visible.map(({ token, outcome, pnlUsd }, rowIndex) => {
           const resultMultiple = outcome.closed ? outcome.exitMultiple : token.final_multiple;
           const sizeUsd = token.position_size_usd ?? 25;
           const positionValueUsd = sizeUsd * outcome.exitMultiple;
@@ -94,7 +94,15 @@ export function CircuitLedger({ items }: { items: CircuitItem[] }) {
                   rel="noreferrer noopener"
                   title={token.token_address}
                 >
-                  <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={48} />
+                  {/* The rows above the fold load eagerly. Lazy loading here
+                      depends on the thumbnail having layout, which makes it
+                      fragile to a change in the row's own sizing. */}
+                  <TokenImage
+                    src={token.image_url}
+                    alt={token.name ?? token.symbol ?? "Token"}
+                    size={48}
+                    priority={rowIndex < 10}
+                  />
                   <span>
                     <strong>{token.name ?? "Metadata pending"}</strong>
                     <small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : token.token_address.slice(0, 10)}</small>

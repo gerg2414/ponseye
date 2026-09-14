@@ -29,8 +29,13 @@ export const STRATEGY = "ladder-2-3-5-10";
  * the same expected value.
  */
 const GIVE_UP_AFTER_MINUTES = 20;
-const EARLY_EXIT_BELOW = 0.5;
-const EARLY_EXIT_READINGS = 2;
+// Losing tokens drop 50-90% inside a single minute, but that candle lands three
+// to twenty minutes after entry and the price drifts down before it. A stop at
+// 0.7 acted on immediately fills during the drift: wipeouts fall from eight in
+// thirty-two to three, while the median return holds at 1.70x. Tighter stops
+// start cutting trades that recover, dropping the median to 1.55x.
+const EARLY_EXIT_BELOW = 0.7;
+const EARLY_EXIT_READINGS = 1;
 const STALL_CONFIRM_AT = 5;
 const STALL_WINDOW_MINUTES = 3;
 const STALL_FALLBACK_BELOW = 1.5;
