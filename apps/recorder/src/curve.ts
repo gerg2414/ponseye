@@ -165,16 +165,35 @@ async function fetchCurveTrades(token: CurveToken) {
   return { trades, truncated: trades.length >= PAGE_SIZE * MAX_PAGES };
 }
 
-/** Tokens that have migrated but have no curve summary yet. */
+/**
+ * Tokens that have migrated but have no curve summary yet.
+ *
+ * The done set is read explicitly rather than through an embedded resource:
+ * curve stats join one-to-one, so PostgREST returns an object rather than an
+ * array, and a length check on it silently matches every row. That made the
+ * backfill reprocess the same few tokens forever while reporting progress.
+ */
 export async function curveCandidates(limit: number) {
+  const done = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from("bitquery_curve_stats")
+      .select("token_address")
+      .range(from, from + 999);
+    if (error) throw new Error(`Read completed curve stats: ${error.message}`);
+    for (const row of data ?? []) done.add(row.token_address as string);
+    if (!data || data.length < 1000) break;
+  }
+
+  // Newest first: those tokens have the most complete post-migration outcomes.
   const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,creator_address,bitquery_curve_stats(token_address)")
+    .select("token_address,migrated_at,creator_address")
     .order("migrated_at", { ascending: false })
-    .limit(limit);
+    .limit(limit + done.size);
   if (error) throw new Error(`Choose curve candidates: ${error.message}`);
 
   const pending = (data ?? [])
-    .filter((row) => !(row as { bitquery_curve_stats?: unknown[] }).bitquery_curve_stats?.length)
+    .filter((row) => !done.has(row.token_address as string))
+    .slice(0, limit)
     .map((row) => ({
       token_address: row.token_address as string,
       migrated_at: row.migrated_at as string,
@@ -216,22 +235,42 @@ export async function updateCurveStats(tokens: CurveToken[]) {
 export async function backfillCurveStats({
   log = console.log,
   batch = 5,
-}: { log?: (message: string) => void; batch?: number } = {}) {
+  maxTokens = Infinity,
+}: { log?: (message: string) => void; batch?: number; maxTokens?: number } = {}) {
   let done = 0;
-  for (let round = 0; round < 1000; round += 1) {
+  let failures = 0;
+  for (let round = 0; round < 5000; round += 1) {
+    if (done >= maxTokens) {
+      log(`Curve backfill stopped at the requested ${maxTokens} tokens`);
+      return done;
+    }
+    // Newest first, so the tokens with the most complete post-migration
+    // outcomes are covered before the budget runs down.
     const tokens = await curveCandidates(2000);
     if (!tokens.length) {
       log(`Curve backfill complete, ${done} tokens summarised`);
       return done;
     }
-    const slice = tokens.slice(0, batch);
+    const slice = tokens.slice(0, Math.min(batch, maxTokens - done));
     try {
       done += await updateCurveStats(slice);
+      failures = 0;
     } catch (error) {
-      console.error(`Curve batch failed for ${slice.map((t) => t.token_address).join(", ")}`, error);
-      return done;
+      // A throttle is transient. Aborting the run over one would leave the
+      // backfill permanently unfinished, so wait longer and carry on; only a
+      // run of consecutive failures means something is actually wrong.
+      failures += 1;
+      const throttled = (error as { throttled?: boolean }).throttled;
+      if (failures >= 5) {
+        console.error("Curve backfill stopping after 5 consecutive failures", error);
+        return done;
+      }
+      const wait = (throttled ? 15_000 : 5_000) * failures;
+      log(`  batch failed (${failures}/5)${throttled ? ", throttled" : ""}, waiting ${wait / 1000}s`);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      continue;
     }
-    if (done % 25 < batch) log(`  ${done}/${tokens.length + done} tokens summarised`);
+    if (done % 25 < batch) log(`  ${done} tokens summarised, ${Math.max(0, tokens.length - slice.length)} still pending`);
   }
   return done;
 }
