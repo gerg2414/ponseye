@@ -643,7 +643,7 @@ async function nextMetricsCandidate() {
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
 }
 
-async function nextLiveMetricsCandidates(limit = 150) {
+async function nextLiveMetricsCandidates(limit = 75) {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
     .select("token_address,migrated_at,transaction_hash,ath_price_usd")
@@ -800,8 +800,8 @@ export async function runBitqueryMigrationTest() {
 
       if (now >= nextLiveMetricsPoll) {
         const candidates = await nextLiveMetricsCandidates();
-        const batches = Array.from({ length: Math.ceil(candidates.length / 50) }, (_, index) =>
-          candidates.slice(index * 50, (index + 1) * 50));
+        const batches = Array.from({ length: Math.ceil(candidates.length / 25) }, (_, index) =>
+          candidates.slice(index * 25, (index + 1) * 25));
         await Promise.all(batches.map((batch) => updateLiveMetrics(batch)));
         nextLiveMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS;
       }
