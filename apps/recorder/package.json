@@ -8,7 +8,8 @@
     "dev": "tsx watch --env-file=../../.env src/index.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "backfill:migration-prices": "tsx --env-file=../../.env src/backfill-migration-prices.ts"
+    "backfill:migration-prices": "tsx --env-file=../../.env src/backfill-migration-prices.ts",
+    "snapshots": "tsx --env-file=../../.env src/build-snapshots.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

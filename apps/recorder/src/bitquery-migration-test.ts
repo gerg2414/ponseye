@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import {
   BitqueryAuthError,
   assertAddress,
@@ -12,6 +11,7 @@ import {
   queryBitquery,
 } from "./bitquery-client.js";
 import { BACKFILL_WINDOW_MS, TRACKING_WINDOW_MS, config } from "./config.js";
+import { db } from "./db.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -20,10 +20,6 @@ const POOL_REGISTERED_TOPIC = "01bf263a1db1652580721573296e1a1fa70b3d4c87f61d02a
 const DEFAULT_SUPPLY = 1_000_000_000;
 /** Tokens that never trade would otherwise be retried forever. */
 const MAX_HISTORY_ATTEMPTS = 5;
-
-const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
 
 type BitqueryArgument = {
   Name: string;
