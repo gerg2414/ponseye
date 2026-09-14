@@ -39,7 +39,14 @@ export function safeImageUrl(value: string | null) {
 
 export function imageCandidates(value: string | null) {
   const cid = ipfsCid(value);
-  if (cid) return [`/api/token-image/${encodeURIComponent(cid)}`];
+  if (cid) return [
+    `/api/token-image/${encodeURIComponent(cid)}`,
+    `https://w3s.link/ipfs/${encodeURIComponent(cid)}`,
+    `https://nftstorage.link/ipfs/${encodeURIComponent(cid)}`,
+    `https://gateway.lighthouse.storage/ipfs/${encodeURIComponent(cid)}`,
+    `https://gateway.pinata.cloud/ipfs/${encodeURIComponent(cid)}`,
+    `https://ipfs.io/ipfs/${encodeURIComponent(cid)}`,
+  ];
 
   const safe = safeImageUrl(value);
   if (!safe) return [];

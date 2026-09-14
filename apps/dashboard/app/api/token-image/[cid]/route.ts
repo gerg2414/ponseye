@@ -19,7 +19,7 @@ async function fetchImage(url: string) {
     headers: { Accept: "image/avif,image/webp,image/*" },
     cache: "force-cache",
     next: { revalidate: 604_800 },
-    signal: AbortSignal.timeout(2_000),
+    signal: AbortSignal.timeout(8_000),
   });
   const contentType = response.headers.get("content-type")?.split(";")[0]?.trim();
   if (!response.ok || !contentType?.startsWith("image/")) {

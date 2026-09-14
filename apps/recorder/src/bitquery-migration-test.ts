@@ -759,11 +759,13 @@ export async function runBitqueryMigrationTest() {
   void runLivePriceStream();
   await setStatus("connecting", "Backfilling PONS migrations from the last 24 hours");
   let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
-  // A token can remain on the bonding curve for longer than the 24-hour
-  // migration view. Look further back so migrated rows can recover metadata.
-  let launchCursor = new Date(Date.now() - 7 * 24 * 60 * 60_000);
+  // Keep recent launches current independently from the deeper recovery pass.
+  // A single old-to-new cursor can leave new token metadata waiting for hours.
+  let launchCursor = new Date(Date.now() - 60 * 60_000);
+  let launchBackfillCursor = new Date(Date.now() - 7 * 24 * 60 * 60_000);
   let nextMigrationPoll = 0;
   let nextLaunchPoll = 0;
+  let nextLaunchBackfillPoll = 0;
   let nextMetadataSync = 0;
   let nextMetricsPoll = 0;
   let nextLiveMetricsPoll = 0;
@@ -782,20 +784,27 @@ export async function runBitqueryMigrationTest() {
 
       if (now >= nextLaunchPoll) {
         const current = new Date();
-        const windowMs = 30 * 60_000;
-        const caughtUp = current.getTime() - launchCursor.getTime() <= windowMs;
-        const till = caughtUp
-          ? current
-          : new Date(Math.min(current.getTime(), launchCursor.getTime() + windowMs));
-        const payload = await queryBitquery<LaunchPayload>(launchMetadataQuery(launchCursor.toISOString(), till.toISOString()));
+        const payload = await queryBitquery<LaunchPayload>(launchMetadataQuery(launchCursor.toISOString(), current.toISOString()));
         await saveLaunchMetadata(payload);
-        launchCursor = caughtUp ? new Date(till.getTime() - 60_000) : till;
+        launchCursor = new Date(current.getTime() - 60_000);
         if (now >= nextMetadataSync) {
           const { error } = await db.rpc("sync_bitquery_migration_metadata");
           if (error) throw new Error(`Sync Bitquery migration metadata: ${error.message}`);
           nextMetadataSync = Date.now() + 15_000;
         }
-        nextLaunchPoll = Date.now() + 1_100;
+        nextLaunchPoll = Date.now() + 15_000;
+      }
+
+      if (now >= nextLaunchBackfillPoll) {
+        const current = new Date();
+        const recentCutoff = new Date(current.getTime() - 60 * 60_000);
+        if (launchBackfillCursor < recentCutoff) {
+          const till = new Date(Math.min(recentCutoff.getTime(), launchBackfillCursor.getTime() + 30 * 60_000));
+          const payload = await queryBitquery<LaunchPayload>(launchMetadataQuery(launchBackfillCursor.toISOString(), till.toISOString()));
+          await saveLaunchMetadata(payload);
+          launchBackfillCursor = till;
+        }
+        nextLaunchBackfillPoll = Date.now() + 10_000;
       }
 
       if (now >= nextLiveMetricsPoll) {
