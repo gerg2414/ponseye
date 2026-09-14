@@ -36,6 +36,55 @@ function releaseRequestSlot() {
   pendingRequests.shift()?.();
 }
 
+// Bitquery bills on request volume, so the only way to control it is to know
+// which stage is spending it. Counted here because this is the single choke
+// point every query already passes through.
+const queryCounts = new Map<string, number>();
+const rowCounts = new Map<string, number>();
+let queryTotal = 0;
+let rowTotal = 0;
+let countingSince = Date.now();
+let currentLabel = "unlabelled";
+
+/** Names the stage responsible for queries issued until the next call. */
+export function labelQueries(label: string) {
+  currentLabel = label;
+}
+
+export function queryStats() {
+  const minutes = Math.max((Date.now() - countingSince) / 60_000, 1 / 60);
+  return {
+    queries: queryTotal,
+    queriesPerMinute: Number((queryTotal / minutes).toFixed(1)),
+    // Bitquery charges on the work a query does, not on the number of requests,
+    // so rows returned tracks the bill far better than request count. A single
+    // thousand-row page costs what a thousand single-row lookups would.
+    rows: rowTotal,
+    rowsPerMinute: Math.round(rowTotal / minutes),
+    projectedRowsPerDay: Math.round((rowTotal / minutes) * 1440),
+    queriesByStage: Object.fromEntries([...queryCounts.entries()].sort((a, b) => b[1] - a[1])),
+    rowsByStage: Object.fromEntries([...rowCounts.entries()].sort((a, b) => b[1] - a[1])),
+    since: new Date(countingSince).toISOString(),
+  };
+}
+
+/** Counts the rows a response carried, however deeply they are nested. */
+function countRows(value: unknown): number {
+  if (Array.isArray(value)) return value.length + value.reduce<number>((t, v) => t + countRows(v), 0);
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).reduce<number>((t, v) => t + countRows(v), 0);
+  }
+  return 0;
+}
+
+export function resetQueryStats() {
+  queryCounts.clear();
+  rowCounts.clear();
+  queryTotal = 0;
+  rowTotal = 0;
+  countingSince = Date.now();
+}
+
 /** True for the errors that mean "you asked for too much at once", not "this is wrong". */
 function isThrottleMessage(message: string) {
   return /session limit|too many concurrent|rate limit|too many requests/i.test(message);
@@ -110,6 +159,8 @@ export async function queryBitquery<T>(query: string, attempts = 3): Promise<T> 
       // The slot is released as soon as the request finishes, before any
       // backoff, so a waiting request is not blocked by another one sleeping.
       await acquireRequestSlot();
+      queryTotal += 1;
+      queryCounts.set(currentLabel, (queryCounts.get(currentLabel) ?? 0) + 1);
       try {
         const token = await getAccessToken();
         const response = await fetch("https://streaming.bitquery.io/graphql", {
@@ -141,6 +192,9 @@ export async function queryBitquery<T>(query: string, attempts = 3): Promise<T> 
           if (payload.data == null) throw new Error(message);
           console.warn(`Bitquery returned a partial result: ${message}`);
         }
+        const rows = countRows(payload.data);
+        rowTotal += rows;
+        rowCounts.set(currentLabel, (rowCounts.get(currentLabel) ?? 0) + rows);
         return (payload.data ?? {}) as T;
       } finally {
         releaseRequestSlot();

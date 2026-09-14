@@ -6,12 +6,15 @@ import {
   getAccessToken,
   invalidateAccessToken,
   isAddress,
+  labelQueries,
   mapWithConcurrency,
   number,
   queryBitquery,
 } from "./bitquery-client.js";
 import { BACKFILL_WINDOW_MS, TRACKING_WINDOW_MS, config } from "./config.js";
 import { db } from "./db.js";
+import { curveCandidates, updateCurveStats } from "./curve.js";
+import { budgetLevel, getBitqueryUsage, stageAllowed, type BudgetLevel } from "./usage.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -575,6 +578,44 @@ async function collectLaunchMetadata(since: Date, till: Date) {
   return saveLaunchMetadata(calls);
 }
 
+/**
+ * How often a token's trade flow is worth re-reading, by how old it is.
+ *
+ * Refreshing every token every few seconds is what makes this expensive, and it
+ * buys nothing: a token that migrated yesterday does not change minute to
+ * minute. Prices still arrive continuously over the WebSocket, which costs one
+ * connection rather than one request per token.
+ */
+const REFRESH_TIERS = [
+  { maxAgeMs: 60 * 60_000, everyMs: 30_000 },       // first hour: the decisive window
+  { maxAgeMs: 6 * 60 * 60_000, everyMs: 5 * 60_000 },
+  { maxAgeMs: Infinity, everyMs: 30 * 60_000 },
+] as const;
+
+function refreshIntervalFor(migratedAt: string) {
+  const age = Date.now() - Date.parse(migratedAt);
+  return (REFRESH_TIERS.find((tier) => age <= tier.maxAgeMs) ?? REFRESH_TIERS.at(-1)!).everyMs;
+}
+
+/** Tokens whose trade flow is stale enough, for their age, to be worth re-reading. */
+async function staleTrackedTokens(limit: number) {
+  const cutoff = new Date(Date.now() - TRACKING_WINDOW_MS).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,transaction_hash,token_supply,trade_flow_updated_at")
+    .gte("migrated_at", cutoff)
+    .order("trade_flow_updated_at", { ascending: true, nullsFirst: true })
+    .limit(limit * 3);
+  if (error) throw new Error(`Choose stale tracked tokens: ${error.message}`);
+
+  const now = Date.now();
+  return ((data ?? []) as Array<TrackedToken & { trade_flow_updated_at: string | null }>)
+    .filter((row) => {
+      if (!row.trade_flow_updated_at) return true;
+      return now - Date.parse(row.trade_flow_updated_at) >= refreshIntervalFor(row.migrated_at);
+    })
+    .slice(0, limit) as TrackedToken[];
+}
+
 async function trackedTokens(limit: number, order: "trade_flow_updated_at") {
   const cutoff = new Date(Date.now() - TRACKING_WINDOW_MS).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
@@ -1021,6 +1062,7 @@ async function streamLivePricesOnce(candidates: Map<string, TrackedToken>) {
 async function runLivePriceStream() {
   while (running) {
     try {
+      labelQueries("live-price-stream");
       const tracked = await trackedTokens(500, "trade_flow_updated_at");
       await streamLivePricesOnce(new Map(tracked.map((row) => [row.token_address, row])));
     } catch (error) {
@@ -1141,7 +1183,8 @@ export async function runBitqueryMigrationTest() {
       nextRunAt: 0,
       failures: 0,
       run: async () => {
-        const candidates = await trackedTokens(150, "trade_flow_updated_at");
+        const candidates = await staleTrackedTokens(75);
+        if (!candidates.length) return;
         const batches = Array.from(
           { length: Math.ceil(candidates.length / 25) },
           (_, index) => candidates.slice(index * 25, (index + 1) * 25),
@@ -1182,6 +1225,19 @@ export async function runBitqueryMigrationTest() {
       },
     },
     {
+      name: "curve-stats",
+      // Pre-migration curve behaviour is fixed once a token graduates, so this
+      // runs once per token and then never again for it.
+      intervalMs: 5_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const tokens = await curveCandidates(400);
+        if (!tokens.length) return;
+        await updateCurveStats(tokens.slice(0, 3));
+      },
+    },
+    {
       name: "history",
       intervalMs: 2_000,
       nextRunAt: 0,
@@ -1197,12 +1253,36 @@ export async function runBitqueryMigrationTest() {
     },
   ];
 
+  let level: BudgetLevel = "full";
+  let nextBudgetCheck = 0;
+  let lastLevel: BudgetLevel | null = null;
+
   while (running) {
     const now = Date.now();
 
+    if (now >= nextBudgetCheck) {
+      const usage = await getBitqueryUsage();
+      level = budgetLevel(usage);
+      nextBudgetCheck = Date.now() + 5 * 60_000;
+      if (usage && level !== lastLevel) {
+        console.log(
+          `Bitquery budget: ${Math.round(usage.pointsFraction * 100)}% of points used ` +
+          `with ${Math.round((1 - usage.periodFraction) * 100)}% of the period left, running at "${level}"`,
+        );
+        lastLevel = level;
+      }
+    }
+
     for (const stage of stages) {
       if (!running || now < stage.nextRunAt) continue;
+      if (!stageAllowed(stage.name, level)) {
+        // Hold the stage rather than dropping it, so it resumes on its own when
+        // the next period starts or spend falls back in line.
+        stage.nextRunAt = Date.now() + 5 * 60_000;
+        continue;
+      }
       try {
+        labelQueries(stage.name);
         await stage.run();
         stage.failures = 0;
         stage.nextRunAt = Date.now() + stage.intervalMs;

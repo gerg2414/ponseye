@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { runBitqueryMigrationTest, stopBitqueryMigrationTest } from "./bitquery-migration-test.js";
 import { config } from "./config.js";
+import { queryStats } from "./bitquery-client.js";
+import { getBitqueryUsage } from "./usage.js";
 
 type RecorderMode = "stopped" | "starting" | "recording" | "error" | "draining";
 
@@ -9,11 +11,12 @@ let recorderMode: RecorderMode = config.BITQUERY_MIGRATION_TEST_ENABLED ? "start
 let connectedAt: string | null = null;
 let lastError: string | null = null;
 
-const server = createServer((request, response) => {
+const server = createServer(async (request, response) => {
   if (request.url !== "/health") {
     response.writeHead(404).end();
     return;
   }
+  const usage = await getBitqueryUsage().catch(() => null);
   response.writeHead(healthy ? 200 : 503, { "content-type": "application/json" });
   response.end(JSON.stringify({
     healthy,
@@ -23,6 +26,15 @@ const server = createServer((request, response) => {
     lastError,
     backfillHours: config.BITQUERY_BACKFILL_HOURS,
     trackingWindowHours: config.BITQUERY_TRACKING_WINDOW_HOURS,
+    bitquery: queryStats(),
+    budget: usage && {
+      plan: usage.planName,
+      pointsUsedPct: Math.round(usage.pointsFraction * 100),
+      periodElapsedPct: Math.round(usage.periodFraction * 100),
+      pointsUsed: usage.pointsUsed,
+      pointsLimit: usage.pointsLimit,
+      periodEnd: usage.periodEnd,
+    },
   }));
 });
 
