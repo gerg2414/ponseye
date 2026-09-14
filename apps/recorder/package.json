@@ -17,7 +17,9 @@
     "compare": "tsx --env-file=../../.env src/compare-strategies.ts",
     "seed:positions": "tsx --env-file=../../.env src/seed-positions.ts",
     "control": "tsx --env-file=../../.env src/control-test.ts",
-    "timing": "tsx --env-file=../../.env src/entry-timing-test.ts"
+    "timing": "tsx --env-file=../../.env src/entry-timing-test.ts",
+    "deadcat": "tsx --env-file=../../.env src/deadcat-test.ts",
+    "wallets": "tsx --env-file=../../.env src/run-wallet-discovery.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",
