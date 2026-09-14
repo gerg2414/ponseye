@@ -28,6 +28,11 @@ type RegistrationEvent = {
   LogHeader: { Data: string };
 };
 
+type LaunchCall = {
+  Transaction: { Hash: string; From?: string };
+  Call: { Input: string; Output: string };
+};
+
 type MarketRow = {
   Block: { Time: string };
   Token?: { Address?: string; Symbol?: string; Name?: string };
@@ -37,18 +42,27 @@ type MarketRow = {
   trades?: string | number;
 };
 
+type TradeFlowRow = {
+  buys?: string | number;
+  sells?: string | number;
+  buyVolume?: string | number;
+  sellVolume?: string | number;
+  uniqueTraders?: string | number;
+};
+
 type MigrationPayload = {
   data?: {
     EVM?: {
       Graduations?: GraduationEvent[];
       Registrations?: RegistrationEvent[];
+      Launches?: LaunchCall[];
     };
   };
   errors?: Array<{ message?: string }>;
 };
 
 type MarketPayload = {
-  data?: { Trading?: { Tokens?: MarketRow[] } };
+  data?: { Trading?: { Tokens?: MarketRow[]; Flow?: TradeFlowRow[] } };
   errors?: Array<{ message?: string }>;
 };
 
@@ -82,6 +96,59 @@ function decodeRegistration(data: string) {
     tokenAddress: addressWord(clean.slice(0, 64)),
     quoteTokenAddress: addressWord(clean.slice(64, 128)),
     creatorAddress: addressWord(clean.slice(128, 192)),
+  };
+}
+
+function hexWord(hex: string, byteOffset: number) {
+  return hex.slice(byteOffset * 2, byteOffset * 2 + 64);
+}
+
+function wordNumber(word: string) {
+  if (!/^[0-9a-f]{64}$/i.test(word)) return null;
+  const value = Number.parseInt(word, 16);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+function dynamicString(hex: string, baseByteOffset: number, offsetWord: string) {
+  const relativeOffset = wordNumber(offsetWord);
+  if (relativeOffset == null) return null;
+  const start = baseByteOffset + relativeOffset;
+  const length = wordNumber(hexWord(hex, start));
+  if (length == null || length < 0 || length > 100_000) return null;
+  const encoded = hex.slice((start + 32) * 2, (start + 32 + length) * 2);
+  if (encoded.length !== length * 2) return null;
+  try {
+    return Buffer.from(encoded, "hex").toString("utf8").replace(/\0/g, "").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeLaunch(call: LaunchCall) {
+  const input = call.Call.Input.replace(/^0x/, "");
+  const output = call.Call.Output.replace(/^0x/, "");
+  if (input.length < 8 + 64 || output.length < 64) return null;
+  const args = input.slice(8);
+  const tupleOffset = wordNumber(hexWord(args, 0));
+  const tokenAddress = addressWord(hexWord(output, 0));
+  if (tupleOffset == null || !tokenAddress) return null;
+  const tuple = tupleOffset;
+  const socialsOffset = wordNumber(hexWord(args, tuple + 4 * 32));
+  const socials = socialsOffset == null ? null : tuple + socialsOffset;
+  return {
+    tokenAddress,
+    name: dynamicString(args, tuple, hexWord(args, tuple)),
+    symbol: dynamicString(args, tuple, hexWord(args, tuple + 32)),
+    imageUrl: dynamicString(args, tuple, hexWord(args, tuple + 2 * 32)),
+    description: dynamicString(args, tuple, hexWord(args, tuple + 3 * 32)),
+    twitterUrl: socials == null ? null : dynamicString(args, socials, hexWord(args, socials)),
+    telegramUrl: socials == null ? null : dynamicString(args, socials, hexWord(args, socials + 32)),
+    discordUrl: socials == null ? null : dynamicString(args, socials, hexWord(args, socials + 2 * 32)),
+    websiteUrl: socials == null ? null : dynamicString(args, socials, hexWord(args, socials + 3 * 32)),
+    farcasterUrl: socials == null ? null : dynamicString(args, socials, hexWord(args, socials + 4 * 32)),
+    creatorFeeRecipient: addressWord(hexWord(args, tuple + 5 * 32)),
+    creatorTaxBps: wordNumber(hexWord(args, tuple + 6 * 32)),
+    buybackEnabled: wordNumber(hexWord(args, tuple + 7 * 32)) === 1,
   };
 }
 
@@ -163,6 +230,21 @@ function migrationQuery(since: string, till: string) {
           Transaction { Hash }
           LogHeader { Data }
         }
+        Launches: Calls(
+          limit: {count: 1000}
+          orderBy: {ascending: Block_Time}
+          where: {
+            Block: {Time: {since: "${since}", till: "${till}"}}
+            Call: {
+              To: {in: ["0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e", "0xe33e9e479df8802cb0866d5d05258bec4cf62948"]}
+              Input: {startsWith: ["0xf35abbcf", "0xa72101af", "0xf85f8e41"]}
+              Success: true
+            }
+          }
+        ) {
+          Transaction { Hash From }
+          Call { Input Output }
+        }
       }
     }
   `;
@@ -189,6 +271,22 @@ function marketQuery(tokenAddress: string, migratedAt: string) {
           Supply { MarketCap CirculatingSupply }
           trades: count
         }
+        Flow: Trades(
+          limit: {count: 1}
+          where: {
+            Pair: {
+              Token: {Address: {is: "${tokenAddress}"}}
+              Market: {Network: {is: "Robinhood"}}
+            }
+            Block: {Time: {since: "${since}"}}
+          }
+        ) {
+          buys: count(if: {Side: {is: "Buy"}})
+          sells: count(if: {Side: {is: "Sell"}})
+          buyVolume: sum(of: AmountsInUsd_Quote, if: {Side: {is: "Buy"}})
+          sellVolume: sum(of: AmountsInUsd_Quote, if: {Side: {is: "Sell"}})
+          uniqueTraders: count(distinct: Trader_Address)
+        }
       }
     }
   `;
@@ -211,6 +309,11 @@ async function saveMigrations(payload: MigrationPayload) {
     const decoded = decodeRegistration(row.LogHeader.Data);
     if (decoded.tokenAddress) registrations.set(decoded.tokenAddress, row);
   }
+  const launches = new Map<string, ReturnType<typeof decodeLaunch>>();
+  for (const call of payload.data?.EVM?.Launches ?? []) {
+    const decoded = decodeLaunch(call);
+    if (decoded) launches.set(decoded.tokenAddress, decoded);
+  }
 
   const rows = graduations.flatMap((graduation) => {
     const args = argumentMap(graduation.Arguments);
@@ -218,6 +321,7 @@ async function saveMigrations(payload: MigrationPayload) {
     if (!/^0x[0-9a-f]{40}$/.test(tokenAddress)) return [];
     const registration = registrations.get(tokenAddress);
     const decoded = registration ? decodeRegistration(registration.LogHeader.Data) : null;
+    const launch = launches.get(tokenAddress);
     return [{
       token_address: tokenAddress,
       migrated_at: graduation.Block.Time,
@@ -227,17 +331,25 @@ async function saveMigrations(payload: MigrationPayload) {
       token_amount_raw: args.tokenAmount == null ? null : String(args.tokenAmount),
       pair_token_amount_raw: args.pairTokenAmount == null ? null : String(args.pairTokenAmount),
       quote_token_address: decoded?.quoteTokenAddress ?? null,
-      creator_address: decoded?.creatorAddress ?? null,
+      creator_address: decoded?.creatorAddress ?? launch?.creatorFeeRecipient ?? null,
+      name: launch?.name ?? null,
+      symbol: launch?.symbol ?? null,
+      image_url: launch?.imageUrl ?? null,
+      description: launch?.description ?? null,
+      twitter_url: launch?.twitterUrl ?? null,
+      telegram_url: launch?.telegramUrl ?? null,
+      discord_url: launch?.discordUrl ?? null,
+      website_url: launch?.websiteUrl ?? null,
+      farcaster_url: launch?.farcasterUrl ?? null,
+      creator_tax_bps: launch?.creatorTaxBps ?? null,
+      buyback_enabled: launch?.buybackEnabled ?? null,
       last_seen_at: new Date().toISOString(),
       raw_graduation: graduation,
       raw_registration: registration ?? null,
     }];
   });
   if (!rows.length) return 0;
-  const { error } = await db.from("bitquery_migration_test").upsert(rows, {
-    onConflict: "token_address",
-    ignoreDuplicates: true,
-  });
+  const { error } = await db.from("bitquery_migration_test").upsert(rows, { onConflict: "token_address" });
   if (error) throw new Error(`Save Bitquery migrations: ${error.message}`);
   return rows.length;
 }
@@ -275,6 +387,7 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
   const athPrice = highs.length ? Math.max(...highs) : null;
   const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
   const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
+  const flow = payload.data?.Trading?.Flow?.[0];
   const { error } = await db.from("bitquery_migration_test").update({
     name: last.Token?.Name ?? first.Token?.Name ?? null,
     symbol: last.Token?.Symbol ?? first.Token?.Symbol ?? null,
@@ -286,6 +399,11 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
     ath_market_cap_usd: athPrice == null ? null : athPrice * PONS_SUPPLY,
     volume_usd: volumeUsd,
     trade_count: Math.round(tradeCount),
+    buys: Math.round(number(flow?.buys) ?? 0),
+    sells: Math.round(number(flow?.sells) ?? 0),
+    buy_volume_usd: number(flow?.buyVolume),
+    sell_volume_usd: number(flow?.sellVolume),
+    unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
     latest_trade_at: last.Block.Time,
     metrics_updated_at: new Date().toISOString(),
     raw_market: payload,
