@@ -1432,15 +1432,10 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .bitqueryTestIntro > span.connected { color: var(--green); }
 .bitqueryTestIntro > span.connected i { background: var(--green); box-shadow: 0 0 10px rgba(154,255,79,.7); }
 .bitqueryTestStats { margin-bottom: 10px; }
-.bitqueryTestLedger table { min-width: 1740px; }
-.bitqueryTestLedger th:first-child { width: 230px; }
-.bitqueryTestLedger th:nth-child(2) { width: 160px; }
-.bitqueryTestLedger th:nth-child(3),.bitqueryTestLedger th:nth-child(4),.bitqueryTestLedger th:nth-child(5) { width: 130px; }
-.bitqueryTestLedger th:nth-child(6) { width: 85px; }
-.bitqueryTestLedger th:nth-child(7) { width: 120px; }
-.bitqueryTestLedger th:nth-child(8) { width: 135px; }
-.bitqueryTestLedger th:nth-child(9),.bitqueryTestLedger th:nth-child(10) { width: 110px; }
-.bitqueryTestLedger th:nth-child(11) { width: 110px; }
+/* Widths come from a colgroup in the markup rather than nth-child, because
+   position-based rules silently reassign every width when a column is inserted:
+   adding the holder column pushed the peak column's 85px onto the ATH column. */
+.bitqueryTestLedger table { min-width: 1870px; table-layout: fixed; }
 .bitqueryTokenName { position: relative; padding-right: 48px; display: flex; align-items: center; gap: 12px; }
 .bitqueryTokenLink { min-width: 0; display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
 .bitqueryTokenName .tokenImageLoader { width: 52px; height: 52px; flex: 0 0 52px; }

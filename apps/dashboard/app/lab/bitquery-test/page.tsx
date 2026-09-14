@@ -156,6 +156,21 @@ export default async function BitqueryMigrationTestPage({
         </form>
         <div className="databaseTableWrap">
           <table>
+            {/* Widths live beside the columns so inserting one cannot shift the rest. */}
+            <colgroup>
+              <col style={{ width: 230 }} />{/* Token */}
+              <col style={{ width: 150 }} />{/* Migrated */}
+              <col style={{ width: 140 }} />{/* Holders @1m */}
+              <col style={{ width: 130 }} />{/* Migration MC */}
+              <col style={{ width: 130 }} />{/* Current MC */}
+              <col style={{ width: 150 }} />{/* Post migration ATH */}
+              <col style={{ width: 100 }} />{/* Peak */}
+              <col style={{ width: 120 }} />{/* Volume */}
+              <col style={{ width: 130 }} />{/* Buys */}
+              <col style={{ width: 130 }} />{/* Sells */}
+              <col style={{ width: 130 }} />{/* Trades */}
+              <col style={{ width: 130 }} />{/* Event details */}
+            </colgroup>
             <thead>
               <tr><th>Token</th><th>Migrated</th><th>Holders @1m</th><th>Migration MC</th><th>Current MC</th><th>Post migration ATH</th><th>Peak</th><th>Volume</th><th>Buys</th><th>Sells</th><th>Trades</th><th>Event details</th></tr>
             </thead>
