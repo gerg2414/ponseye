@@ -84,6 +84,16 @@ export async function fetchPonsTrenches(): Promise<GmgnToken[]> {
   return [...tokens.values()];
 }
 
+export async function fetchTokenInfo(tokenAddress: string) {
+  const response = await runRawJson([
+    "token", "info",
+    "--chain", "robinhood",
+    "--address", tokenAddress,
+  ]);
+  const root = asObject(response);
+  return asObject(root.data ?? response);
+}
+
 export async function fetchOneMinuteCandles(tokenAddress: string, from: Date, to: Date) {
   const response = await runRawJson([
     "market", "kline",
