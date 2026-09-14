@@ -169,7 +169,7 @@ function migrationQuery(since: string, till: string) {
 }
 
 function marketQuery(tokenAddress: string, migratedAt: string) {
-  const since = new Date(migratedAt).toISOString().slice(0, 19).replace("T", " ");
+  const since = new Date(migratedAt).toISOString();
   return `
     query PonsMigrationMarketTest {
       Trading {
