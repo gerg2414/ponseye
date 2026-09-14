@@ -91,12 +91,15 @@ export type BudgetLevel = "full" | "reduced" | "essential";
 
 export function budgetLevel(usage: BitqueryUsage | null): BudgetLevel {
   if (!usage || usage.pointsLimit <= 0) return "full";
-  const { pointsFraction, periodFraction } = usage;
 
-  if (pointsFraction >= 0.95) return "essential";
-  // Spending well ahead of the calendar exhausts the month early, so ease off
-  // before the hard ceiling rather than at it.
-  if (pointsFraction >= 0.85 || pointsFraction > periodFraction + 0.25) return "reduced";
+  // Judged on headroom alone, not on pace against the calendar.
+  //
+  // A pace rule reads a one-off backfill as a permanent burn rate and holds the
+  // pipeline down for the rest of the period, long after the spending stopped.
+  // Cumulative usage cannot distinguish "still spending fast" from "spent a lot
+  // once", so it is the wrong signal; what matters is how much is left.
+  if (usage.pointsFraction >= 0.95) return "essential";
+  if (usage.pointsFraction >= 0.85) return "reduced";
   return "full";
 }
 
@@ -108,10 +111,13 @@ export const STAGE_PRIORITY: Record<string, BudgetLevel> = {
   "live-metrics": "reduced",
   "migration-price": "reduced",
   "metadata-sync": "reduced",
-  // Pure backfill, entirely deferrable.
+  // Cheap and needed daily: outcomes take a day to mature, so pausing this
+  // quietly stops the research dataset improving while everything still looks
+  // healthy. It reads only new candles, so it costs little to keep running.
+  "snapshot-refresh": "reduced",
+  // Pure backfill of history that is not going anywhere, entirely deferrable.
   "launch-backfill": "full",
   "curve-stats": "full",
-  "snapshot-refresh": "full",
   history: "full",
 };
 
