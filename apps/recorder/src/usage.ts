@@ -118,7 +118,8 @@ export const STAGE_PRIORITY: Record<string, BudgetLevel> = {
   // Pure backfill of history that is not going anywhere, entirely deferrable.
   "launch-backfill": "full",
   "curve-stats": "full",
-  holders: "full",
+  // Carries the entry filter, so it stays up unless the allowance is nearly gone.
+  holders: "reduced",
   history: "full",
 };
 

@@ -89,16 +89,23 @@ export async function measureHolders(token: HolderToken, ageSeconds: number) {
   };
 }
 
-/** Tokens old enough to measure that have no holder snapshot yet. */
-export async function holderCandidates(limit: number) {
-  const widest = Math.max(...HOLDER_AGES_SECONDS);
-  const cutoff = new Date(Date.now() - widest * 1_000).toISOString();
+/**
+ * Tokens ready for one particular age.
+ *
+ * Split by age deliberately. Waiting until a token is old enough for the widest
+ * age before measuring anything delayed the one-minute reading by five minutes,
+ * which is the reading the entry filter is built on. Each age is now claimed as
+ * soon as it is reachable, newest first, so a fresh migration is scored about a
+ * minute after it graduates rather than after the backlog clears.
+ */
+export async function holderCandidatesForAge(ageSeconds: number, limit: number) {
+  const cutoff = new Date(Date.now() - ageSeconds * 1_000).toISOString();
 
   const done = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("bitquery_holder_snapshots")
       .select("token_address")
-      .eq("age_seconds", widest)
+      .eq("age_seconds", ageSeconds)
       .range(from, from + 999);
     if (error) throw new Error(`Read completed holder snapshots: ${error.message}`);
     for (const row of data ?? []) done.add(row.token_address as string);
@@ -117,13 +124,22 @@ export async function holderCandidates(limit: number) {
     .slice(0, limit) as HolderToken[];
 }
 
-export async function updateHolders(tokens: HolderToken[]) {
-  const rows = [];
-  for (const token of tokens) {
-    for (const age of HOLDER_AGES_SECONDS) {
-      const row = await measureHolders(token, age);
-      if (row) rows.push(row);
+/** Every age, freshest first, so live scoring never queues behind a backfill. */
+export async function holderCandidates(limit: number) {
+  const work: Array<{ token: HolderToken; age: number }> = [];
+  for (const age of [...HOLDER_AGES_SECONDS].sort((a, b) => a - b)) {
+    for (const token of await holderCandidatesForAge(age, limit)) {
+      work.push({ token, age });
     }
+  }
+  return work;
+}
+
+export async function updateHolders(work: Array<{ token: HolderToken; age: number }>) {
+  const rows = [];
+  for (const item of work) {
+    const row = await measureHolders(item.token, item.age);
+    if (row) rows.push(row);
   }
   if (!rows.length) return 0;
   const { error } = await db.from("bitquery_holder_snapshots")
@@ -144,7 +160,7 @@ export async function backfillHolders({
     if (done >= maxTokens) { log(`Holder backfill stopped at ${done} tokens`); return done; }
 
     const tokens = await holderCandidates(500);
-    if (!tokens.length) { log(`Holder backfill complete, ${done} tokens measured`); return done; }
+    if (!tokens.length) { log(`Holder backfill complete, ${done} measurements taken`); return done; }
 
     const slice = tokens.slice(0, Math.min(batch, maxTokens - done));
     try {

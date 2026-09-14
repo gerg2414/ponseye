@@ -1289,13 +1289,15 @@ export async function runBitqueryMigrationTest() {
     },
     {
       name: "holders",
-      intervalMs: 8_000,
+      // Fast, because the one-minute reading is the entry filter and is only
+      // useful while the token is still near its migration price.
+      intervalMs: 3_000,
       nextRunAt: 0,
       failures: 0,
       run: async () => {
-        const tokens = await holderCandidates(200);
-        if (!tokens.length) return;
-        await updateHolders(tokens.slice(0, 2));
+        const work = await holderCandidates(200);
+        if (!work.length) return;
+        await updateHolders(work.slice(0, 4));
       },
     },
     {
