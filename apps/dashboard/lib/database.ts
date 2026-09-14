@@ -53,11 +53,25 @@ export type BitqueryMigrationTestRow = {
   creator_address: string | null;
   name: string | null;
   symbol: string | null;
+  image_url: string | null;
+  description: string | null;
+  twitter_url: string | null;
+  telegram_url: string | null;
+  discord_url: string | null;
+  website_url: string | null;
+  farcaster_url: string | null;
+  creator_tax_bps: number | null;
+  buyback_enabled: boolean | null;
   migration_market_cap_usd: number | null;
   current_market_cap_usd: number | null;
   ath_market_cap_usd: number | null;
   volume_usd: number | null;
   trade_count: number;
+  buys: number;
+  sells: number;
+  buy_volume_usd: number | null;
+  sell_volume_usd: number | null;
+  unique_traders: number;
   latest_trade_at: string | null;
   metrics_updated_at: string | null;
   first_seen_at: string;
@@ -184,7 +198,7 @@ export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestR
   const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const [migrationResult, statusResult] = await Promise.all([
     db.from("bitquery_migration_test")
-      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,latest_trade_at,metrics_updated_at,first_seen_at")
+      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
       .gte("migrated_at", since)
       .order("migrated_at", { ascending: false }),
     db.from("stream_status")
@@ -202,6 +216,11 @@ export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestR
     ath_market_cap_usd: numberOrNull(row.ath_market_cap_usd),
     volume_usd: numberOrNull(row.volume_usd),
     trade_count: Number(row.trade_count ?? 0),
+    buys: Number(row.buys ?? 0),
+    sells: Number(row.sells ?? 0),
+    buy_volume_usd: numberOrNull(row.buy_volume_usd),
+    sell_volume_usd: numberOrNull(row.sell_volume_usd),
+    unique_traders: Number(row.unique_traders ?? 0),
   })) as BitqueryMigrationTestRow[];
   return {
     migrations,
