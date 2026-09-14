@@ -2421,3 +2421,19 @@ a.chartLink:hover b,a.chartLink:focus-visible b { transform: translate(2px,-2px)
 .circuitTokenLink > span { min-width: 0; display: grid; gap: 3px; }
 .circuitOpenChart { color: var(--green); font-size: 9px; font-style: normal; letter-spacing: .05em; text-transform: uppercase; opacity: 0; transition: opacity 120ms ease-out; }
 .circuitTokenLink:hover .circuitOpenChart, .circuitTokenLink:focus-visible .circuitOpenChart { opacity: 1; }
+
+/* Acquired card: entry, current value and multiple on one line. Replaces a
+   three column grid whose labels collided, and the panel below it that repeated
+   the multiple and the state the badge already shows. */
+.acquiredLine { margin-top: 12px; padding-top: 11px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-top: 1px solid #1d232b; }
+.acquiredFlow { min-width: 0; display: flex; align-items: baseline; gap: 7px; overflow: hidden; }
+.acquiredFlow b { color: #e6e9ed; font-family: "SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.acquiredFlow i { color: #5b6470; font-size: 12px; font-style: normal; }
+.acquiredLine > strong { flex: 0 0 auto; font-family: "SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size: 16px; white-space: nowrap; }
+.launchCard.isAcquired .acquiredLine > strong.gainUp { color: var(--green); }
+.launchCard.isAcquired .acquiredLine > strong.gainDown { color: #ff6378; }
+
+/* Acquired cards carry a title row and one line of numbers, where the other
+   lanes carry a lock meter sized to fill 320px. Holding them to that height
+   left most of the card empty, so they size to their content instead. */
+.launchCard.isAcquired { height: auto; }

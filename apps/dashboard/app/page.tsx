@@ -84,7 +84,7 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
   const acquired = mode === "acquired";
   const positionClosed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const valuationMarketCap = positionClosed ? launch.exit_market_cap_usd : launch.market_cap_usd;
-  const usdMarketCap = valuationMarketCap ? quoteValue(valuationMarketCap, "USDG") : launch.trade_count ? "Pending USD" : "Measuring";
+  const usdMarketCap = valuationMarketCap ? quoteValue(valuationMarketCap, "USDG") : launch.trade_count ? "—" : "—";
   const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
   const priceGainMultiple = launch.entry_market_cap_usd && valuationMarketCap
     ? valuationMarketCap / launch.entry_market_cap_usd
@@ -114,10 +114,19 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
         </div>
 
         {acquired ? (
-          <div className="acquiredMetrics">
-            <div><span>Entry MC</span><strong>{entryMarketCap ?? "Pending"}</strong></div>
-            <div><span>{positionClosed ? "Exit MC" : "Current MC"}</span><strong>{usdMarketCap}</strong></div>
-            <div className="gainMetric"><span>Gains</span><strong>{gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong></div>
+          /* One line: what it cost, what it is worth, and the multiple. The
+             three column grid crowded its own labels, and the panel beneath it
+             repeated the multiple and the open or closed state that the badge
+             above already carries. */
+          <div className="acquiredLine">
+            <span className="acquiredFlow">
+              <b>{entryMarketCap ?? "—"}</b>
+              <i aria-hidden="true">→</i>
+              <b>{usdMarketCap}</b>
+            </span>
+            <strong className={positionLoss ? "gainDown" : "gainUp"}>
+              {gainMultiple ? `${positionLoss ? "↓" : "↑"} ${gainMultiple.toFixed(2)}x` : "—"}
+            </strong>
           </div>
         ) : (
           <div className="cardMarketCap">
@@ -126,14 +135,7 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
           </div>
         )}
 
-        {acquired ? (
-          <div className={`positionMonitor ${positionClosed ? "closed" : "live"} ${positionLoss ? "loss" : "profit"}`}>
-            <div className="positionMonitorFooter">
-              <span><i />{positionClosed ? "Position closed" : "Position open"}</span>
-              <strong className={positionLoss ? "gainDown" : "gainUp"}>{positionLoss ? "↓" : "↑"} {gainMultiple ? `${gainMultiple.toFixed(2)}x` : "Pending"}</strong>
-            </div>
-          </div>
-        ) : (
+        {acquired ? null : (
           <div className="targetLock">
             <div className="targetLockHead">
               <strong>{lockLabel(launch, lockScore, mode)}</strong>

@@ -221,6 +221,10 @@ function positionFields(position: Record<string, unknown> | undefined) {
   return {
     acquired_at: position.opened_at as string,
     entry_market_cap_usd: entry,
+    // The card values a closed position at its exit rather than the token's
+    // price now, which may be days of decay later and says nothing about the
+    // trade.
+    exit_market_cap_usd: toNumber(position.exit_market_cap_usd),
     position_status: position.closed_at ? "closed" : "open",
     closed_at: position.closed_at as string | null,
     exit_reason: (position.close_reason ?? null) as string | null,
@@ -264,7 +268,7 @@ async function loadDashboardData() {
       .gte("migrated_at", new Date(Date.now() - 2 * 60 * 60_000).toISOString()),
     db.from("stream_status").select("feed,status,last_seen_at"),
     db.from("ponseye_positions_live")
-      .select("token_address,opened_at,entry_price_usd,entry_market_cap_usd,remaining_fraction,realised_multiple,rungs_filled,peak_multiple_seen,closed_at,close_reason,current_multiple,position_value_multiple"),
+      .select("token_address,opened_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,position_size_usd,remaining_fraction,realised_multiple,rungs_filled,peak_multiple_seen,closed_at,close_reason,current_multiple,position_value_multiple"),
     db.from("bitquery_migration_test").select("token_address", { count: "exact", head: true }),
   ]);
 

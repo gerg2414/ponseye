@@ -45,6 +45,7 @@ type OpenRow = {
   token_address: string;
   opened_at: string;
   entry_price_usd: number | string;
+  entry_market_cap_usd: number | string | null;
   remaining_fraction: number | string;
   realised_multiple: number | string;
   rungs_filled: number[];
@@ -115,7 +116,7 @@ export async function openPositions(signals: Awaited<ReturnType<typeof entrySign
 /** Walks every open position against the latest price. */
 export async function updatePositions() {
   const { data, error } = await db.from("ponseye_positions_live")
-    .select("token_address,opened_at,entry_price_usd,remaining_fraction,realised_multiple,rungs_filled,peak_multiple_seen,current_price_usd")
+    .select("token_address,opened_at,entry_price_usd,entry_market_cap_usd,remaining_fraction,realised_multiple,rungs_filled,peak_multiple_seen,current_price_usd")
     .is("closed_at", null);
   if (error) throw new Error(`Read live positions: ${error.message}`);
   if (!data?.length) return 0;
@@ -173,7 +174,13 @@ export async function updatePositions() {
       peak_multiple_seen: peak,
       last_price_usd: price,
       last_seen_at: new Date().toISOString(),
-      ...(closeReason ? { closed_at: new Date().toISOString(), close_reason: closeReason } : {}),
+      ...(closeReason ? {
+        closed_at: new Date().toISOString(),
+        close_reason: closeReason,
+        // What the position was worth on the way out, so the card values a
+        // closed trade at its exit rather than at the token's price days later.
+        exit_market_cap_usd: (number(row.entry_market_cap_usd) ?? 0) * realised || null,
+      } : {}),
       updated_at: new Date().toISOString(),
     });
     if (closeReason) console.log(`Closed ${row.token_address}: ${closeReason}, realised ${realised.toFixed(2)}x`);
