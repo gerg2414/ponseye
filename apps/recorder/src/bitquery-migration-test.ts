@@ -101,14 +101,18 @@ export function stopBitqueryMigrationTest() {
   running = false;
 }
 
-/** Bitquery stamps each candle at the start of its bucket. */
-function floorToMinute(value: string | Date) {
-  const time = value instanceof Date ? value.getTime() : Date.parse(value);
-  return new Date(Math.floor(time / 60_000) * 60_000);
+function supplyOf(token: { token_supply: number | string | null }) {
+  return positiveSupply(token.token_supply) ?? DEFAULT_SUPPLY;
 }
 
-function supplyOf(token: { token_supply: number | string | null }) {
-  return number(token.token_supply) ?? DEFAULT_SUPPLY;
+/**
+ * Bitquery reports CirculatingSupply as 0 for PONS tokens on Robinhood chain, so
+ * a reported supply is only usable when it is actually positive. Treating 0 as a
+ * value would drive every market cap to zero.
+ */
+function positiveSupply(value: unknown) {
+  const parsed = number(value);
+  return parsed != null && parsed > 0 ? parsed : null;
 }
 
 function argumentMap(args: BitqueryArgument[] = []) {
@@ -266,10 +270,13 @@ function launchMetadataQuery(since: string, till: string, limit: number, offset:
 }
 
 /**
- * Full one-minute candle history for a token from the minute its graduation
- * landed in. `since` is floored to the minute because a candle is stamped at its
- * bucket start: filtering from the exact graduation second skips the candle that
- * contains the graduation and makes the first row a minute too late.
+ * Full one-minute candle history for a token from its graduation onwards.
+ *
+ * Note that the first candle's Open is NOT the seeded pool price: measured over
+ * 355 recorded migrations it is the bonding curve exit price, and the price can
+ * move more than tenfold inside that first candle. migration_price_usd is
+ * therefore left unmeasured here rather than recorded from a value known to be
+ * wrong. See the pool-reserve derivation described in the migration notes.
  */
 function historyQuery(tokenAddress: string, since: string, limit: number, offset: number) {
   return `
@@ -537,7 +544,7 @@ async function updateLiveMetrics(candidates: TrackedToken[]) {
   const updates = candidates.map((candidate, index) => {
     const last = ((trading[`Token${index}`] ?? []) as MarketRow[])[0];
     const flow = ((trading[`Flow${index}`] ?? []) as TradeFlowRow[])[0];
-    const supply = number(last?.Supply?.CirculatingSupply) ?? supplyOf(candidate);
+    const supply = positiveSupply(last?.Supply?.CirculatingSupply) ?? supplyOf(candidate);
     const currentPrice = number(last?.Price?.Ohlc?.Close);
     const latestHigh = number(last?.Price?.Ohlc?.High);
     const buys = Math.round(number(flow?.buys) ?? 0);
@@ -599,7 +606,7 @@ async function historyCandidates(limit: number) {
  * again. Everything after the measurement is carried forward by the live stages.
  */
 async function measureHistory(candidate: HistoryCandidate) {
-  const since = floorToMinute(candidate.migrated_at).toISOString();
+  const since = new Date(candidate.migrated_at).toISOString();
   const rows = await fetchAllPages<MarketRow>(
     (limit, offset) => historyQuery(candidate.token_address, since, limit, offset),
     (data) => (data as HistoryData).Trading?.Tokens ?? [],
@@ -629,7 +636,7 @@ async function measureHistory(candidate: HistoryCandidate) {
   const athPrice = highs.length ? Math.max(...highs) : null;
   // One supply for every market cap on the row, so the peak multiple is a ratio
   // of like for like even if Bitquery reports a different supply later.
-  const supply = number(first.Supply?.CirculatingSupply) ?? supplyOf(candidate);
+  const supply = positiveSupply(first.Supply?.CirculatingSupply) ?? supplyOf(candidate);
   const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
   const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
   const name = last.Token?.Name ?? first.Token?.Name;
@@ -642,7 +649,7 @@ async function measureHistory(candidate: HistoryCandidate) {
     ...(migrationPrice == null ? {} : {
       migration_price_usd: migrationPrice,
       migration_market_cap_usd: migrationPrice * supply,
-      migration_price_source: "graduation_candle_open",
+      migration_price_source: "first_candle_open_untrusted",
     }),
     ...(currentPrice == null ? {} : {
       current_price_usd: currentPrice,

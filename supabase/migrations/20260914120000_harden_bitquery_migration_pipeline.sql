@@ -24,20 +24,22 @@ comment on column public.bitquery_migration_test.price_observed_at is
 comment on column public.bitquery_migration_test.migration_price_checked_at is
   'Last attempt at measuring the graduation price. Null means never attempted.';
 comment on column public.bitquery_migration_test.migration_price_source is
-  'How migration_price_usd was measured, e.g. graduation_candle_open.';
+  'How migration_price_usd was measured. Only ''pool_reserves'' is trusted and frozen; '
+  'other values are provisional and may be recomputed.';
 
--- Existing migration prices were measured from the first candle strictly after
--- the graduation timestamp, which is the candle *following* the one containing
--- the graduation. Those values are a minute late and sit on the wrong side of
--- the launch spike. Clear them so the corrected pass measures them again.
+-- Label what is already recorded. Measured across 355 migrations, the first
+-- candle's Open is the bonding curve exit price rather than the seeded pool
+-- price: on 30 of 187 native-quote tokens it sits 2-10x below the real
+-- graduation price, which inflates those tokens' peak multiples to a median of
+-- 17x against 2.2x for the rest. The corruption therefore concentrates in
+-- exactly the rows a strategy backtest would select as winners.
+--
+-- These values are kept but marked untrusted so they can be recomputed in place
+-- once the pool-reserve derivation lands. Only a trusted source is frozen.
 update public.bitquery_migration_test
-set
-  migration_price_usd = null,
-  migration_market_cap_usd = null,
-  migration_price_checked_at = null,
-  migration_price_attempts = 0,
-  migration_price_source = null
-where migration_price_source is null;
+set migration_price_source = 'first_candle_open_untrusted'
+where migration_price_usd is not null
+  and migration_price_source is null;
 
 create or replace function public.bitquery_migration_test_price_guard()
 returns trigger
@@ -58,8 +60,10 @@ begin
     new.price_observed_at := old.price_observed_at;
   end if;
 
-  -- The graduation price never changes once it has been measured properly.
-  if old.migration_price_usd is not null and old.migration_price_source is not null then
+  -- The graduation price never changes once it has been measured from the pool
+  -- reserves recorded in the graduation event. Values carrying any other source
+  -- are provisional and stay open to correction.
+  if old.migration_price_usd is not null and old.migration_price_source = 'pool_reserves' then
     new.migration_price_usd := old.migration_price_usd;
     new.migration_market_cap_usd := old.migration_market_cap_usd;
     new.migration_price_source := old.migration_price_source;
