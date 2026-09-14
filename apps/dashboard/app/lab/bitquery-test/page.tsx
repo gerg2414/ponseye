@@ -194,7 +194,15 @@ export default async function BitqueryMigrationTestPage({
                           {token.top_holder_pct.toFixed(1)}%
                         </strong>
                         <small>top 10: {token.top10_pct?.toFixed(0) ?? "?"}%</small>
-                        <small>{token.holder_count?.toLocaleString("en-GB") ?? "?"} holders</small>
+                        {token.top_holder_growth == null ? (
+                          <small>{token.holder_count?.toLocaleString("en-GB") ?? "?"} holders</small>
+                        ) : (
+                          <small className={token.top_holder_growth >= 15 ? "sellValue" : undefined}>
+                            {token.top_holder_growth >= 0 ? "+" : ""}
+                            {token.top_holder_growth.toFixed(1)}pp by 5m
+                            {token.top_holder_growth >= 15 ? " — accumulating" : ""}
+                          </small>
+                        )}
                       </>
                     )}
                   </td>

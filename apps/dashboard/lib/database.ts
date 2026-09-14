@@ -81,6 +81,8 @@ export type BitqueryMigrationTestRow = {
   top_holder_pct: number | null;
   top10_pct: number | null;
   holder_count: number | null;
+  /** Percentage points the largest holder gained between 1m and 5m. */
+  top_holder_growth: number | null;
 };
 
 export type BitqueryMigrationSort =
@@ -217,6 +219,11 @@ export async function getTokenDatabase({
 
 const holderEmbed = "bitquery_holder_snapshots(age_seconds,top_holder_pct,top10_pct,holder_count)";
 
+// A second embed of the same table, aliased, used only to restrict which tokens
+// come back. Filtering the display embed instead would also drop the rows for
+// every other age, which is how the five-minute reading went missing.
+const holderGate = "gate:bitquery_holder_snapshots!inner(age_seconds,top_holder_pct)";
+
 const bitqueryColumns = "token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at,peak_multiple,migration_price_source";
 
 const bitquerySortColumns: Record<BitqueryMigrationSort, string> = {
@@ -235,11 +242,18 @@ function toBitqueryRow(row: Record<string, unknown>) {
   // The embed is an array because a token has one row per snapshot age.
   const snapshots = (row.bitquery_holder_snapshots ?? []) as Array<Record<string, unknown>>;
   const atOneMinute = snapshots.find((snapshot) => Number(snapshot.age_seconds) === 60);
+  const atFiveMinutes = snapshots.find((snapshot) => Number(snapshot.age_seconds) === 300);
+  const early = numberOrNull(atOneMinute?.top_holder_pct);
+  const later = numberOrNull(atFiveMinutes?.top_holder_pct);
   return {
     ...row,
-    top_holder_pct: numberOrNull(atOneMinute?.top_holder_pct),
+    top_holder_pct: early,
     top10_pct: numberOrNull(atOneMinute?.top10_pct),
     holder_count: numberOrNull(atOneMinute?.holder_count),
+    // A wallet quietly building a large position between the two readings is the
+    // trap the one-minute figure alone cannot see: of 98 tokens where the
+    // largest holder gained 15 points or more, none reached 10x.
+    top_holder_growth: early != null && later != null ? later - early : null,
     migration_market_cap_usd: numberOrNull(row.migration_market_cap_usd),
     current_market_cap_usd: numberOrNull(row.current_market_cap_usd),
     ath_market_cap_usd: numberOrNull(row.ath_market_cap_usd),
@@ -263,8 +277,18 @@ export async function getBitqueryMigrationTest(
   // Filtering and sorting happen in the database. This page refreshes every few
   // seconds, so pulling the whole window back to sort it in JavaScript got more
   // expensive with every migration recorded.
+  // The gate embed is only present when filtering on it, because an inner join
+  // would otherwise exclude every token that has no snapshot yet.
+  //
+  // Supabase infers row types from a literal select string, so a value chosen at
+  // runtime defeats that inference. The shape is asserted at the end instead,
+  // which is what toBitqueryRow already does for the embedded snapshots.
+  const selection: string = filters.maxTopHolderPct > 0
+    ? `${bitqueryColumns},${holderEmbed},${holderGate}`
+    : `${bitqueryColumns},${holderEmbed}`;
+
   let rowQuery = db.from("bitquery_migration_test")
-    .select(`${bitqueryColumns},${holderEmbed}`, { count: "exact" })
+    .select(selection, { count: "exact" })
     .gte("migrated_at", since)
     .order(bitquerySortColumns[filters.sort], { ascending: false, nullsFirst: false })
     .order("migrated_at", { ascending: false })
@@ -281,9 +305,8 @@ export async function getBitqueryMigrationTest(
   // a snapshot come back with the embed empty rather than being excluded.
   if (filters.maxTopHolderPct > 0) {
     rowQuery = rowQuery
-      .not("bitquery_holder_snapshots", "is", null)
-      .eq("bitquery_holder_snapshots.age_seconds", 60)
-      .lt("bitquery_holder_snapshots.top_holder_pct", filters.maxTopHolderPct);
+      .eq("gate.age_seconds", 60)
+      .lt("gate.top_holder_pct", filters.maxTopHolderPct);
   }
 
   const [rowResult, totalResult, readyResult, statusResult] = await Promise.all([
@@ -307,7 +330,7 @@ export async function getBitqueryMigrationTest(
   if (statusResult.error) throw new Error(statusResult.error.message);
 
   return {
-    migrations: (rowResult.data ?? []).map((row) => toBitqueryRow(row as Record<string, unknown>)),
+    migrations: ((rowResult.data ?? []) as unknown as Array<Record<string, unknown>>).map(toBitqueryRow),
     status: statusResult.data as RecorderFeed | null,
     metricsReady: readyResult.count ?? 0,
     totalInWindow: totalResult.count ?? 0,
