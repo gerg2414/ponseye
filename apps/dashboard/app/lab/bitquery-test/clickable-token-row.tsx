@@ -14,11 +14,11 @@ export function ClickableTokenRow({ href, children }: { href: string; children: 
       tabIndex={0}
       onClick={(event) => {
         if (isInteractive(event.target)) return;
-        window.open(href, "_blank", "noopener,noreferrer");
+        window.location.assign(href);
       }}
       onKeyDown={(event) => {
         if (event.key !== "Enter" || isInteractive(event.target)) return;
-        window.open(href, "_blank", "noopener,noreferrer");
+        window.location.assign(href);
       }}
     >
       {children}

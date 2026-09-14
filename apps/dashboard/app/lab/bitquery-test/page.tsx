@@ -137,7 +137,7 @@ export default async function BitqueryMigrationTestPage({
                 <ClickableTokenRow key={token.token_address} href={`https://gmgn.ai/robinhood/token/${token.token_address}`}>
                   <td>
                     <div className="bitqueryTokenName">
-                      <a className="bitqueryTokenLink" href={`https://gmgn.ai/robinhood/token/${token.token_address}`} target="_blank" rel="noreferrer">
+                      <a className="bitqueryTokenLink" href={`https://gmgn.ai/robinhood/token/${token.token_address}`}>
                         <TokenImage src={token.image_url} alt={token.name ?? token.symbol ?? "Token"} size={52} priority={index < 8} />
                         <span><strong>{token.name ?? shortAddress(token.token_address)}</strong><small>{token.symbol ? `$${token.symbol.replace(/^\$/, "")}` : "Token metadata unavailable"}</small><em>Open GMGN chart ↗</em></span>
                       </a>
