@@ -71,6 +71,17 @@ type MarketPayload = {
   errors?: Array<{ message?: string }>;
 };
 
+type LiveMetricsCandidate = {
+  token_address: string;
+  migrated_at: string;
+  ath_price_usd: number | string | null;
+};
+
+type LiveMarketPayload = {
+  data?: { Trading?: Record<string, MarketRow[] | TradeFlowRow[] | undefined> };
+  errors?: Array<{ message?: string }>;
+};
+
 let accessToken: string | null = null;
 let accessTokenExpiresAt = 0;
 
@@ -307,6 +318,51 @@ function marketQuery(tokenAddress: string, migratedAt: string) {
   `;
 }
 
+function liveMarketQuery(candidates: LiveMetricsCandidate[]) {
+  const fields = candidates.map((candidate, index) => {
+    const since = new Date(candidate.migrated_at).toISOString();
+    return `
+      Token${index}: Tokens(
+        limit: {count: 1}
+        orderBy: {descending: Block_Time}
+        where: {
+          Token: {Address: {is: "${candidate.token_address}"} Network: {is: "Robinhood"}}
+          Interval: {Time: {Duration: {eq: 60}}}
+          Block: {Time: {since: "${since}"}}
+        }
+      ) {
+        Block { Time }
+        Token { Address Symbol Name }
+        Price { Ohlc { High Close } }
+      }
+      Flow${index}: Trades(
+        limit: {count: 1}
+        where: {
+          Pair: {
+            Token: {Address: {is: "${candidate.token_address}"}}
+            Market: {Network: {is: "Robinhood"}}
+          }
+          Block: {Time: {since: "${since}"}}
+        }
+      ) {
+        buys: count(if: {Side: {is: "Buy"}})
+        sells: count(if: {Side: {is: "Sell"}})
+        buyVolume: sum(of: AmountsInUsd_Quote, if: {Side: {is: "Buy"}})
+        sellVolume: sum(of: AmountsInUsd_Quote, if: {Side: {is: "Sell"}})
+        uniqueTraders: count(distinct: Trader_Address)
+      }
+    `;
+  }).join("\n");
+
+  return `
+    query PonsMigrationLiveMarketTest {
+      Trading {
+        ${fields}
+      }
+    }
+  `;
+}
+
 async function setStatus(status: "connecting" | "connected" | "error", message: string) {
   const { error } = await db.from("stream_status").upsert({
     feed: "bitquery_migration_test",
@@ -434,13 +490,71 @@ async function nextMetricsCandidate() {
   const { data, error } = await db.from("bitquery_migration_test")
     .select("token_address,migrated_at,metrics_updated_at,metadata_updated_at,trade_flow_updated_at")
     .gte("migrated_at", cutoff)
-    .order("trade_flow_updated_at", { ascending: true, nullsFirst: true })
     .order("metrics_updated_at", { ascending: true, nullsFirst: true })
     .order("migrated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`Choose Bitquery market candidate: ${error.message}`);
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
+}
+
+async function nextLiveMetricsCandidates(limit = 25) {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,ath_price_usd")
+    .gte("migrated_at", cutoff)
+    .order("trade_flow_updated_at", { ascending: true, nullsFirst: true })
+    .order("migrated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Choose live Bitquery market candidates: ${error.message}`);
+  return (data ?? []) as LiveMetricsCandidate[];
+}
+
+async function updateLiveMetrics(candidates: LiveMetricsCandidate[]) {
+  if (!candidates.length) return;
+  const payload = await queryBitquery<LiveMarketPayload>(liveMarketQuery(candidates));
+  const trading = payload.data?.Trading ?? {};
+  const updatedAt = new Date().toISOString();
+
+  await Promise.all(candidates.map(async (candidate, index) => {
+    const rows = (trading[`Token${index}`] ?? []) as MarketRow[];
+    const flowRows = (trading[`Flow${index}`] ?? []) as TradeFlowRow[];
+    const last = rows[0];
+    const flow = flowRows[0];
+    const currentPrice = number(last?.Price?.Ohlc?.Close);
+    const latestHigh = number(last?.Price?.Ohlc?.High);
+    const storedAth = number(candidate.ath_price_usd);
+    const athPrice = latestHigh == null ? storedAth : Math.max(storedAth ?? 0, latestHigh);
+    const buys = Math.round(number(flow?.buys) ?? 0);
+    const sells = Math.round(number(flow?.sells) ?? 0);
+    const buyVolume = number(flow?.buyVolume);
+    const sellVolume = number(flow?.sellVolume);
+    const tokenName = last?.Token?.Name;
+    const tokenSymbol = last?.Token?.Symbol;
+
+    const { error } = await db.from("bitquery_migration_test").update({
+      ...(tokenName ? { name: tokenName } : {}),
+      ...(tokenSymbol ? { symbol: tokenSymbol } : {}),
+      ...(currentPrice == null ? {} : {
+        current_price_usd: currentPrice,
+        current_market_cap_usd: currentPrice * PONS_SUPPLY,
+      }),
+      ...(athPrice == null ? {} : {
+        ath_price_usd: athPrice,
+        ath_market_cap_usd: athPrice * PONS_SUPPLY,
+      }),
+      volume_usd: (buyVolume ?? 0) + (sellVolume ?? 0),
+      trade_count: buys + sells,
+      buys,
+      sells,
+      buy_volume_usd: buyVolume,
+      sell_volume_usd: sellVolume,
+      unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
+      trade_flow_updated_at: updatedAt,
+      ...(last?.Block.Time ? { latest_trade_at: last.Block.Time } : {}),
+    }).eq("token_address", candidate.token_address);
+    if (error) throw new Error(`Save live Bitquery metrics for ${candidate.token_address}: ${error.message}`);
+  }));
 }
 
 async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
@@ -494,11 +608,14 @@ export async function runBitqueryMigrationTest() {
   if (!config.BITQUERY_MIGRATION_TEST_ENABLED) return;
   await setStatus("connecting", "Backfilling PONS migrations from the last 24 hours");
   let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
-  let launchCursor = new Date(Date.now() - 24 * 60 * 60_000);
+  // A token can remain on the bonding curve for longer than the 24-hour
+  // migration view. Look further back so migrated rows can recover metadata.
+  let launchCursor = new Date(Date.now() - 7 * 24 * 60 * 60_000);
   let nextMigrationPoll = 0;
   let nextLaunchPoll = 0;
   let nextMetadataSync = 0;
   let nextMetricsPoll = 0;
+  let nextLiveMetricsPoll = 0;
 
   while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
     const now = Date.now();
@@ -510,7 +627,6 @@ export async function runBitqueryMigrationTest() {
         migrationCursor = new Date(till.getTime() - 60_000);
         nextMigrationPoll = Date.now() + config.BITQUERY_MIGRATION_POLL_MS;
         await setStatus("connected", `${count} migration events received in latest scan`);
-        continue;
       }
 
       if (now >= nextLaunchPoll) {
@@ -529,14 +645,18 @@ export async function runBitqueryMigrationTest() {
           nextMetadataSync = Date.now() + 15_000;
         }
         nextLaunchPoll = Date.now() + 1_100;
-        continue;
+      }
+
+      if (now >= nextLiveMetricsPoll) {
+        const candidates = await nextLiveMetricsCandidates();
+        await updateLiveMetrics(candidates);
+        nextLiveMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS;
       }
 
       if (now >= nextMetricsPoll) {
         const candidate = await nextMetricsCandidate();
         if (candidate) await updateMetrics(candidate);
-        nextMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS;
-        continue;
+        nextMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS * 2;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

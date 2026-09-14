@@ -83,7 +83,7 @@ export default async function BitqueryMigrationTestPage({
 
   return (
     <main className="databasePage bitqueryTestPage">
-      <AutoRefresh intervalMs={10_000} />
+      <AutoRefresh intervalMs={5_000} />
       <LabHeader current="bitquery" />
 
       <section className="bitqueryTestIntro">
