@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 function isInteractive(target: EventTarget | null) {
@@ -8,8 +7,6 @@ function isInteractive(target: EventTarget | null) {
 }
 
 export function ClickableTokenRow({ href, children }: { href: string; children: ReactNode }) {
-  const router = useRouter();
-
   return (
     <tr
       className="clickableTokenRow"
@@ -17,12 +14,11 @@ export function ClickableTokenRow({ href, children }: { href: string; children: 
       tabIndex={0}
       onClick={(event) => {
         if (isInteractive(event.target)) return;
-        if (event.metaKey || event.ctrlKey) window.open(href, "_blank", "noopener,noreferrer");
-        else router.push(href);
+        window.open(href, "_blank", "noopener,noreferrer");
       }}
       onKeyDown={(event) => {
         if (event.key !== "Enter" || isInteractive(event.target)) return;
-        router.push(href);
+        window.open(href, "_blank", "noopener,noreferrer");
       }}
     >
       {children}
