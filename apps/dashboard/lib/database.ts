@@ -78,6 +78,9 @@ export type BitqueryMigrationTestRow = {
   first_seen_at: string;
   peak_multiple: number | null;
   migration_price_source: string | null;
+  top_holder_pct: number | null;
+  top10_pct: number | null;
+  holder_count: number | null;
 };
 
 export type BitqueryMigrationSort =
@@ -89,6 +92,8 @@ export type BitqueryMigrationFilters = {
   minAth: number;
   minMultiple: number;
   readyOnly: boolean;
+  /** Only tokens whose largest holder was under this share of supply at 1 minute. */
+  maxTopHolderPct: number;
   limit: number;
 };
 
@@ -210,6 +215,8 @@ export async function getTokenDatabase({
   };
 }
 
+const holderEmbed = "bitquery_holder_snapshots(age_seconds,top_holder_pct,top10_pct,holder_count)";
+
 const bitqueryColumns = "token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at,peak_multiple,migration_price_source";
 
 const bitquerySortColumns: Record<BitqueryMigrationSort, string> = {
@@ -225,8 +232,14 @@ const bitquerySortColumns: Record<BitqueryMigrationSort, string> = {
 };
 
 function toBitqueryRow(row: Record<string, unknown>) {
+  // The embed is an array because a token has one row per snapshot age.
+  const snapshots = (row.bitquery_holder_snapshots ?? []) as Array<Record<string, unknown>>;
+  const atOneMinute = snapshots.find((snapshot) => Number(snapshot.age_seconds) === 60);
   return {
     ...row,
+    top_holder_pct: numberOrNull(atOneMinute?.top_holder_pct),
+    top10_pct: numberOrNull(atOneMinute?.top10_pct),
+    holder_count: numberOrNull(atOneMinute?.holder_count),
     migration_market_cap_usd: numberOrNull(row.migration_market_cap_usd),
     current_market_cap_usd: numberOrNull(row.current_market_cap_usd),
     ath_market_cap_usd: numberOrNull(row.ath_market_cap_usd),
@@ -251,7 +264,7 @@ export async function getBitqueryMigrationTest(
   // seconds, so pulling the whole window back to sort it in JavaScript got more
   // expensive with every migration recorded.
   let rowQuery = db.from("bitquery_migration_test")
-    .select(bitqueryColumns, { count: "exact" })
+    .select(`${bitqueryColumns},${holderEmbed}`, { count: "exact" })
     .gte("migrated_at", since)
     .order(bitquerySortColumns[filters.sort], { ascending: false, nullsFirst: false })
     .order("migrated_at", { ascending: false })
@@ -264,6 +277,14 @@ export async function getBitqueryMigrationTest(
   // filled with rows that have no market data yet.
   if (filters.sort === "ath") rowQuery = rowQuery.not("ath_market_cap_usd", "is", null);
   if (filters.sort === "multiple") rowQuery = rowQuery.not("peak_multiple", "is", null);
+  // Filtering on an embedded table needs an inner join, otherwise rows without
+  // a snapshot come back with the embed empty rather than being excluded.
+  if (filters.maxTopHolderPct > 0) {
+    rowQuery = rowQuery
+      .not("bitquery_holder_snapshots", "is", null)
+      .eq("bitquery_holder_snapshots.age_seconds", 60)
+      .lt("bitquery_holder_snapshots.top_holder_pct", filters.maxTopHolderPct);
+  }
 
   const [rowResult, totalResult, readyResult, statusResult] = await Promise.all([
     rowQuery,
@@ -297,7 +318,7 @@ export async function getBitqueryMigrationTest(
 export async function getBitqueryMigrationToken(tokenAddress: string) {
   const db = databaseClient();
   const tokenResult = await db.from("bitquery_migration_test")
-    .select(bitqueryColumns)
+    .select(`${bitqueryColumns},${holderEmbed}`)
     .eq("token_address", tokenAddress)
     .maybeSingle();
   if (tokenResult.error) throw new Error(tokenResult.error.message);
