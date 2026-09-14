@@ -14,16 +14,46 @@ const thumbnailSize = 192;
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function fetchImage(url: string) {
+const cidPattern = /^(?:Qm[1-9A-HJ-NP-Za-km-z]{40,}|baf[a-z0-9]{20,})$/i;
+
+/**
+ * A token's image field is not always an image. Some launches point at an IPFS
+ * metadata document whose own `image` field holds the picture, so a CID that
+ * resolves to JSON needs following one step further.
+ */
+function imageCidFromMetadata(text: string) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const image = (parsed as { image?: unknown; image_url?: unknown })?.image
+    ?? (parsed as { image_url?: unknown })?.image_url;
+  if (typeof image !== "string") return null;
+  const candidate = image.trim().replace(/^ipfs:\/\//i, "").replace(/^.*\/ipfs\//i, "").split(/[/?#]/)[0];
+  return cidPattern.test(candidate) ? candidate : null;
+}
+
+async function fetchImage(url: string, allowMetadata = true): Promise<{ body: ArrayBuffer; contentType: string }> {
   const response = await fetch(url, {
-    headers: { Accept: "image/avif,image/webp,image/*" },
+    headers: { Accept: "image/avif,image/webp,image/*,application/json" },
     cache: "force-cache",
     next: { revalidate: 604_800 },
     signal: AbortSignal.timeout(8_000),
   });
   const contentType = response.headers.get("content-type")?.split(";")[0]?.trim();
-  if (!response.ok || !contentType?.startsWith("image/")) {
-    throw new Error(`Invalid image response: ${response.status}`);
+  if (!response.ok) throw new Error(`Invalid image response: ${response.status}`);
+
+  if (allowMetadata && contentType === "application/json") {
+    const nested = imageCidFromMetadata(await response.text());
+    if (!nested) throw new Error("Metadata document carries no usable image");
+    // One hop only, so a document pointing at itself cannot loop.
+    return Promise.any(gateways.map((gateway) => fetchImage(`${gateway}${nested}`, false)));
+  }
+
+  if (!contentType?.startsWith("image/")) {
+    throw new Error(`Invalid image response: ${response.status} ${contentType}`);
   }
 
   const contentLength = Number(response.headers.get("content-length") ?? 0);

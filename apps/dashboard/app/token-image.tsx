@@ -4,6 +4,21 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { imageCandidates } from "../lib/images";
 
+/**
+ * The first character to show while an image loads.
+ *
+ * charAt(0) splits a surrogate pair, so a name beginning with an emoji yielded a
+ * lone surrogate. That is not valid text, and the server and the client encode
+ * it differently, which broke hydration for the whole table. Prefer the first
+ * letter or digit, which is what actually reads as an initial, and fall back to
+ * the first whole code point.
+ */
+function initialOf(value: string) {
+  const characters = Array.from(value.trim());
+  const alphanumeric = characters.find((character) => /\p{L}|\p{N}/u.test(character));
+  return (alphanumeric ?? characters[0] ?? "?").toUpperCase();
+}
+
 export function TokenImage({
   src,
   alt,
@@ -52,7 +67,7 @@ export function TokenImage({
 
   return (
     <span ref={host} className="tokenImageLoader">
-      <span aria-hidden="true" className="tokenImageInitial">{alt.trim().charAt(0).toUpperCase() || "?"}</span>
+      <span aria-hidden="true" className="tokenImageInitial">{initialOf(alt)}</span>
       {resolvedSrc ? (
         <Image
           key={resolvedSrc}

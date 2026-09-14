@@ -76,12 +76,28 @@ export type BitqueryMigrationTestRow = {
   latest_trade_at: string | null;
   metrics_updated_at: string | null;
   first_seen_at: string;
+  peak_multiple: number | null;
+  migration_price_source: string | null;
+};
+
+export type BitqueryMigrationSort =
+  | "newest" | "ath" | "multiple" | "current" | "migration" | "volume" | "trades" | "buys" | "sells";
+
+export type BitqueryMigrationFilters = {
+  windowHours: number;
+  sort: BitqueryMigrationSort;
+  minAth: number;
+  minMultiple: number;
+  readyOnly: boolean;
+  limit: number;
 };
 
 export type BitqueryMigrationTestResult = {
   migrations: BitqueryMigrationTestRow[];
   status: RecorderFeed | null;
   metricsReady: number;
+  totalInWindow: number;
+  filteredCount: number;
 };
 
 // Keep this as a literal so Supabase can infer the selected row shape at build time.
@@ -194,27 +210,27 @@ export async function getTokenDatabase({
   };
 }
 
-export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestResult> {
-  const db = databaseClient();
-  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const [migrationResult, statusResult] = await Promise.all([
-    db.from("bitquery_migration_test")
-      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
-      .gte("migrated_at", since)
-      .order("migrated_at", { ascending: false }),
-    db.from("stream_status")
-      .select("feed,status,message,last_seen_at")
-      .eq("feed", "bitquery_migration_test")
-      .maybeSingle(),
-  ]);
-  if (migrationResult.error) throw new Error(migrationResult.error.message);
-  if (statusResult.error) throw new Error(statusResult.error.message);
+const bitqueryColumns = "token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at,peak_multiple,migration_price_source";
 
-  const migrations = (migrationResult.data ?? []).map((row) => ({
+const bitquerySortColumns: Record<BitqueryMigrationSort, string> = {
+  newest: "migrated_at",
+  ath: "ath_market_cap_usd",
+  multiple: "peak_multiple",
+  current: "current_market_cap_usd",
+  migration: "migration_market_cap_usd",
+  volume: "volume_usd",
+  trades: "trade_count",
+  buys: "buys",
+  sells: "sells",
+};
+
+function toBitqueryRow(row: Record<string, unknown>) {
+  return {
     ...row,
     migration_market_cap_usd: numberOrNull(row.migration_market_cap_usd),
     current_market_cap_usd: numberOrNull(row.current_market_cap_usd),
     ath_market_cap_usd: numberOrNull(row.ath_market_cap_usd),
+    peak_multiple: numberOrNull(row.peak_multiple),
     volume_usd: numberOrNull(row.volume_usd),
     trade_count: Number(row.trade_count ?? 0),
     buys: Number(row.buys ?? 0),
@@ -222,35 +238,71 @@ export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestR
     buy_volume_usd: numberOrNull(row.buy_volume_usd),
     sell_volume_usd: numberOrNull(row.sell_volume_usd),
     unique_traders: Number(row.unique_traders ?? 0),
-  })) as BitqueryMigrationTestRow[];
+  } as BitqueryMigrationTestRow;
+}
+
+export async function getBitqueryMigrationTest(
+  filters: BitqueryMigrationFilters,
+): Promise<BitqueryMigrationTestResult> {
+  const db = databaseClient();
+  const since = new Date(Date.now() - filters.windowHours * 60 * 60_000).toISOString();
+
+  // Filtering and sorting happen in the database. This page refreshes every few
+  // seconds, so pulling the whole window back to sort it in JavaScript got more
+  // expensive with every migration recorded.
+  let rowQuery = db.from("bitquery_migration_test")
+    .select(bitqueryColumns, { count: "exact" })
+    .gte("migrated_at", since)
+    .order(bitquerySortColumns[filters.sort], { ascending: false, nullsFirst: false })
+    .order("migrated_at", { ascending: false })
+    .limit(filters.limit);
+
+  if (filters.readyOnly) rowQuery = rowQuery.not("metrics_updated_at", "is", null);
+  if (filters.minAth > 0) rowQuery = rowQuery.gte("ath_market_cap_usd", filters.minAth);
+  if (filters.minMultiple > 0) rowQuery = rowQuery.gte("peak_multiple", filters.minMultiple);
+  // Sorting by peak requires a peak to exist, otherwise the top of the list is
+  // filled with rows that have no market data yet.
+  if (filters.sort === "ath") rowQuery = rowQuery.not("ath_market_cap_usd", "is", null);
+  if (filters.sort === "multiple") rowQuery = rowQuery.not("peak_multiple", "is", null);
+
+  const [rowResult, totalResult, readyResult, statusResult] = await Promise.all([
+    rowQuery,
+    db.from("bitquery_migration_test")
+      .select("token_address", { count: "exact", head: true })
+      .gte("migrated_at", since),
+    db.from("bitquery_migration_test")
+      .select("token_address", { count: "exact", head: true })
+      .gte("migrated_at", since)
+      .not("metrics_updated_at", "is", null),
+    db.from("stream_status")
+      .select("feed,status,message,last_seen_at")
+      .eq("feed", "bitquery_migration_test")
+      .maybeSingle(),
+  ]);
+
+  if (rowResult.error) throw new Error(rowResult.error.message);
+  if (totalResult.error) throw new Error(totalResult.error.message);
+  if (readyResult.error) throw new Error(readyResult.error.message);
+  if (statusResult.error) throw new Error(statusResult.error.message);
+
   return {
-    migrations,
+    migrations: (rowResult.data ?? []).map((row) => toBitqueryRow(row as Record<string, unknown>)),
     status: statusResult.data as RecorderFeed | null,
-    metricsReady: migrations.filter((row) => row.metrics_updated_at != null).length,
+    metricsReady: readyResult.count ?? 0,
+    totalInWindow: totalResult.count ?? 0,
+    filteredCount: rowResult.count ?? 0,
   };
 }
 
 export async function getBitqueryMigrationToken(tokenAddress: string) {
   const db = databaseClient();
   const tokenResult = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
+    .select(bitqueryColumns)
     .eq("token_address", tokenAddress)
     .maybeSingle();
   if (tokenResult.error) throw new Error(tokenResult.error.message);
   if (!tokenResult.data) return null;
 
-  const token = {
-    ...tokenResult.data,
-    migration_market_cap_usd: numberOrNull(tokenResult.data.migration_market_cap_usd),
-    current_market_cap_usd: numberOrNull(tokenResult.data.current_market_cap_usd),
-    ath_market_cap_usd: numberOrNull(tokenResult.data.ath_market_cap_usd),
-    volume_usd: numberOrNull(tokenResult.data.volume_usd),
-    trade_count: Number(tokenResult.data.trade_count ?? 0),
-    buys: Number(tokenResult.data.buys ?? 0),
-    sells: Number(tokenResult.data.sells ?? 0),
-    buy_volume_usd: numberOrNull(tokenResult.data.buy_volume_usd),
-    sell_volume_usd: numberOrNull(tokenResult.data.sell_volume_usd),
-    unique_traders: Number(tokenResult.data.unique_traders ?? 0),
-  } as BitqueryMigrationTestRow;
+  const token = toBitqueryRow(tokenResult.data as Record<string, unknown>);
   return { token };
 }
