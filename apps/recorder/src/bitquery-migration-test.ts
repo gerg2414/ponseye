@@ -83,6 +83,17 @@ type LiveMarketPayload = {
   errors?: Array<{ message?: string }>;
 };
 
+type LivePriceRow = {
+  Block?: { Time?: string };
+  Token?: { Address?: string; Symbol?: string; Name?: string };
+  Price?: { Ohlc?: { High?: string | number; Close?: string | number } };
+};
+
+type LivePricePayload = {
+  data?: { Trading?: { Pairs?: LivePriceRow[] } };
+  errors?: Array<{ message?: string }>;
+};
+
 let accessToken: string | null = null;
 let accessTokenExpiresAt = 0;
 
@@ -364,6 +375,139 @@ function liveMarketQuery(candidates: LiveMetricsCandidate[]) {
   `;
 }
 
+function livePriceSubscriptionQuery(addresses: string[]) {
+  return `
+    subscription PonsMigrationLivePrices {
+      Trading {
+        Pairs(
+          where: {
+            Interval: {Time: {Duration: {eq: 1}}}
+            Price: {IsQuotedInUsd: true}
+            Market: {Network: {is: "Robinhood"}}
+            Token: {Address: {in: [${addresses.map((address) => `"${address}"`).join(",")} ]}}
+            Ranking: {Position: {eq: 1}}
+          }
+        ) {
+          Block { Time }
+          Token { Address Symbol Name }
+          Price { Ohlc { High Close } }
+        }
+      }
+    }
+  `;
+}
+
+async function livePriceCandidates() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,transaction_hash,ath_price_usd")
+    .gte("migrated_at", cutoff);
+  if (error) throw new Error(`Read live price candidates: ${error.message}`);
+  return new Map(((data ?? []) as LiveMetricsCandidate[]).map((row) => [row.token_address, row]));
+}
+
+async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate>) {
+  if (!candidates.size) {
+    await delay(5_000);
+    return;
+  }
+  const token = await getAccessToken();
+  const pending = new Map<string, Record<string, unknown>>();
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const flush = async () => {
+    flushTimer = null;
+    const updates = [...pending.values()];
+    pending.clear();
+    if (!updates.length) return;
+    const { error } = await db.from("bitquery_migration_test")
+      .upsert(updates, { onConflict: "token_address" });
+    if (error) throw new Error(`Save streamed Bitquery prices: ${error.message}`);
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const socket = new WebSocket(
+      `wss://streaming.bitquery.io/graphql?token=${encodeURIComponent(token)}`,
+      "graphql-ws",
+    );
+    const refreshTimer = setTimeout(() => socket.close(1000, "refresh token list"), 5 * 60_000);
+    let acknowledged = false;
+    let finished = false;
+
+    const finish = (error?: Error) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(refreshTimer);
+      if (flushTimer) clearTimeout(flushTimer);
+      void flush().then(() => error ? reject(error) : resolve()).catch(reject);
+    };
+
+    socket.onopen = () => socket.send(JSON.stringify({ type: "connection_init" }));
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(String(event.data)) as { type?: string; payload?: LivePricePayload };
+        if (message.type === "connection_ack" && !acknowledged) {
+          acknowledged = true;
+          socket.send(JSON.stringify({
+            type: "start",
+            id: "live-prices",
+            payload: { query: livePriceSubscriptionQuery([...candidates.keys()]) },
+          }));
+          console.log(`Bitquery live price stream subscribed to ${candidates.size} migrated tokens`);
+          return;
+        }
+        if (message.type !== "data" && message.type !== "next") return;
+        if (message.payload?.errors?.length) {
+          throw new Error(message.payload.errors.map((error) => error.message ?? "Live price stream error").join("; "));
+        }
+        for (const row of message.payload?.data?.Trading?.Pairs ?? []) {
+          const address = row.Token?.Address?.toLowerCase();
+          const candidate = address ? candidates.get(address) : null;
+          const currentPrice = number(row.Price?.Ohlc?.Close);
+          if (!address || !candidate || currentPrice == null) continue;
+          const latestHigh = number(row.Price?.Ohlc?.High) ?? currentPrice;
+          const existing = pending.get(address);
+          const storedAth = number(existing?.ath_price_usd) ?? number(candidate.ath_price_usd) ?? 0;
+          const athPrice = Math.max(storedAth, latestHigh);
+          pending.set(address, {
+            token_address: address,
+            migrated_at: candidate.migrated_at,
+            transaction_hash: candidate.transaction_hash,
+            ...(row.Token?.Name ? { name: row.Token.Name } : {}),
+            ...(row.Token?.Symbol ? { symbol: row.Token.Symbol } : {}),
+            current_price_usd: currentPrice,
+            current_market_cap_usd: currentPrice * PONS_SUPPLY,
+            ath_price_usd: athPrice,
+            ath_market_cap_usd: athPrice * PONS_SUPPLY,
+            live_price_updated_at: new Date().toISOString(),
+            ...(row.Block?.Time ? { latest_trade_at: row.Block.Time } : {}),
+          });
+        }
+        if (pending.size && !flushTimer) {
+          flushTimer = setTimeout(() => void flush().catch((error) => console.error("Bitquery live price flush failed", error)), 1_000);
+        }
+      } catch (error) {
+        socket.close(1011, "stream processing error");
+        finish(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+    socket.onerror = () => finish(new Error("Bitquery live price WebSocket error"));
+    socket.onclose = () => finish(acknowledged ? undefined : new Error("Bitquery live price stream closed before acknowledgement"));
+  });
+}
+
+async function runLivePriceStream() {
+  while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
+    try {
+      await streamLivePricesOnce(await livePriceCandidates());
+    } catch (error) {
+      console.error("Bitquery live price stream failed", error);
+      accessToken = null;
+      await delay(5_000);
+    }
+  }
+}
+
 async function setStatus(status: "connecting" | "connected" | "error", message: string) {
   const { error } = await db.from("stream_status").upsert({
     feed: "bitquery_migration_test",
@@ -612,6 +756,7 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
 
 export async function runBitqueryMigrationTest() {
   if (!config.BITQUERY_MIGRATION_TEST_ENABLED) return;
+  void runLivePriceStream();
   await setStatus("connecting", "Backfilling PONS migrations from the last 24 hours");
   let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
   // A token can remain on the bonding curve for longer than the 24-hour
