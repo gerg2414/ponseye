@@ -11,7 +11,8 @@
     "backfill:migration-prices": "tsx --env-file=../../.env src/backfill-migration-prices.ts",
     "snapshots": "tsx --env-file=../../.env src/build-snapshots.ts",
     "curve": "tsx --env-file=../../.env src/build-curve-stats.ts",
-    "snapshots:refresh": "tsx --env-file=../../.env src/refresh-snapshots.ts"
+    "snapshots:refresh": "tsx --env-file=../../.env src/refresh-snapshots.ts",
+    "holders": "tsx --env-file=../../.env src/build-holders.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

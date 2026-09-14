@@ -118,6 +118,7 @@ export const STAGE_PRIORITY: Record<string, BudgetLevel> = {
   // Pure backfill of history that is not going anywhere, entirely deferrable.
   "launch-backfill": "full",
   "curve-stats": "full",
+  holders: "full",
   history: "full",
 };
 

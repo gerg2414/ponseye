@@ -14,6 +14,7 @@ import {
 import { BACKFILL_WINDOW_MS, TRACKING_WINDOW_MS, config } from "./config.js";
 import { db } from "./db.js";
 import { curveCandidates, updateCurveStats } from "./curve.js";
+import { holderCandidates, updateHolders } from "./holders.js";
 import { budgetLevel, getBitqueryUsage, stageAllowed, type BudgetLevel } from "./usage.js";
 import { refreshSnapshotOutcomes } from "./snapshots.js";
 
@@ -1284,6 +1285,17 @@ export async function runBitqueryMigrationTest() {
       failures: 0,
       run: async () => {
         await refreshSnapshotOutcomes({ limit: 60, log: () => undefined });
+      },
+    },
+    {
+      name: "holders",
+      intervalMs: 8_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const tokens = await holderCandidates(200);
+        if (!tokens.length) return;
+        await updateHolders(tokens.slice(0, 2));
       },
     },
     {
