@@ -498,7 +498,7 @@ async function nextMetricsCandidate() {
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
 }
 
-async function nextLiveMetricsCandidates(limit = 25) {
+async function nextLiveMetricsCandidates(limit = 50) {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
     .select("token_address,migrated_at,ath_price_usd")
@@ -656,7 +656,9 @@ export async function runBitqueryMigrationTest() {
       if (now >= nextMetricsPoll) {
         const candidate = await nextMetricsCandidate();
         if (candidate) await updateMetrics(candidate);
-        nextMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS * 2;
+        // Full post-migration history is much heavier than the live summary.
+        // Keep it off the critical path used by the dashboard columns.
+        nextMetricsPoll = Date.now() + Math.max(30_000, config.BITQUERY_METRICS_POLL_MS * 2);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
