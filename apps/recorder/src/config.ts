@@ -23,6 +23,10 @@ const schema = z.object({
   // unmeasured. One request at a time is the setting that stops that happening.
   BITQUERY_MAX_CONCURRENT_QUERIES: z.coerce.number().int().min(1).max(8).default(1),
   BITQUERY_MIN_REQUEST_INTERVAL_MS: z.coerce.number().int().min(0).max(10_000).default(120),
+
+  // Stake per paper trade. Stored on each position when it opens, so changing
+  // this never restates a trade already taken.
+  POSITION_SIZE_USD: z.coerce.number().positive().default(50),
 }).superRefine((value, ctx) => {
   // Credentials are optional so the recorder can boot disabled, but if it is
   // switched on without them every query fails one at a time at runtime instead

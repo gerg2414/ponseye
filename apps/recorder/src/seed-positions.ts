@@ -11,6 +11,7 @@
  */
 import { DEFAULT_RULES, runBacktest } from "./backtest.js";
 import { LADDER, STRATEGY } from "./positions.js";
+import { config } from "./config.js";
 import { db } from "./db.js";
 
 const rules = { ...DEFAULT_RULES, ladder: [...LADDER], giveUpAfterMinutes: 20, runnerConfirmAt: 5, runnerFallbackBelow: 1.5 };
@@ -21,6 +22,7 @@ const rows = results.map((result) => ({
   opened_at: result.entryAt,
   entry_price_usd: result.entryPrice,
   strategy: STRATEGY,
+  position_size_usd: config.POSITION_SIZE_USD,
   remaining_fraction: 0,
   realised_multiple: result.realised,
   rungs_filled: result.rungsHit,

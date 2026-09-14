@@ -293,9 +293,9 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
       future_peak_multiple: numberOrNull(position.peak_multiple_seen),
       realised_return_multiple: realised,
       remaining_pct: remaining * 100,
-      // Paper trading, so every position is the same notional stake and the
-      // returns above are per unit rather than in currency.
-      position_size_usd: 100,
+      // Read from the position rather than assumed, so a change to the stake
+      // does not restate trades that were taken at the old size.
+      position_size_usd: numberOrNull(position.position_size_usd) ?? 50,
       position_status: position.closed_at ? "closed" : "open",
       closed_at: (position.closed_at ?? null) as string | null,
       exit_reason: (position.close_reason ?? null) as string | null,

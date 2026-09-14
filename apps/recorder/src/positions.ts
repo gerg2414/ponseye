@@ -1,4 +1,5 @@
 import { number } from "./bitquery-client.js";
+import { config } from "./config.js";
 import { db } from "./db.js";
 
 /**
@@ -92,6 +93,7 @@ export async function openPositions(signals: Awaited<ReturnType<typeof entrySign
       entry_top_holder_pct: number(signal.top1_at_1m),
       entry_holder_count: number(signal.holders_at_1m),
       strategy: STRATEGY,
+      position_size_usd: config.POSITION_SIZE_USD,
       last_price_usd: price,
       last_seen_at: new Date().toISOString(),
     });
