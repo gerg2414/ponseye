@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
-import { fetchTokenInfo } from "./gmgn.js";
+import { fetchOneMinuteCandles, fetchTokenInfo } from "./gmgn.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -393,21 +393,72 @@ async function nextMetadataCandidate() {
 }
 
 async function updateMetadata(tokenAddress: string) {
-  const info = await fetchTokenInfo(tokenAddress);
-  const link = object(info.link);
+  try {
+    const info = await fetchTokenInfo(tokenAddress);
+    const link = object(info.link);
+    const { error } = await db.from("bitquery_migration_test").update({
+      name: info.name ?? null,
+      symbol: info.symbol ?? null,
+      image_url: info.logo ?? null,
+      description: link.description ?? null,
+      twitter_url: link.twitter_username ? `https://x.com/${String(link.twitter_username).replace(/^@/, "")}` : null,
+      telegram_url: link.telegram ?? null,
+      discord_url: link.discord ?? null,
+      website_url: link.website ?? null,
+      metadata_updated_at: new Date().toISOString(),
+      metadata_source: "gmgn_token_info",
+    }).eq("token_address", tokenAddress);
+    if (error) throw new Error(`Save token metadata: ${error.message}`);
+  } catch (error) {
+    await db.from("bitquery_migration_test").update({
+      metadata_updated_at: new Date().toISOString(),
+      metadata_source: "gmgn_unavailable",
+    }).eq("token_address", tokenAddress);
+    throw error;
+  }
+}
+
+async function nextChartCandidate() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,gmgn_chart_requested_at,gmgn_chart_updated_at")
+    .gte("migrated_at", cutoff)
+    .order("gmgn_chart_requested_at", { ascending: false, nullsFirst: false })
+    .order("gmgn_chart_updated_at", { ascending: true, nullsFirst: true })
+    .order("migrated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Choose GMGN chart candidate: ${error.message}`);
+  return data as {
+    token_address: string;
+    migrated_at: string;
+    gmgn_chart_requested_at: string | null;
+    gmgn_chart_updated_at: string | null;
+  } | null;
+}
+
+async function updateChart(candidate: { token_address: string; migrated_at: string }) {
+  const to = new Date();
+  const from = new Date(Math.max(Date.parse(candidate.migrated_at), to.getTime() - 100 * 60_000));
+  const candles = await fetchOneMinuteCandles(candidate.token_address, from, to);
+  if (candles.length) {
+    const { error } = await db.from("bitquery_migration_test_candles").upsert(candles.map((candle) => ({
+      token_address: candidate.token_address,
+      resolution: "1m",
+      candle_at: candle.candleAt,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+    })), { onConflict: "token_address,resolution,candle_at" });
+    if (error) throw new Error(`Save GMGN chart candles: ${error.message}`);
+  }
   const { error } = await db.from("bitquery_migration_test").update({
-    name: info.name ?? null,
-    symbol: info.symbol ?? null,
-    image_url: info.logo ?? null,
-    description: link.description ?? null,
-    twitter_url: link.twitter_username ? `https://x.com/${String(link.twitter_username).replace(/^@/, "")}` : null,
-    telegram_url: link.telegram ?? null,
-    discord_url: link.discord ?? null,
-    website_url: link.website ?? null,
-    metadata_updated_at: new Date().toISOString(),
-    metadata_source: "gmgn_token_info",
-  }).eq("token_address", tokenAddress);
-  if (error) throw new Error(`Save token metadata: ${error.message}`);
+    gmgn_chart_requested_at: null,
+    gmgn_chart_updated_at: new Date().toISOString(),
+  }).eq("token_address", candidate.token_address);
+  if (error) throw new Error(`Mark GMGN chart update: ${error.message}`);
 }
 
 async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
@@ -463,6 +514,8 @@ export async function runBitqueryMigrationTest() {
   let nextMetricsPoll = 0;
   let nextMetadataPoll = 0;
   let metadataWorkerRunning = false;
+  let nextChartPoll = 0;
+  let chartWorkerRunning = false;
 
   while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
     const now = Date.now();
@@ -475,6 +528,16 @@ export async function runBitqueryMigrationTest() {
           .finally(() => {
             metadataWorkerRunning = false;
             nextMetadataPoll = Date.now() + 1_100;
+          });
+      }
+      if (now >= nextChartPoll && !chartWorkerRunning) {
+        chartWorkerRunning = true;
+        void nextChartCandidate()
+          .then((candidate) => candidate ? updateChart(candidate) : undefined)
+          .catch((error) => console.warn("GMGN chart backfill failed", error))
+          .finally(() => {
+            chartWorkerRunning = false;
+            nextChartPoll = Date.now() + 1_100;
           });
       }
       if (now >= nextMigrationPoll) {
