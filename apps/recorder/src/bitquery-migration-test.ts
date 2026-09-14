@@ -30,6 +30,7 @@ type RegistrationEvent = {
 };
 
 type LaunchCall = {
+  Block?: { Time?: string };
   Transaction: { Hash: string; From?: string };
   Call: { Input: string; Output: string };
 };
@@ -197,7 +198,7 @@ async function queryBitquery<T>(query: string): Promise<T> {
 function migrationQuery(since: string, till: string) {
   return `
     query PonsMigrationTest {
-      EVM(network: robinhood, dataset: combined) {
+      EVM(network: robinhood) {
         Graduations: Events(
           limit: {count: 1000}
           orderBy: {ascending: Block_Time}
@@ -243,6 +244,7 @@ function migrationQuery(since: string, till: string) {
             }
           }
         ) {
+          Block { Time }
           Transaction { Hash From }
           Call { Input Output }
         }
@@ -311,9 +313,63 @@ async function saveMigrations(payload: MigrationPayload) {
     if (decoded.tokenAddress) registrations.set(decoded.tokenAddress, row);
   }
   const launches = new Map<string, ReturnType<typeof decodeLaunch>>();
+  const launchRows: Array<Record<string, unknown>> = [];
   for (const call of payload.data?.EVM?.Launches ?? []) {
     const decoded = decodeLaunch(call);
-    if (decoded) launches.set(decoded.tokenAddress, decoded);
+    if (!decoded) continue;
+    launches.set(decoded.tokenAddress, decoded);
+    launchRows.push({
+      token_address: decoded.tokenAddress,
+      launched_at: call.Block?.Time ?? null,
+      name: decoded.name,
+      symbol: decoded.symbol,
+      image_url: decoded.imageUrl,
+      description: decoded.description,
+      twitter_url: decoded.twitterUrl,
+      telegram_url: decoded.telegramUrl,
+      discord_url: decoded.discordUrl,
+      website_url: decoded.websiteUrl,
+      farcaster_url: decoded.farcasterUrl,
+      creator_address: decoded.creatorFeeRecipient,
+      creator_tax_bps: decoded.creatorTaxBps,
+      buyback_enabled: decoded.buybackEnabled,
+      raw_call: call,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  if (launchRows.length) {
+    const { error } = await db.from("bitquery_launch_metadata_test")
+      .upsert(launchRows, { onConflict: "token_address" });
+    if (error) throw new Error(`Save Bitquery launch metadata: ${error.message}`);
+  }
+
+  const graduationAddresses = graduations
+    .map((graduation) => String(argumentMap(graduation.Arguments).token ?? "").toLowerCase())
+    .filter((address) => /^0x[0-9a-f]{40}$/.test(address));
+  if (graduationAddresses.length) {
+    const { data, error } = await db.from("bitquery_launch_metadata_test")
+      .select("*")
+      .in("token_address", graduationAddresses);
+    if (error) throw new Error(`Read Bitquery launch metadata: ${error.message}`);
+    for (const row of data ?? []) {
+      if (!launches.has(row.token_address)) {
+        launches.set(row.token_address, {
+          tokenAddress: row.token_address,
+          name: row.name,
+          symbol: row.symbol,
+          imageUrl: row.image_url,
+          description: row.description,
+          twitterUrl: row.twitter_url,
+          telegramUrl: row.telegram_url,
+          discordUrl: row.discord_url,
+          websiteUrl: row.website_url,
+          farcasterUrl: row.farcaster_url,
+          creatorFeeRecipient: row.creator_address,
+          creatorTaxBps: row.creator_tax_bps,
+          buybackEnabled: row.buyback_enabled,
+        });
+      }
+    }
   }
 
   const rows = graduations.flatMap((graduation) => {
@@ -439,9 +495,11 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
   const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
   const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
   const flow = payload.data?.Trading?.Flow?.[0];
+  const tokenName = last.Token?.Name ?? first.Token?.Name;
+  const tokenSymbol = last.Token?.Symbol ?? first.Token?.Symbol;
   const { error } = await db.from("bitquery_migration_test").update({
-    name: last.Token?.Name ?? first.Token?.Name ?? null,
-    symbol: last.Token?.Symbol ?? first.Token?.Symbol ?? null,
+    ...(tokenName ? { name: tokenName } : {}),
+    ...(tokenSymbol ? { symbol: tokenSymbol } : {}),
     migration_price_usd: migrationPrice,
     current_price_usd: currentPrice,
     ath_price_usd: athPrice,
