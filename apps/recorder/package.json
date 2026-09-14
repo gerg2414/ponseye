@@ -12,7 +12,9 @@
     "snapshots": "tsx --env-file=../../.env src/build-snapshots.ts",
     "curve": "tsx --env-file=../../.env src/build-curve-stats.ts",
     "snapshots:refresh": "tsx --env-file=../../.env src/refresh-snapshots.ts",
-    "holders": "tsx --env-file=../../.env src/build-holders.ts"
+    "holders": "tsx --env-file=../../.env src/build-holders.ts",
+    "backtest": "tsx --env-file=../../.env src/run-backtest.ts",
+    "compare": "tsx --env-file=../../.env src/compare-strategies.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",
