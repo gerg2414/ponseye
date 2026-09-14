@@ -12,7 +12,7 @@ const schema = z.object({
   GMGN_DISCOVERY_INTERVAL_MS: z.coerce.number().int().min(5000).default(15000),
   GMGN_KLINE_INTERVAL_MS: z.coerce.number().int().min(5000).default(10000),
   BITQUERY_MIGRATION_POLL_MS: z.coerce.number().int().min(5000).default(15000),
-  BITQUERY_METRICS_POLL_MS: z.coerce.number().int().min(5000).default(10000),
+  BITQUERY_METRICS_POLL_MS: z.coerce.number().int().min(5000).default(5000),
 });
 
 export const config = schema.parse(process.env);
