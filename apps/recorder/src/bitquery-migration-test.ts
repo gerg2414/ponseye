@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
+import { fetchTokenInfo } from "./gmgn.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -76,6 +77,10 @@ function delay(ms: number) {
 function number(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function object(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function argumentMap(args: BitqueryArgument[] = []) {
@@ -322,6 +327,22 @@ async function saveMigrations(payload: MigrationPayload) {
     const registration = registrations.get(tokenAddress);
     const decoded = registration ? decodeRegistration(registration.LogHeader.Data) : null;
     const launch = launches.get(tokenAddress);
+    const metadata = launch ? {
+      name: launch.name,
+      symbol: launch.symbol,
+      image_url: launch.imageUrl,
+      description: launch.description,
+      twitter_url: launch.twitterUrl,
+      telegram_url: launch.telegramUrl,
+      discord_url: launch.discordUrl,
+      website_url: launch.websiteUrl,
+      farcaster_url: launch.farcasterUrl,
+      creator_tax_bps: launch.creatorTaxBps,
+      buyback_enabled: launch.buybackEnabled,
+      metadata_updated_at: new Date().toISOString(),
+      metadata_source: "bitquery_launch_call",
+    } : {};
+    const creator = decoded?.creatorAddress ?? launch?.creatorFeeRecipient;
     return [{
       token_address: tokenAddress,
       migrated_at: graduation.Block.Time,
@@ -331,18 +352,8 @@ async function saveMigrations(payload: MigrationPayload) {
       token_amount_raw: args.tokenAmount == null ? null : String(args.tokenAmount),
       pair_token_amount_raw: args.pairTokenAmount == null ? null : String(args.pairTokenAmount),
       quote_token_address: decoded?.quoteTokenAddress ?? null,
-      creator_address: decoded?.creatorAddress ?? launch?.creatorFeeRecipient ?? null,
-      name: launch?.name ?? null,
-      symbol: launch?.symbol ?? null,
-      image_url: launch?.imageUrl ?? null,
-      description: launch?.description ?? null,
-      twitter_url: launch?.twitterUrl ?? null,
-      telegram_url: launch?.telegramUrl ?? null,
-      discord_url: launch?.discordUrl ?? null,
-      website_url: launch?.websiteUrl ?? null,
-      farcaster_url: launch?.farcasterUrl ?? null,
-      creator_tax_bps: launch?.creatorTaxBps ?? null,
-      buyback_enabled: launch?.buybackEnabled ?? null,
+      ...(creator ? { creator_address: creator } : {}),
+      ...metadata,
       last_seen_at: new Date().toISOString(),
       raw_graduation: graduation,
       raw_registration: registration ?? null,
@@ -357,17 +368,17 @@ async function saveMigrations(payload: MigrationPayload) {
 async function nextMetricsCandidate() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,metrics_updated_at")
+    .select("token_address,migrated_at,metrics_updated_at,metadata_updated_at")
     .gte("migrated_at", cutoff)
     .order("metrics_updated_at", { ascending: true, nullsFirst: true })
     .order("migrated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(`Choose Bitquery market candidate: ${error.message}`);
-  return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null } | null;
+  return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null } | null;
 }
 
-async function updateMetrics(candidate: { token_address: string; migrated_at: string }) {
+async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
   const payload = await queryBitquery<MarketPayload>(marketQuery(candidate.token_address, candidate.migrated_at));
   const rows = payload.data?.Trading?.Tokens ?? [];
   if (!rows.length) {
@@ -388,6 +399,27 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
   const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
   const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
   const flow = payload.data?.Trading?.Flow?.[0];
+  let gmgnMetadata: Record<string, unknown> = {};
+  if (!candidate.metadata_updated_at) {
+    try {
+      const info = await fetchTokenInfo(candidate.token_address);
+      const link = object(info.link);
+      gmgnMetadata = {
+        name: info.name ?? last.Token?.Name ?? first.Token?.Name ?? null,
+        symbol: info.symbol ?? last.Token?.Symbol ?? first.Token?.Symbol ?? null,
+        image_url: info.logo ?? null,
+        description: link.description ?? null,
+        twitter_url: link.twitter_username ? `https://x.com/${String(link.twitter_username).replace(/^@/, "")}` : null,
+        telegram_url: link.telegram ?? null,
+        discord_url: link.discord ?? null,
+        website_url: link.website ?? null,
+        metadata_updated_at: new Date().toISOString(),
+        metadata_source: "gmgn_token_info",
+      };
+    } catch (error) {
+      console.warn("GMGN metadata fallback failed", candidate.token_address, error);
+    }
+  }
   const { error } = await db.from("bitquery_migration_test").update({
     name: last.Token?.Name ?? first.Token?.Name ?? null,
     symbol: last.Token?.Symbol ?? first.Token?.Symbol ?? null,
@@ -407,6 +439,7 @@ async function updateMetrics(candidate: { token_address: string; migrated_at: st
     latest_trade_at: last.Block.Time,
     metrics_updated_at: new Date().toISOString(),
     raw_market: payload,
+    ...gmgnMetadata,
   }).eq("token_address", candidate.token_address);
   if (error) throw new Error(`Save Bitquery market metrics: ${error.message}`);
 }
