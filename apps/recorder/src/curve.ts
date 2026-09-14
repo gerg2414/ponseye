@@ -62,6 +62,15 @@ function curveQuery(tokenAddress: string, since: string, till: string, limit: nu
 const PAGE_SIZE = 1000;
 const MAX_PAGES = 10;
 
+export type CurveBuyer = {
+  token_address: string;
+  wallet: string;
+  buy_usd: number;
+  buys: number;
+  first_buy_at: string | null;
+  buy_rank: number;
+};
+
 export function summariseCurve(token: CurveToken, trades: DexTrade[], truncated: boolean) {
   const address = token.token_address.toLowerCase();
   const creator = token.creator_address?.toLowerCase() ?? null;
@@ -77,6 +86,8 @@ export function summariseCurve(token: CurveToken, trades: DexTrade[], truncated:
   const wallets = new Set<string>();
   const buyers = new Set<string>();
   const buyByWallet = new Map<string, number>();
+  // Per-wallet detail, so a wallet can be followed from one token to the next.
+  const walletDetail = new Map<string, { usd: number; buys: number; firstAt: number }>();
   let firstTradeAt: number | null = null;
 
   for (const trade of trades) {
@@ -100,6 +111,14 @@ export function summariseCurve(token: CurveToken, trades: DexTrade[], truncated:
       if (wallet) {
         buyers.add(wallet);
         buyByWallet.set(wallet, (buyByWallet.get(wallet) ?? 0) + usd);
+        const detail = walletDetail.get(wallet);
+        if (detail) {
+          detail.usd += usd;
+          detail.buys += 1;
+          if (Number.isFinite(at) && at < detail.firstAt) detail.firstAt = at;
+        } else {
+          walletDetail.set(wallet, { usd, buys: 1, firstAt: Number.isFinite(at) ? at : migratedAt });
+        }
       }
       if (creator && wallet === creator) creatorBuy += usd;
     } else {
@@ -114,7 +133,18 @@ export function summariseCurve(token: CurveToken, trades: DexTrade[], truncated:
   // Below a minute the rate is dominated by rounding, so guard the divisor.
   const minutes = curveSeconds == null ? null : Math.max(curveSeconds, 1) / 60;
 
-  return {
+  const buyerRows: CurveBuyer[] = [...walletDetail.entries()]
+    .sort((a, b) => b[1].usd - a[1].usd)
+    .map(([wallet, detail], index) => ({
+      token_address: address,
+      wallet,
+      buy_usd: detail.usd,
+      buys: detail.buys,
+      first_buy_at: new Date(detail.firstAt).toISOString(),
+      buy_rank: index + 1,
+    }));
+
+  const summary = {
     token_address: address,
     launched_at: token.launched_at,
     migrated_at: token.migrated_at,
@@ -145,8 +175,11 @@ export function summariseCurve(token: CurveToken, trades: DexTrade[], truncated:
     creator_buy_usd: creator ? creatorBuy : null,
 
     truncated,
+    buyers_captured: true,
     computed_at: new Date().toISOString(),
   };
+
+  return { summary, buyers: buyerRows };
 }
 
 async function fetchCurveTrades(token: CurveToken) {
@@ -174,10 +207,13 @@ async function fetchCurveTrades(token: CurveToken) {
  * backfill reprocess the same few tokens forever while reporting progress.
  */
 export async function curveCandidates(limit: number) {
+  // Done means summarised *and* with its buyers stored. Tokens summarised
+  // before buyer capture existed are re-read once to pick them up.
   const done = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("bitquery_curve_stats")
       .select("token_address")
+      .eq("buyers_captured", true)
       .range(from, from + 999);
     if (error) throw new Error(`Read completed curve stats: ${error.message}`);
     for (const row of data ?? []) done.add(row.token_address as string);
@@ -218,12 +254,25 @@ export async function curveCandidates(limit: number) {
 export async function updateCurveStats(tokens: CurveToken[]) {
   if (!tokens.length) return 0;
   const rows = [];
+  const buyers: CurveBuyer[] = [];
   for (const token of tokens) {
     const { trades, truncated } = await fetchCurveTrades(token);
-    rows.push(summariseCurve(token, trades, truncated));
+    const result = summariseCurve(token, trades, truncated);
+    rows.push(result.summary);
+    buyers.push(...result.buyers);
   }
+
   const { error } = await db.from("bitquery_curve_stats").upsert(rows, { onConflict: "token_address" });
   if (error) throw new Error(`Save curve stats: ${error.message}`);
+
+  // Chunked: a busy curve can carry hundreds of wallets and several tokens are
+  // summarised per call.
+  for (let index = 0; index < buyers.length; index += 500) {
+    const chunk = buyers.slice(index, index + 500);
+    const { error: buyerError } = await db.from("bitquery_curve_buyers")
+      .upsert(chunk, { onConflict: "token_address,wallet" });
+    if (buyerError) throw new Error(`Save curve buyers: ${buyerError.message}`);
+  }
   return rows.length;
 }
 
