@@ -14,9 +14,10 @@ alter table public.bitquery_migration_test
   add column if not exists migration_price_checked_at timestamptz,
   add column if not exists migration_price_attempts integer not null default 0,
   add column if not exists migration_price_source text,
-  -- Circulating supply reported by Bitquery. PONS tokens are minted at one
-  -- billion, but reading the real value keeps market caps correct if that ever
-  -- stops being true for a launch.
+  -- Supply used for every market cap on the row, so the peak multiple compares
+  -- like with like. Bitquery reports CirculatingSupply as 0 for these tokens, so
+  -- this falls back to the one billion PONS mints and only takes a reported
+  -- value when it is actually positive.
   add column if not exists token_supply numeric;
 
 comment on column public.bitquery_migration_test.price_observed_at is
