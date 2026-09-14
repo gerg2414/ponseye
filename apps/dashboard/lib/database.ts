@@ -62,6 +62,7 @@ export type BitqueryMigrationTestRow = {
   farcaster_url: string | null;
   creator_tax_bps: number | null;
   buyback_enabled: boolean | null;
+  metadata_source: string | null;
   migration_market_cap_usd: number | null;
   current_market_cap_usd: number | null;
   ath_market_cap_usd: number | null;
@@ -198,7 +199,7 @@ export async function getBitqueryMigrationTest(): Promise<BitqueryMigrationTestR
   const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const [migrationResult, statusResult] = await Promise.all([
     db.from("bitquery_migration_test")
-      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
+      .select("token_address,migrated_at,block_number,transaction_hash,position_id,token_amount_raw,pair_token_amount_raw,quote_token_address,creator_address,name,symbol,image_url,description,twitter_url,telegram_url,discord_url,website_url,farcaster_url,creator_tax_bps,buyback_enabled,metadata_source,migration_market_cap_usd,current_market_cap_usd,ath_market_cap_usd,volume_usd,trade_count,buys,sells,buy_volume_usd,sell_volume_usd,unique_traders,latest_trade_at,metrics_updated_at,first_seen_at")
       .gte("migrated_at", since)
       .order("migrated_at", { ascending: false }),
     db.from("stream_status")
