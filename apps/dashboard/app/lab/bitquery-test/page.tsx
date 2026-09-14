@@ -9,7 +9,7 @@ import { ClickableTokenRow } from "./clickable-token-row";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Bitquery Migration Test | PonsEye Lab",
+  title: "Graduation Test | PonsEye Lab",
   description: "A rolling window of Bitquery PONS migration events and post-migration market data.",
 };
 
@@ -107,8 +107,8 @@ export default async function BitqueryMigrationTestPage({
       <section className="bitqueryTestIntro">
         <div>
           <small>Isolated source test</small>
-          <h1>Bitquery migrations</h1>
-          <p>PONS pool graduation events from the last {windowHours} hours, with post-migration market data. No launch feed or bonding curve trades are collected.</p>
+          <h1>Graduations</h1>
+          <p>PONS pool graduations from the last {windowHours} hours, with the market data that follows each one.</p>
         </div>
         <span className={status?.status === "connected" ? "connected" : ""}>
           <i />{status?.status ?? "Waiting"}
@@ -116,15 +116,15 @@ export default async function BitqueryMigrationTestPage({
       </section>
 
       <section className="databaseStats bitqueryTestStats">
-        <article><small>Migrations</small><strong>{totalInWindow.toLocaleString("en-GB")}</strong></article>
+        <article><small>Graduations</small><strong>{totalInWindow.toLocaleString("en-GB")}</strong></article>
         <article><small>Market data ready</small><strong>{metricsReady.toLocaleString("en-GB")}</strong></article>
-        <article><small>Latest migration</small><strong>{lastMigration ? time(lastMigration).replace(/^\d{2} \w{3},? /, "") : "Waiting"}</strong></article>
+        <article><small>Latest graduation</small><strong>{lastMigration ? time(lastMigration).replace(/^\d{2} \w{3},? /, "") : "Waiting"}</strong></article>
         <article><small>Listener</small><strong>{status?.status === "connected" ? "Live" : status?.status ?? "Waiting"}</strong></article>
       </section>
 
       <section className="databaseLedger bitqueryTestLedger">
         <header>
-          <div><small>Bitquery event rows</small><strong>{shown.length.toLocaleString("en-GB")} shown of {filteredCount.toLocaleString("en-GB")} matching, {totalInWindow.toLocaleString("en-GB")} in window</strong></div>
+          <div><small>Graduation rows</small><strong>{shown.length.toLocaleString("en-GB")} shown of {filteredCount.toLocaleString("en-GB")} matching, {totalInWindow.toLocaleString("en-GB")} in window</strong></div>
           <span>{status?.message ?? "Waiting for the first Bitquery scan"}</span>
         </header>
         <form className="bitqueryFilters">
@@ -133,7 +133,7 @@ export default async function BitqueryMigrationTestPage({
           </select></label>
           <label><span>Sort by</span><select name="sort" defaultValue={sort}>
             <option value="newest">Newest</option><option value="ath">Highest ATH</option><option value="multiple">Highest multiple</option>
-            <option value="current">Highest current MC</option><option value="migration">Highest migration MC</option>
+            <option value="current">Highest current MC</option><option value="migration">Highest entry MC</option>
             <option value="volume">Highest volume</option><option value="trades">Most trades</option>
             <option value="buys">Most buys</option><option value="sells">Most sells</option>
           </select></label>
@@ -159,11 +159,11 @@ export default async function BitqueryMigrationTestPage({
             {/* Widths live beside the columns so inserting one cannot shift the rest. */}
             <colgroup>
               <col style={{ width: 230 }} />{/* Token */}
-              <col style={{ width: 150 }} />{/* Migrated */}
+              <col style={{ width: 150 }} />{/* Sighted */}
               <col style={{ width: 140 }} />{/* Holders @1m */}
-              <col style={{ width: 130 }} />{/* Migration MC */}
+              <col style={{ width: 130 }} />{/* Entry MC */}
               <col style={{ width: 130 }} />{/* Current MC */}
-              <col style={{ width: 150 }} />{/* Post migration ATH */}
+              <col style={{ width: 150 }} />{/* Peak MC */}
               <col style={{ width: 100 }} />{/* Peak */}
               <col style={{ width: 120 }} />{/* Volume */}
               <col style={{ width: 130 }} />{/* Buys */}
@@ -172,7 +172,7 @@ export default async function BitqueryMigrationTestPage({
               <col style={{ width: 130 }} />{/* Event details */}
             </colgroup>
             <thead>
-              <tr><th>Token</th><th>Migrated</th><th>Holders @1m</th><th>Migration MC</th><th>Current MC</th><th>Post migration ATH</th><th>Peak</th><th>Volume</th><th>Buys</th><th>Sells</th><th>Trades</th><th>Event details</th></tr>
+              <tr><th>Token</th><th>Sighted</th><th>Holders @1m</th><th>Entry MC</th><th>Current MC</th><th>Peak MC</th><th>Peak</th><th>Volume</th><th>Buys</th><th>Sells</th><th>Trades</th><th>Event details</th></tr>
             </thead>
             <tbody>
               {shown.map((token, index) => (

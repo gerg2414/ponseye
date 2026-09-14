@@ -206,6 +206,32 @@ type FunnelRow = {
   reason: string | null;
 };
 
+/**
+ * Position fields for a token the filter actually opened on.
+ *
+ * Kept separate from the funnel row because a position is a record of something
+ * that happened: changing a threshold reclassifies the funnel but must never
+ * rewrite a trade already taken.
+ */
+function positionFields(position: Record<string, unknown> | undefined) {
+  if (!position) return {};
+  const entry = toNumber(position.entry_market_cap_usd);
+  const realised = toNumber(position.realised_multiple) ?? 0;
+  const remaining = toNumber(position.remaining_fraction) ?? 0;
+  return {
+    acquired_at: position.opened_at as string,
+    entry_market_cap_usd: entry,
+    position_status: position.closed_at ? "closed" : "open",
+    closed_at: position.closed_at as string | null,
+    exit_reason: (position.close_reason ?? null) as string | null,
+    remaining_pct: remaining * 100,
+    realised_return_multiple: realised,
+    position_value_multiple: toNumber(position.position_value_multiple) ?? realised + remaining,
+    strategy_version: position.strategy as string | undefined,
+    rungs_filled: (position.rungs_filled ?? []) as number[],
+  };
+}
+
 const STAGE_TO_LANE = {
   sighted: "sighted",
   surveilling: "under_watch",
@@ -225,7 +251,7 @@ async function loadDashboardData() {
 
   const db = createClient(url, key, { auth: { persistSession: false } });
 
-  const [funnelResult, flowResult, statusResult, totalsResult] = await Promise.all([
+  const [funnelResult, flowResult, statusResult, positionResult, totalsResult] = await Promise.all([
     db.from("ponseye_funnel")
       .select("*")
       .in("stage", ["sighted", "surveilling", "acquired"])
@@ -237,12 +263,16 @@ async function loadDashboardData() {
       .select("token_address,trade_count,unique_traders,buys,sells")
       .gte("migrated_at", new Date(Date.now() - 2 * 60 * 60_000).toISOString()),
     db.from("stream_status").select("feed,status,last_seen_at"),
+    db.from("ponseye_positions_live")
+      .select("token_address,opened_at,entry_price_usd,entry_market_cap_usd,remaining_fraction,realised_multiple,rungs_filled,peak_multiple_seen,closed_at,close_reason,current_multiple,position_value_multiple"),
     db.from("bitquery_migration_test").select("token_address", { count: "exact", head: true }),
   ]);
 
   if (funnelResult.error) throw new Error(funnelResult.error.message);
 
   const flow = new Map(((flowResult.data ?? []) as Array<Record<string, unknown>>)
+    .map((row) => [row.token_address as string, row]));
+  const positions = new Map(((positionResult.data ?? []) as Array<Record<string, unknown>>)
     .map((row) => [row.token_address as string, row]));
 
   const launches = ((funnelResult.data ?? []) as unknown as FunnelRow[]).map((row) => {
@@ -278,6 +308,7 @@ async function loadDashboardData() {
       holder_count: toNumber(row.holders_at_1m),
       first_minute_buyers: Number(toNumber(row.holders_at_1m) ?? 0),
       sparkline_prices: [],
+      ...positionFields(positions.get(row.token_address)),
     } as unknown as Launch;
   });
 

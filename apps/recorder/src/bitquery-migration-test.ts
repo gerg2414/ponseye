@@ -15,6 +15,7 @@ import { BACKFILL_WINDOW_MS, TRACKING_WINDOW_MS, config } from "./config.js";
 import { db } from "./db.js";
 import { curveCandidates, updateCurveStats } from "./curve.js";
 import { holderCandidates, updateHolders } from "./holders.js";
+import { entrySignals, openPositions, updatePositions } from "./positions.js";
 import { budgetLevel, getBitqueryUsage, stageAllowed, type BudgetLevel } from "./usage.js";
 import { refreshSnapshotOutcomes } from "./snapshots.js";
 
@@ -1261,6 +1262,19 @@ export async function runBitqueryMigrationTest() {
         for (const failure of failed) {
           console.error("Migration price batch failed", (failure as PromiseRejectedResult).reason);
         }
+      },
+    },
+    {
+      name: "positions",
+      // Opens on a fresh signal and marks open positions to the latest price.
+      // Cheap: it reads prices the other stages already wrote, and makes no
+      // Bitquery request of its own.
+      intervalMs: 5_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        await openPositions(await entrySignals());
+        await updatePositions();
       },
     },
     {

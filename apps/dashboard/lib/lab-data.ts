@@ -234,106 +234,83 @@ async function loadCapitalCircuitData(): Promise<LabToken[]> {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) throw new Error("Capital Circuit database environment is missing");
 
-  const db = createClient(url, key, { auth: { persistSession: false }, db: { retry: false } });
-  const positionsResult = await db.from("acquired_positions")
-    .select("token_address,acquired_at,entry_price_usd,entry_market_cap_usd,exit_market_cap_usd,peak_price_usd,target_multiple,stop_multiple,strategy_version,position_size_usd,remaining_pct,realised_return_multiple,hit_10x_at,hit_20x_at,hit_50x_at,hit_100x_at,position_status,closed_at,exit_reason")
-    .order("acquired_at", { ascending: false });
+  const db = createClient(url, key, { auth: { persistSession: false } });
 
-  if (positionsResult.error) throw new Error(positionsResult.error.message);
-  const positions = (positionsResult.data ?? []) as CapitalPosition[];
-  if (!positions.length) return [];
+  // The full ledger, open and closed. The acquired lane on the home page shows
+  // only the last day; everything ever taken lives here.
+  const result = await db.from("ponseye_positions_live")
+    .select("*")
+    .order("opened_at", { ascending: false })
+    .limit(500)
+    .abortSignal(AbortSignal.timeout(30_000));
 
-  const acquiredAddresses = positions.map((position) => position.token_address);
-  const launchesResult = await db.from("gmgn_launches")
-    .select("token_address,name,symbol,image_url,created_at,lifecycle_stage,price_usd,market_cap_usd,ath_market_cap_usd,swaps_24h,buys_24h,sells_24h,holder_count,top_10_holder_pct,creator_balance_pct")
-    .in("token_address", acquiredAddresses);
+  if (result.error) throw new Error(result.error.message);
 
-  if (launchesResult.error) throw new Error(launchesResult.error.message);
-
-  const launches = new Map(((launchesResult.data ?? []) as CapitalLaunch[]).map((launch) => [launch.token_address, launch]));
-
-  return positions.flatMap((position) => {
-    const launch = launches.get(position.token_address);
-    if (!launch) return [];
-    const entryPrice = numberOrNull(position.entry_price_usd);
-    const currentPrice = numberOrNull(launch.price_usd);
-    const peakPrice = numberOrNull(position.peak_price_usd);
+  return ((result.data ?? []) as Array<Record<string, unknown>>).map((position) => {
     const entryMarketCap = numberOrNull(position.entry_market_cap_usd);
-    const exitMarketCap = numberOrNull(position.exit_market_cap_usd);
-    const targetMultiple = numberOrNull(position.target_multiple);
-    const stopMultiple = numberOrNull(position.stop_multiple);
-    const liveMultiple = entryPrice && currentPrice ? currentPrice / entryPrice : null;
-    const peakMultiple = entryPrice && peakPrice ? peakPrice / entryPrice : null;
-    const remainingPct = numberOrNull(position.remaining_pct) ?? 100;
-    const realisedReturnMultiple = numberOrNull(position.realised_return_multiple) ?? 0;
-    const markMultiple = liveMultiple ?? (entryMarketCap && numberOrNull(launch.market_cap_usd)
-      ? numberOrNull(launch.market_cap_usd)! / entryMarketCap
-      : 1);
-    const positionValueMultiple = realisedReturnMultiple + (remainingPct / 100) * markMultiple;
-    const buys = Number(launch.buys_24h ?? 0);
-    const sells = Number(launch.sells_24h ?? 0);
-    const tradeCount = Number(launch.swaps_24h ?? buys + sells);
+    const realised = numberOrNull(position.realised_multiple) ?? 0;
+    const remaining = numberOrNull(position.remaining_fraction) ?? 0;
+    const rungs = (position.rungs_filled ?? []) as number[];
+    // Value per unit staked: what has been banked plus whatever still rides.
+    const finalMultiple = numberOrNull(position.position_value_multiple) ?? realised + remaining;
 
     return {
-      token_address: position.token_address,
-      name: launch.name,
-      symbol: launch.symbol,
-      image_url: launch.image_url,
-      launched_at: launch.created_at,
-      signal_at: position.acquired_at,
-      signal_age_seconds: Math.max(0, Math.round((Date.parse(position.acquired_at) - Date.parse(launch.created_at)) / 1_000)),
-      status: launch.lifecycle_stage,
-      actual_state: "target_locked",
+      token_address: position.token_address as string,
+      name: (position.name ?? null) as string | null,
+      symbol: (position.symbol ?? null) as string | null,
+      image_url: (position.image_url ?? null) as string | null,
+      launched_at: position.opened_at as string,
+      signal_at: position.opened_at as string,
+      signal_age_seconds: 60,
+      status: position.closed_at ? "closed" : "open",
+      actual_state: "acquired",
+      // The ledger filters on this: every row here is a position that was
+      // actually taken, as opposed to a signal that merely qualified.
       actual_acquired: true,
       actual_binned: false,
-      trade_count: tradeCount,
-      buys,
+      outcome_scope: "full_market" as const,
+      signal_market_cap_usd: entryMarketCap,
+      signal_price_usd: numberOrNull(position.entry_price_usd),
+      signal_volume_usd: 0,
+      followup_trades: 0,
+      trade_count: 0,
+      buys: 0,
+      sells: 0,
       recent_buys_20s: 0,
-      sells,
       unique_traders: 0,
-      buy_pressure_pct: tradeCount ? buys * 100 / tradeCount : null,
+      buy_pressure_pct: null,
       creator_sells: 0,
-      first_minute_buyers: 0,
+      first_minute_buyers: numberOrNull(position.entry_holder_count) ?? 0,
       momentum_multiple: null,
       peak_hold_pct: null,
-      holder_count: numberOrNull(launch.holder_count),
-      top_10_holder_pct: numberOrNull(launch.top_10_holder_pct),
-      creator_balance_pct: numberOrNull(launch.creator_balance_pct),
-      signal_price_usd: entryPrice,
-      signal_market_cap_usd: entryMarketCap,
-      signal_volume_usd: 0,
-      followup_trades: tradeCount,
-      outcome_scope: "full_market",
-      future_peak_multiple: peakMultiple ?? (entryMarketCap && numberOrNull(launch.ath_market_cap_usd)
-        ? numberOrNull(launch.ath_market_cap_usd)! / entryMarketCap
-        : null),
+      holder_count: numberOrNull(position.entry_holder_count),
+      top_10_holder_pct: null,
+      creator_balance_pct: null,
       future_low_multiple: null,
-      final_multiple: positionValueMultiple,
-      closed_at: position.closed_at,
-      position_status: position.position_status,
       entry_market_cap_usd: entryMarketCap,
-      exit_market_cap_usd: exitMarketCap,
-      target_multiple: targetMultiple,
-      stop_multiple: stopMultiple,
-      exit_reason: position.exit_reason,
-      strategy_version: position.strategy_version,
-      position_size_usd: numberOrNull(position.position_size_usd),
-      remaining_pct: remainingPct,
-      realised_return_multiple: realisedReturnMultiple,
-      position_value_multiple: positionValueMultiple,
-      hit_10x_at: position.hit_10x_at,
-      hit_20x_at: position.hit_20x_at,
-      hit_50x_at: position.hit_50x_at,
-      hit_100x_at: position.hit_100x_at,
-      pre_target_low_multiples: {},
-      post_2x_pre_target_low_multiples: {},
-    } satisfies LabToken;
+      market_cap_usd: numberOrNull(position.current_market_cap_usd),
+      final_multiple: finalMultiple,
+      future_peak_multiple: numberOrNull(position.peak_multiple_seen),
+      realised_return_multiple: realised,
+      remaining_pct: remaining * 100,
+      // Paper trading, so every position is the same notional stake and the
+      // returns above are per unit rather than in currency.
+      position_size_usd: 100,
+      position_status: position.closed_at ? "closed" : "open",
+      closed_at: (position.closed_at ?? null) as string | null,
+      exit_reason: (position.close_reason ?? null) as string | null,
+      strategy_version: (position.strategy ?? null) as string | null,
+      hit_10x_at: rungs.includes(10) ? (position.closed_at ?? null) : null,
+      hit_20x_at: null,
+      hit_50x_at: null,
+      hit_100x_at: null,
+    } as unknown as LabToken;
   });
 }
 
 const getCachedCapitalCircuitData = unstable_cache(
   loadCapitalCircuitData,
-  ["ponseye-capital-circuit-v3"],
+  ["ponseye-capital-circuit-positions-v1"],
   { revalidate: 5 },
 );
 

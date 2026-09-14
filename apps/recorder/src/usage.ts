@@ -120,6 +120,8 @@ export const STAGE_PRIORITY: Record<string, BudgetLevel> = {
   "curve-stats": "full",
   // Carries the entry filter, so it stays up unless the allowance is nearly gone.
   holders: "reduced",
+  // Makes no Bitquery request at all, so budget never needs to stop it.
+  positions: "essential",
   history: "full",
 };
 

@@ -179,7 +179,7 @@ async function candlesFrom(tokenAddress: string, since: string) {
 }
 
 /** Tokens that cleared the entry filter, oldest first so outcomes are mature. */
-export async function filteredTokens(maxTopHolderPct = 15, maxGrowthPp = 15) {
+export async function filteredTokens(maxTopHolderPct = 15, maxGrowthPp = Infinity, invert = false) {
   const { data, error } = await db.from("bitquery_holder_snapshots")
     .select("token_address,age_seconds,top_holder_pct,bitquery_migration_test(symbol,migrated_at,peak_multiple)")
     .in("age_seconds", [60, 300]);
@@ -197,8 +197,13 @@ export async function filteredTokens(maxTopHolderPct = 15, maxGrowthPp = 15) {
   }
 
   return [...byToken.entries()]
-    .filter(([, v]) => v.at60 != null && v.at60 < maxTopHolderPct
-      && (v.at300 == null || v.at300 - v.at60 < maxGrowthPp))
+    .filter(([, v]) => {
+      if (v.at60 == null) return false;
+      const passes = v.at60 < maxTopHolderPct && (v.at300 == null || v.at300 - v.at60 < maxGrowthPp);
+      // Inverted gives the control group: the same ladder on tokens the filter
+      // rejected, which is the only way to tell selection from a rising tide.
+      return invert ? !passes : passes;
+    })
     .map(([token_address, v]) => ({ token_address, symbol: v.symbol, migrated_at: v.migratedAt }))
     .sort((a, b) => Date.parse(a.migrated_at) - Date.parse(b.migrated_at));
 }

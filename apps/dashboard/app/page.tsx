@@ -73,7 +73,7 @@ function targetLockScore(launch: Launch, mode: "sighted" | "surveillance" | "acq
 
 function lockLabel(launch: Launch, score: number, mode: "sighted" | "surveillance" | "acquired") {
   if (launch.research_state === "target_locked") return "Target locked";
-  if (mode === "sighted") return "Migrated";
+  if (mode === "sighted") return "Sighted";
   if (score >= 80) return "Final checks";
   if (score >= 48) return "Tracking";
   return "Scanning";
@@ -84,7 +84,7 @@ function TokenCard({ launch, mode, imagePriority = false }: { launch: Launch; mo
   const acquired = mode === "acquired";
   const positionClosed = launch.position_status === "closed" || Boolean(launch.closed_at);
   const valuationMarketCap = positionClosed ? launch.exit_market_cap_usd : launch.market_cap_usd;
-  const usdMarketCap = valuationMarketCap ? quoteValue(valuationMarketCap, "USDG") : launch.trade_count ? "Pending USD" : "No trades yet";
+  const usdMarketCap = valuationMarketCap ? quoteValue(valuationMarketCap, "USDG") : launch.trade_count ? "Pending USD" : "Measuring";
   const entryMarketCap = launch.entry_market_cap_usd ? quoteValue(launch.entry_market_cap_usd, "USDG") : null;
   const priceGainMultiple = launch.entry_market_cap_usd && valuationMarketCap
     ? valuationMarketCap / launch.entry_market_cap_usd
@@ -195,6 +195,7 @@ export default async function Home() {
   const liveFeeds = recorderFeeds.filter((stream) => stream.status === "connected").length;
   const recorderLive = liveFeeds === currentFeeds.size;
   const acquired = launches
+    // Acquired holds a day. The full ledger lives on Capital Circuit.
     .filter((launch) => launch.research_state === "target_locked" && Date.now() - new Date(launch.launched_at).getTime() < 24 * 60 * 60_000)
     .sort((a, b) => new Date(b.research_state_at).getTime() - new Date(a.research_state_at).getTime());
   const surveillance = launches
@@ -259,7 +260,7 @@ export default async function Home() {
             <LaunchLane title="Surveilling" count={surveillance.length} tone="completing" icon="/ponseye-surveillance-icon.svg" mode="surveillance" launches={surveillance} empty="No targets under surveillance" />
             <LaunchLane title="Acquired" count={acquired.length} tone="completed" icon="/ponseye-acquired-icon.svg" mode="acquired" launches={acquired} empty="No targets acquired yet" />
           </div>
-          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} migrated tokens</span><span>Targets appear after dip confirmation</span></footer>
+          <footer className="panelFoot"><span>Ponseye is watching {launchCount.toLocaleString("en-GB")} tokens</span><span>Targets appear after dip confirmation</span></footer>
         </section>
       </div>
     </main>
