@@ -1,14 +1,28 @@
 import { createClient } from "@supabase/supabase-js";
-import { config } from "./config.js";
+import {
+  BitqueryAuthError,
+  assertAddress,
+  delay,
+  fetchAllPages,
+  getAccessToken,
+  invalidateAccessToken,
+  isAddress,
+  mapWithConcurrency,
+  number,
+  queryBitquery,
+} from "./bitquery-client.js";
+import { BACKFILL_WINDOW_MS, TRACKING_WINDOW_MS, config } from "./config.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
 const POOL_REGISTERED_TOPIC = "01bf263a1db1652580721573296e1a1fa70b3d4c87f61d02a69c4e1109d2d573";
-const PONS_SUPPLY = 1_000_000_000;
+/** PONS mints one billion tokens. Used only when Bitquery reports no supply. */
+const DEFAULT_SUPPLY = 1_000_000_000;
+/** Tokens that never trade would otherwise be retried forever. */
+const MAX_HISTORY_ATTEMPTS = 5;
 
 const db = createClient(config.SUPABASE_URL, config.SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
-  db: { retry: false },
 });
 
 type BitqueryArgument = {
@@ -51,37 +65,24 @@ type TradeFlowRow = {
   uniqueTraders?: string | number;
 };
 
-type MigrationPayload = {
-  data?: {
-    EVM?: {
-      Graduations?: GraduationEvent[];
-      Registrations?: RegistrationEvent[];
-    };
-  };
-  errors?: Array<{ message?: string }>;
+type MigrationData = {
+  EVM?: { Graduations?: GraduationEvent[]; Registrations?: RegistrationEvent[] };
 };
 
-type LaunchPayload = {
-  data?: { EVM?: { Launches?: LaunchCall[] } };
-  errors?: Array<{ message?: string }>;
-};
+type LaunchData = { EVM?: { Launches?: LaunchCall[] } };
 
-type MarketPayload = {
-  data?: { Trading?: { Tokens?: MarketRow[]; Flow?: TradeFlowRow[] } };
-  errors?: Array<{ message?: string }>;
-};
+type HistoryData = { Trading?: { Tokens?: MarketRow[] } };
 
-type LiveMetricsCandidate = {
+type LiveMarketData = { Trading?: Record<string, MarketRow[] | TradeFlowRow[] | undefined> };
+
+type TrackedToken = {
   token_address: string;
   migrated_at: string;
   transaction_hash: string;
-  ath_price_usd: number | string | null;
+  token_supply: number | string | null;
 };
 
-type LiveMarketPayload = {
-  data?: { Trading?: Record<string, MarketRow[] | TradeFlowRow[] | undefined> };
-  errors?: Array<{ message?: string }>;
-};
+type HistoryCandidate = TrackedToken & { migration_price_attempts: number | null };
 
 type LivePriceRow = {
   Block?: { Time?: string };
@@ -94,16 +95,20 @@ type LivePricePayload = {
   errors?: Array<{ message?: string }>;
 };
 
-let accessToken: string | null = null;
-let accessTokenExpiresAt = 0;
+let running = true;
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function stopBitqueryMigrationTest() {
+  running = false;
 }
 
-function number(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+/** Bitquery stamps each candle at the start of its bucket. */
+function floorToMinute(value: string | Date) {
+  const time = value instanceof Date ? value.getTime() : Date.parse(value);
+  return new Date(Math.floor(time / 60_000) * 60_000);
+}
+
+function supplyOf(token: { token_supply: number | string | null }) {
+  return number(token.token_supply) ?? DEFAULT_SUPPLY;
 }
 
 function argumentMap(args: BitqueryArgument[] = []) {
@@ -180,53 +185,16 @@ function decodeLaunch(call: LaunchCall) {
   };
 }
 
-async function getAccessToken() {
-  if (accessToken && Date.now() < accessTokenExpiresAt - 60_000) return accessToken;
-  if (!config.BITQUERY_CLIENT_ID || !config.BITQUERY_CLIENT_SECRET) {
-    throw new Error("Bitquery migration test credentials are missing");
-  }
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
 
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: config.BITQUERY_CLIENT_ID,
-    client_secret: config.BITQUERY_CLIENT_SECRET,
-    scope: "api",
-  });
-  const response = await fetch("https://oauth2.bitquery.io/oauth2/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`Bitquery OAuth failed with ${response.status}`);
-  const payload = await response.json() as { access_token: string; expires_in: number };
-  accessToken = payload.access_token;
-  accessTokenExpiresAt = Date.now() + payload.expires_in * 1_000;
-  return accessToken;
-}
-
-async function queryBitquery<T>(query: string): Promise<T> {
-  const token = await getAccessToken();
-  const response = await fetch("https://streaming.bitquery.io/graphql", {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(45_000),
-  });
-  if (!response.ok) throw new Error(`Bitquery query failed with ${response.status}`);
-  const payload = await response.json() as T & { errors?: Array<{ message?: string }> };
-  if (payload.errors?.length) {
-    throw new Error(payload.errors.map((error) => error.message ?? "Unknown Bitquery error").join("; "));
-  }
-  return payload;
-}
-
-function migrationQuery(since: string, till: string) {
+function migrationQuery(since: string, till: string, limit: number, offset: number) {
   return `
     query PonsMigrationTest {
       EVM(network: robinhood) {
         Graduations: Events(
-          limit: {count: 1000}
+          limit: {count: ${limit}, offset: ${offset}}
           orderBy: {ascending: Block_Time}
           where: {
             Block: {Time: {since: "${since}", till: "${till}"}}
@@ -245,8 +213,17 @@ function migrationQuery(since: string, till: string) {
             }
           }
         }
+      }
+    }
+  `;
+}
+
+function registrationQuery(since: string, till: string, limit: number, offset: number) {
+  return `
+    query PonsRegistrationTest {
+      EVM(network: robinhood) {
         Registrations: Events(
-          limit: {count: 1000}
+          limit: {count: ${limit}, offset: ${offset}}
           orderBy: {ascending: Block_Time}
           where: {
             Block: {Time: {since: "${since}", till: "${till}"}}
@@ -263,12 +240,12 @@ function migrationQuery(since: string, till: string) {
   `;
 }
 
-function launchMetadataQuery(since: string, till: string) {
+function launchMetadataQuery(since: string, till: string, limit: number, offset: number) {
   return `
     query PonsLaunchMetadataTest {
       EVM(network: robinhood) {
         Launches: Calls(
-          limit: {count: 1000}
+          limit: {count: ${limit}, offset: ${offset}}
           orderBy: {ascending: Block_Time}
           where: {
             Block: {Time: {since: "${since}", till: "${till}"}}
@@ -288,16 +265,21 @@ function launchMetadataQuery(since: string, till: string) {
   `;
 }
 
-function marketQuery(tokenAddress: string, migratedAt: string) {
-  const since = new Date(migratedAt).toISOString();
+/**
+ * Full one-minute candle history for a token from the minute its graduation
+ * landed in. `since` is floored to the minute because a candle is stamped at its
+ * bucket start: filtering from the exact graduation second skips the candle that
+ * contains the graduation and makes the first row a minute too late.
+ */
+function historyQuery(tokenAddress: string, since: string, limit: number, offset: number) {
   return `
-    query PonsMigrationMarketTest {
+    query PonsMigrationHistory {
       Trading {
         Tokens(
-          limit: {count: 1500}
+          limit: {count: ${limit}, offset: ${offset}}
           orderBy: {ascending: Block_Time}
           where: {
-            Token: {Address: {is: "${tokenAddress}"} Network: {is: "Robinhood"}}
+            Token: {Address: {is: "${assertAddress(tokenAddress)}"} Network: {is: "Robinhood"}}
             Interval: {Time: {Duration: {eq: 60}}}
             Block: {Time: {since: "${since}"}}
           }
@@ -309,36 +291,21 @@ function marketQuery(tokenAddress: string, migratedAt: string) {
           Supply { MarketCap CirculatingSupply }
           trades: count
         }
-        Flow: Trades(
-          limit: {count: 1}
-          where: {
-            Pair: {
-              Token: {Address: {is: "${tokenAddress}"}}
-              Market: {Network: {is: "Robinhood"}}
-            }
-            Block: {Time: {since: "${since}"}}
-          }
-        ) {
-          buys: count(if: {Side: {is: "Buy"}})
-          sells: count(if: {Side: {is: "Sell"}})
-          buyVolume: sum(of: AmountsInUsd_Quote, if: {Side: {is: "Buy"}})
-          sellVolume: sum(of: AmountsInUsd_Quote, if: {Side: {is: "Sell"}})
-          uniqueTraders: count(distinct: Trader_Address)
-        }
       }
     }
   `;
 }
 
-function liveMarketQuery(candidates: LiveMetricsCandidate[]) {
+function liveMarketQuery(candidates: TrackedToken[]) {
   const fields = candidates.map((candidate, index) => {
+    const address = assertAddress(candidate.token_address);
     const since = new Date(candidate.migrated_at).toISOString();
     return `
       Token${index}: Tokens(
         limit: {count: 1}
         orderBy: {descending: Block_Time}
         where: {
-          Token: {Address: {is: "${candidate.token_address}"} Network: {is: "Robinhood"}}
+          Token: {Address: {is: "${address}"} Network: {is: "Robinhood"}}
           Interval: {Time: {Duration: {eq: 60}}}
           Block: {Time: {since: "${since}"}}
         }
@@ -346,12 +313,13 @@ function liveMarketQuery(candidates: LiveMetricsCandidate[]) {
         Block { Time }
         Token { Address Symbol Name }
         Price { Ohlc { High Close } }
+        Supply { CirculatingSupply }
       }
       Flow${index}: Trades(
         limit: {count: 1}
         where: {
           Pair: {
-            Token: {Address: {is: "${candidate.token_address}"}}
+            Token: {Address: {is: "${address}"}}
             Market: {Network: {is: "Robinhood"}}
           }
           Block: {Time: {since: "${since}"}}
@@ -366,16 +334,11 @@ function liveMarketQuery(candidates: LiveMetricsCandidate[]) {
     `;
   }).join("\n");
 
-  return `
-    query PonsMigrationLiveMarketTest {
-      Trading {
-        ${fields}
-      }
-    }
-  `;
+  return `query PonsMigrationLiveMarketTest { Trading { ${fields} } }`;
 }
 
 function livePriceSubscriptionQuery(addresses: string[]) {
+  const list = addresses.map((address) => `"${assertAddress(address)}"`).join(",");
   return `
     subscription PonsMigrationLivePrices {
       Trading {
@@ -384,7 +347,7 @@ function livePriceSubscriptionQuery(addresses: string[]) {
             Interval: {Time: {Duration: {eq: 1}}}
             Price: {IsQuotedInUsd: true}
             Market: {Network: {is: "Robinhood"}}
-            Token: {Address: {in: [${addresses.map((address) => `"${address}"`).join(",")} ]}}
+            Token: {Address: {in: [${list}]}}
             Ranking: {Position: {eq: 1}}
           }
         ) {
@@ -397,20 +360,319 @@ function livePriceSubscriptionQuery(addresses: string[]) {
   `;
 }
 
-async function livePriceCandidates() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,transaction_hash,ath_price_usd")
-    .gte("migrated_at", cutoff);
-  if (error) throw new Error(`Read live price candidates: ${error.message}`);
-  return new Map(((data ?? []) as LiveMetricsCandidate[]).map((row) => [row.token_address, row]));
+// ---------------------------------------------------------------------------
+// Writes
+// ---------------------------------------------------------------------------
+
+async function setStatus(status: "connecting" | "connected" | "error", message: string) {
+  const { error } = await db.from("stream_status").upsert({
+    feed: "bitquery_migration_test",
+    status,
+    message,
+    last_seen_at: new Date().toISOString(),
+  }, { onConflict: "feed" });
+  if (error) throw new Error(`Save Bitquery test status: ${error.message}`);
 }
 
-async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate>) {
+async function saveMigrations(graduations: GraduationEvent[], registrationRows: RegistrationEvent[]) {
+  if (!graduations.length) return 0;
+
+  const registrations = new Map<string, RegistrationEvent>();
+  for (const row of registrationRows) {
+    const decoded = decodeRegistration(row.LogHeader.Data);
+    if (decoded.tokenAddress) registrations.set(decoded.tokenAddress, row);
+  }
+
+  const graduationAddresses = graduations
+    .map((graduation) => String(argumentMap(graduation.Arguments).token ?? "").toLowerCase())
+    .filter(isAddress);
+
+  const launches = new Map<string, Record<string, unknown>>();
+  // Chunked because PostgREST builds an `in` list into the request URL.
+  for (let index = 0; index < graduationAddresses.length; index += 200) {
+    const chunk = graduationAddresses.slice(index, index + 200);
+    const { data, error } = await db.from("bitquery_launch_metadata_test").select("*").in("token_address", chunk);
+    if (error) throw new Error(`Read Bitquery launch metadata: ${error.message}`);
+    for (const row of data ?? []) launches.set(row.token_address, row);
+  }
+
+  const seen = new Set<string>();
+  const rows = graduations.flatMap((graduation) => {
+    const args = argumentMap(graduation.Arguments);
+    const tokenAddress = String(args.token ?? "").toLowerCase();
+    // A token address may only appear once per upsert or Postgres rejects the
+    // whole batch with "cannot affect row a second time".
+    if (!isAddress(tokenAddress) || seen.has(tokenAddress)) return [];
+    seen.add(tokenAddress);
+
+    const registration = registrations.get(tokenAddress);
+    const decoded = registration ? decodeRegistration(registration.LogHeader.Data) : null;
+    const launch = launches.get(tokenAddress);
+    const metadata = launch ? {
+      name: launch.name,
+      symbol: launch.symbol,
+      image_url: launch.image_url,
+      description: launch.description,
+      twitter_url: launch.twitter_url,
+      telegram_url: launch.telegram_url,
+      discord_url: launch.discord_url,
+      website_url: launch.website_url,
+      farcaster_url: launch.farcaster_url,
+      creator_tax_bps: launch.creator_tax_bps,
+      buyback_enabled: launch.buyback_enabled,
+      metadata_updated_at: new Date().toISOString(),
+      metadata_source: "bitquery_launch_call",
+    } : {};
+    const creator = decoded?.creatorAddress ?? (launch?.creator_address as string | undefined);
+
+    return [{
+      token_address: tokenAddress,
+      migrated_at: graduation.Block.Time,
+      block_number: graduation.Block.Number ?? registration?.Block.Number ?? null,
+      transaction_hash: graduation.Transaction.Hash.toLowerCase(),
+      position_id: args.positionId == null ? null : String(args.positionId),
+      token_amount_raw: args.tokenAmount == null ? null : String(args.tokenAmount),
+      pair_token_amount_raw: args.pairTokenAmount == null ? null : String(args.pairTokenAmount),
+      quote_token_address: decoded?.quoteTokenAddress ?? null,
+      ...(creator ? { creator_address: creator } : {}),
+      ...metadata,
+      last_seen_at: new Date().toISOString(),
+      raw_graduation: graduation,
+      raw_registration: registration ?? null,
+    }];
+  });
+
+  if (!rows.length) return 0;
+  const { error } = await db.from("bitquery_migration_test").upsert(rows, { onConflict: "token_address" });
+  if (error) throw new Error(`Save Bitquery migrations: ${error.message}`);
+  return rows.length;
+}
+
+async function saveLaunchMetadata(calls: LaunchCall[]) {
+  const seen = new Set<string>();
+  const launchRows: Array<Record<string, unknown>> = [];
+
+  for (const call of calls) {
+    const decoded = decodeLaunch(call);
+    if (!decoded || seen.has(decoded.tokenAddress)) continue;
+    seen.add(decoded.tokenAddress);
+    launchRows.push({
+      token_address: decoded.tokenAddress,
+      launched_at: call.Block?.Time ?? null,
+      name: decoded.name,
+      symbol: decoded.symbol,
+      image_url: decoded.imageUrl,
+      description: decoded.description,
+      twitter_url: decoded.twitterUrl,
+      telegram_url: decoded.telegramUrl,
+      discord_url: decoded.discordUrl,
+      website_url: decoded.websiteUrl,
+      farcaster_url: decoded.farcasterUrl,
+      creator_address: decoded.creatorFeeRecipient,
+      creator_tax_bps: decoded.creatorTaxBps,
+      buyback_enabled: decoded.buybackEnabled,
+      raw_call: call,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  if (!launchRows.length) return 0;
+  const { error } = await db.from("bitquery_launch_metadata_test")
+    .upsert(launchRows, { onConflict: "token_address" });
+  if (error) throw new Error(`Save Bitquery launch metadata: ${error.message}`);
+  return launchRows.length;
+}
+
+// ---------------------------------------------------------------------------
+// Stages
+// ---------------------------------------------------------------------------
+
+async function collectMigrations(since: Date, till: Date) {
+  const [graduations, registrations] = await Promise.all([
+    fetchAllPages<GraduationEvent>(
+      (limit, offset) => migrationQuery(since.toISOString(), till.toISOString(), limit, offset),
+      (data) => (data as MigrationData).EVM?.Graduations ?? [],
+      { label: "PONS graduations" },
+    ),
+    fetchAllPages<RegistrationEvent>(
+      (limit, offset) => registrationQuery(since.toISOString(), till.toISOString(), limit, offset),
+      (data) => (data as MigrationData).EVM?.Registrations ?? [],
+      { label: "PONS registrations" },
+    ),
+  ]);
+  return saveMigrations(graduations, registrations);
+}
+
+async function collectLaunchMetadata(since: Date, till: Date) {
+  const calls = await fetchAllPages<LaunchCall>(
+    (limit, offset) => launchMetadataQuery(since.toISOString(), till.toISOString(), limit, offset),
+    (data) => (data as LaunchData).EVM?.Launches ?? [],
+    { label: "PONS launches" },
+  );
+  return saveLaunchMetadata(calls);
+}
+
+async function trackedTokens(limit: number, order: "trade_flow_updated_at") {
+  const cutoff = new Date(Date.now() - TRACKING_WINDOW_MS).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,transaction_hash,token_supply")
+    .gte("migrated_at", cutoff)
+    .order(order, { ascending: true, nullsFirst: true })
+    .order("migrated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Choose tracked tokens: ${error.message}`);
+  return (data ?? []) as TrackedToken[];
+}
+
+/**
+ * Current price and cumulative trade flow for tokens inside the tracking window.
+ * Peaks are sent as observed rather than maxed in memory: the database keeps the
+ * higher of the two, so a stale read here can no longer erase a recorded spike.
+ */
+async function updateLiveMetrics(candidates: TrackedToken[]) {
+  if (!candidates.length) return;
+  const trading = (await queryBitquery<LiveMarketData>(liveMarketQuery(candidates))).Trading ?? {};
+  const updatedAt = new Date().toISOString();
+
+  const updates = candidates.map((candidate, index) => {
+    const last = ((trading[`Token${index}`] ?? []) as MarketRow[])[0];
+    const flow = ((trading[`Flow${index}`] ?? []) as TradeFlowRow[])[0];
+    const supply = number(last?.Supply?.CirculatingSupply) ?? supplyOf(candidate);
+    const currentPrice = number(last?.Price?.Ohlc?.Close);
+    const latestHigh = number(last?.Price?.Ohlc?.High);
+    const buys = Math.round(number(flow?.buys) ?? 0);
+    const sells = Math.round(number(flow?.sells) ?? 0);
+    const buyVolume = number(flow?.buyVolume);
+    const sellVolume = number(flow?.sellVolume);
+
+    return {
+      token_address: candidate.token_address,
+      migrated_at: candidate.migrated_at,
+      transaction_hash: candidate.transaction_hash,
+      token_supply: supply,
+      ...(last?.Token?.Name ? { name: last.Token.Name } : {}),
+      ...(last?.Token?.Symbol ? { symbol: last.Token.Symbol } : {}),
+      ...(currentPrice == null ? {} : {
+        current_price_usd: currentPrice,
+        current_market_cap_usd: currentPrice * supply,
+        price_observed_at: last?.Block.Time ?? updatedAt,
+      }),
+      ...(latestHigh == null ? {} : {
+        ath_price_usd: latestHigh,
+        ath_market_cap_usd: latestHigh * supply,
+      }),
+      volume_usd: (buyVolume ?? 0) + (sellVolume ?? 0),
+      trade_count: buys + sells,
+      buys,
+      sells,
+      buy_volume_usd: buyVolume,
+      sell_volume_usd: sellVolume,
+      unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
+      trade_flow_updated_at: updatedAt,
+      ...(last?.Block.Time ? { latest_trade_at: last.Block.Time } : {}),
+    };
+  });
+
+  const { error } = await db.from("bitquery_migration_test")
+    .upsert(updates, { onConflict: "token_address" });
+  if (error) throw new Error(`Save live Bitquery metrics batch: ${error.message}`);
+}
+
+async function historyCandidates(limit: number) {
+  const cutoff = new Date(Date.now() - Math.max(TRACKING_WINDOW_MS, BACKFILL_WINDOW_MS)).toISOString();
+  const { data, error } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,transaction_hash,token_supply,migration_price_attempts")
+    .gte("migrated_at", cutoff)
+    .is("migration_price_usd", null)
+    .lt("migration_price_attempts", MAX_HISTORY_ATTEMPTS)
+    .order("migration_price_checked_at", { ascending: true, nullsFirst: true })
+    .order("migrated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Choose history candidates: ${error.message}`);
+  return (data ?? []) as HistoryCandidate[];
+}
+
+/**
+ * Measures a token's graduation price and the peak it reached, once. The
+ * graduation price is historical and never changes, so the database freezes it
+ * after the first successful measurement and this never runs for that token
+ * again. Everything after the measurement is carried forward by the live stages.
+ */
+async function measureHistory(candidate: HistoryCandidate) {
+  const since = floorToMinute(candidate.migrated_at).toISOString();
+  const rows = await fetchAllPages<MarketRow>(
+    (limit, offset) => historyQuery(candidate.token_address, since, limit, offset),
+    (data) => (data as HistoryData).Trading?.Tokens ?? [],
+    { pageSize: 1000, maxPages: 10, label: `history for ${candidate.token_address}` },
+  );
+
+  const checkedAt = new Date().toISOString();
+  const attempts = (candidate.migration_price_attempts ?? 0) + 1;
+
+  if (!rows.length) {
+    // No trades yet. Record the attempt so a token that never trades stops being
+    // retried once it reaches the attempt ceiling.
+    const { error } = await db.from("bitquery_migration_test").update({
+      migration_price_checked_at: checkedAt,
+      migration_price_attempts: attempts,
+      metrics_updated_at: checkedAt,
+    }).eq("token_address", candidate.token_address);
+    if (error) throw new Error(`Mark empty Bitquery history: ${error.message}`);
+    return;
+  }
+
+  const first = rows[0]!;
+  const last = rows[rows.length - 1]!;
+  const migrationPrice = number(first.Price?.Ohlc?.Open);
+  const currentPrice = number(last.Price?.Ohlc?.Close);
+  const highs = rows.map((row) => number(row.Price?.Ohlc?.High)).filter((value): value is number => value != null);
+  const athPrice = highs.length ? Math.max(...highs) : null;
+  // One supply for every market cap on the row, so the peak multiple is a ratio
+  // of like for like even if Bitquery reports a different supply later.
+  const supply = number(first.Supply?.CirculatingSupply) ?? supplyOf(candidate);
+  const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
+  const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
+  const name = last.Token?.Name ?? first.Token?.Name;
+  const symbol = last.Token?.Symbol ?? first.Token?.Symbol;
+
+  const { error } = await db.from("bitquery_migration_test").update({
+    ...(name ? { name } : {}),
+    ...(symbol ? { symbol } : {}),
+    token_supply: supply,
+    ...(migrationPrice == null ? {} : {
+      migration_price_usd: migrationPrice,
+      migration_market_cap_usd: migrationPrice * supply,
+      migration_price_source: "graduation_candle_open",
+    }),
+    ...(currentPrice == null ? {} : {
+      current_price_usd: currentPrice,
+      current_market_cap_usd: currentPrice * supply,
+      price_observed_at: last.Block.Time,
+    }),
+    ...(athPrice == null ? {} : {
+      ath_price_usd: athPrice,
+      ath_market_cap_usd: athPrice * supply,
+    }),
+    volume_usd: volumeUsd,
+    trade_count: Math.round(tradeCount),
+    latest_trade_at: last.Block.Time,
+    migration_price_checked_at: checkedAt,
+    migration_price_attempts: attempts,
+    metrics_updated_at: checkedAt,
+  }).eq("token_address", candidate.token_address);
+  if (error) throw new Error(`Save Bitquery history: ${error.message}`);
+}
+
+// ---------------------------------------------------------------------------
+// Live price stream
+// ---------------------------------------------------------------------------
+
+async function streamLivePricesOnce(candidates: Map<string, TrackedToken>) {
   if (!candidates.size) {
     await delay(5_000);
     return;
   }
+
   const token = await getAccessToken();
   const pending = new Map<string, Record<string, unknown>>();
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -430,7 +692,11 @@ async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate
       `wss://streaming.bitquery.io/graphql?token=${encodeURIComponent(token)}`,
       "graphql-ws",
     );
+    // Re-subscribe periodically so newly migrated tokens join the stream.
     const refreshTimer = setTimeout(() => socket.close(1000, "refresh token list"), 5 * 60_000);
+    const shutdownTimer = setInterval(() => {
+      if (!running) socket.close(1000, "shutting down");
+    }, 1_000);
     let acknowledged = false;
     let finished = false;
 
@@ -438,7 +704,10 @@ async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate
       if (finished) return;
       finished = true;
       clearTimeout(refreshTimer);
+      clearInterval(shutdownTimer);
       if (flushTimer) clearTimeout(flushTimer);
+      // Always drain what was received before settling, so a reconnect does not
+      // discard prices that arrived just before the socket closed.
       void flush().then(() => error ? reject(error) : resolve()).catch(reject);
     };
 
@@ -460,15 +729,15 @@ async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate
         if (message.payload?.errors?.length) {
           throw new Error(message.payload.errors.map((error) => error.message ?? "Live price stream error").join("; "));
         }
+
         for (const row of message.payload?.data?.Trading?.Pairs ?? []) {
           const address = row.Token?.Address?.toLowerCase();
           const candidate = address ? candidates.get(address) : null;
           const currentPrice = number(row.Price?.Ohlc?.Close);
           if (!address || !candidate || currentPrice == null) continue;
-          const latestHigh = number(row.Price?.Ohlc?.High) ?? currentPrice;
-          const existing = pending.get(address);
-          const storedAth = number(existing?.ath_price_usd) ?? number(candidate.ath_price_usd) ?? 0;
-          const athPrice = Math.max(storedAth, latestHigh);
+          const supply = supplyOf(candidate);
+          const observedHigh = number(row.Price?.Ohlc?.High) ?? currentPrice;
+          const observedAt = row.Block?.Time ?? new Date().toISOString();
           pending.set(address, {
             token_address: address,
             migrated_at: candidate.migrated_at,
@@ -476,15 +745,21 @@ async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate
             ...(row.Token?.Name ? { name: row.Token.Name } : {}),
             ...(row.Token?.Symbol ? { symbol: row.Token.Symbol } : {}),
             current_price_usd: currentPrice,
-            current_market_cap_usd: currentPrice * PONS_SUPPLY,
-            ath_price_usd: athPrice,
-            ath_market_cap_usd: athPrice * PONS_SUPPLY,
+            current_market_cap_usd: currentPrice * supply,
+            // Sent as observed. The database keeps whichever peak is higher.
+            ath_price_usd: observedHigh,
+            ath_market_cap_usd: observedHigh * supply,
+            price_observed_at: observedAt,
             live_price_updated_at: new Date().toISOString(),
-            ...(row.Block?.Time ? { latest_trade_at: row.Block.Time } : {}),
+            latest_trade_at: observedAt,
           });
         }
+
         if (pending.size && !flushTimer) {
-          flushTimer = setTimeout(() => void flush().catch((error) => console.error("Bitquery live price flush failed", error)), 1_000);
+          flushTimer = setTimeout(
+            () => void flush().catch((error) => console.error("Bitquery live price flush failed", error)),
+            1_000,
+          );
         }
       } catch (error) {
         socket.close(1011, "stream processing error");
@@ -497,339 +772,155 @@ async function streamLivePricesOnce(candidates: Map<string, LiveMetricsCandidate
 }
 
 async function runLivePriceStream() {
-  while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
+  while (running) {
     try {
-      await streamLivePricesOnce(await livePriceCandidates());
+      const tracked = await trackedTokens(500, "trade_flow_updated_at");
+      await streamLivePricesOnce(new Map(tracked.map((row) => [row.token_address, row])));
     } catch (error) {
       console.error("Bitquery live price stream failed", error);
-      accessToken = null;
+      if (error instanceof BitqueryAuthError) invalidateAccessToken();
       await delay(5_000);
     }
   }
 }
 
-async function setStatus(status: "connecting" | "connected" | "error", message: string) {
-  const { error } = await db.from("stream_status").upsert({
-    feed: "bitquery_migration_test",
-    status,
-    message,
-    last_seen_at: new Date().toISOString(),
-  }, { onConflict: "feed" });
-  if (error) throw new Error(`Save Bitquery test status: ${error.message}`);
-}
+// ---------------------------------------------------------------------------
+// Runner
+// ---------------------------------------------------------------------------
 
-async function saveMigrations(payload: MigrationPayload) {
-  const graduations = payload.data?.EVM?.Graduations ?? [];
-  const registrations = new Map<string, RegistrationEvent>();
-  for (const row of payload.data?.EVM?.Registrations ?? []) {
-    const decoded = decodeRegistration(row.LogHeader.Data);
-    if (decoded.tokenAddress) registrations.set(decoded.tokenAddress, row);
-  }
-  const launches = new Map<string, ReturnType<typeof decodeLaunch>>();
-  const graduationAddresses = graduations
-    .map((graduation) => String(argumentMap(graduation.Arguments).token ?? "").toLowerCase())
-    .filter((address) => /^0x[0-9a-f]{40}$/.test(address));
-  if (graduationAddresses.length) {
-    const { data, error } = await db.from("bitquery_launch_metadata_test")
-      .select("*")
-      .in("token_address", graduationAddresses);
-    if (error) throw new Error(`Read Bitquery launch metadata: ${error.message}`);
-    for (const row of data ?? []) {
-      launches.set(row.token_address, {
-        tokenAddress: row.token_address,
-        name: row.name,
-        symbol: row.symbol,
-        imageUrl: row.image_url,
-        description: row.description,
-        twitterUrl: row.twitter_url,
-        telegramUrl: row.telegram_url,
-        discordUrl: row.discord_url,
-        websiteUrl: row.website_url,
-        farcasterUrl: row.farcaster_url,
-        creatorFeeRecipient: row.creator_address,
-        creatorTaxBps: row.creator_tax_bps,
-        buybackEnabled: row.buyback_enabled,
-      });
-    }
-  }
-
-  const rows = graduations.flatMap((graduation) => {
-    const args = argumentMap(graduation.Arguments);
-    const tokenAddress = String(args.token ?? "").toLowerCase();
-    if (!/^0x[0-9a-f]{40}$/.test(tokenAddress)) return [];
-    const registration = registrations.get(tokenAddress);
-    const decoded = registration ? decodeRegistration(registration.LogHeader.Data) : null;
-    const launch = launches.get(tokenAddress);
-    const metadata = launch ? {
-      name: launch.name,
-      symbol: launch.symbol,
-      image_url: launch.imageUrl,
-      description: launch.description,
-      twitter_url: launch.twitterUrl,
-      telegram_url: launch.telegramUrl,
-      discord_url: launch.discordUrl,
-      website_url: launch.websiteUrl,
-      farcaster_url: launch.farcasterUrl,
-      creator_tax_bps: launch.creatorTaxBps,
-      buyback_enabled: launch.buybackEnabled,
-      metadata_updated_at: new Date().toISOString(),
-      metadata_source: "bitquery_launch_call",
-    } : {};
-    const creator = decoded?.creatorAddress ?? launch?.creatorFeeRecipient;
-    return [{
-      token_address: tokenAddress,
-      migrated_at: graduation.Block.Time,
-      block_number: graduation.Block.Number ?? registration?.Block.Number ?? null,
-      transaction_hash: graduation.Transaction.Hash.toLowerCase(),
-      position_id: args.positionId == null ? null : String(args.positionId),
-      token_amount_raw: args.tokenAmount == null ? null : String(args.tokenAmount),
-      pair_token_amount_raw: args.pairTokenAmount == null ? null : String(args.pairTokenAmount),
-      quote_token_address: decoded?.quoteTokenAddress ?? null,
-      ...(creator ? { creator_address: creator } : {}),
-      ...metadata,
-      last_seen_at: new Date().toISOString(),
-      raw_graduation: graduation,
-      raw_registration: registration ?? null,
-    }];
-  });
-  if (!rows.length) return 0;
-  const { error } = await db.from("bitquery_migration_test").upsert(rows, { onConflict: "token_address" });
-  if (error) throw new Error(`Save Bitquery migrations: ${error.message}`);
-  return rows.length;
-}
-
-async function saveLaunchMetadata(payload: LaunchPayload) {
-  const launchRows: Array<Record<string, unknown>> = [];
-  for (const call of payload.data?.EVM?.Launches ?? []) {
-    const decoded = decodeLaunch(call);
-    if (!decoded) continue;
-    launchRows.push({
-      token_address: decoded.tokenAddress,
-      launched_at: call.Block?.Time ?? null,
-      name: decoded.name,
-      symbol: decoded.symbol,
-      image_url: decoded.imageUrl,
-      description: decoded.description,
-      twitter_url: decoded.twitterUrl,
-      telegram_url: decoded.telegramUrl,
-      discord_url: decoded.discordUrl,
-      website_url: decoded.websiteUrl,
-      farcaster_url: decoded.farcasterUrl,
-      creator_address: decoded.creatorFeeRecipient,
-      creator_tax_bps: decoded.creatorTaxBps,
-      buyback_enabled: decoded.buybackEnabled,
-      raw_call: call,
-      updated_at: new Date().toISOString(),
-    });
-  }
-  if (launchRows.length) {
-    const { error } = await db.from("bitquery_launch_metadata_test")
-      .upsert(launchRows, { onConflict: "token_address" });
-    if (error) throw new Error(`Save Bitquery launch metadata: ${error.message}`);
-  }
-  return launchRows.length;
-}
-
-async function nextMetricsCandidate() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,metrics_updated_at,metadata_updated_at,trade_flow_updated_at")
-    .gte("migrated_at", cutoff)
-    .order("metrics_updated_at", { ascending: true, nullsFirst: true })
-    .order("migrated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(`Choose Bitquery market candidate: ${error.message}`);
-  return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
-}
-
-async function nextLiveMetricsCandidates(limit = 75) {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address,migrated_at,transaction_hash,ath_price_usd")
-    .gte("migrated_at", cutoff)
-    .order("trade_flow_updated_at", { ascending: true, nullsFirst: true })
-    .order("migrated_at", { ascending: false })
-    .limit(limit);
-  if (error) throw new Error(`Choose live Bitquery market candidates: ${error.message}`);
-  return (data ?? []) as LiveMetricsCandidate[];
-}
-
-async function updateLiveMetrics(candidates: LiveMetricsCandidate[]) {
-  if (!candidates.length) return;
-  const payload = await queryBitquery<LiveMarketPayload>(liveMarketQuery(candidates));
-  const trading = payload.data?.Trading ?? {};
-  const updatedAt = new Date().toISOString();
-
-  const updates = candidates.map((candidate, index) => {
-    const rows = (trading[`Token${index}`] ?? []) as MarketRow[];
-    const flowRows = (trading[`Flow${index}`] ?? []) as TradeFlowRow[];
-    const last = rows[0];
-    const flow = flowRows[0];
-    const currentPrice = number(last?.Price?.Ohlc?.Close);
-    const latestHigh = number(last?.Price?.Ohlc?.High);
-    const storedAth = number(candidate.ath_price_usd);
-    const athPrice = latestHigh == null ? storedAth : Math.max(storedAth ?? 0, latestHigh);
-    const buys = Math.round(number(flow?.buys) ?? 0);
-    const sells = Math.round(number(flow?.sells) ?? 0);
-    const buyVolume = number(flow?.buyVolume);
-    const sellVolume = number(flow?.sellVolume);
-    const tokenName = last?.Token?.Name;
-    const tokenSymbol = last?.Token?.Symbol;
-
-    return {
-      token_address: candidate.token_address,
-      migrated_at: candidate.migrated_at,
-      transaction_hash: candidate.transaction_hash,
-      ...(tokenName ? { name: tokenName } : {}),
-      ...(tokenSymbol ? { symbol: tokenSymbol } : {}),
-      ...(currentPrice == null ? {} : {
-        current_price_usd: currentPrice,
-        current_market_cap_usd: currentPrice * PONS_SUPPLY,
-      }),
-      ...(athPrice == null ? {} : {
-        ath_price_usd: athPrice,
-        ath_market_cap_usd: athPrice * PONS_SUPPLY,
-      }),
-      volume_usd: (buyVolume ?? 0) + (sellVolume ?? 0),
-      trade_count: buys + sells,
-      buys,
-      sells,
-      buy_volume_usd: buyVolume,
-      sell_volume_usd: sellVolume,
-      unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
-      trade_flow_updated_at: updatedAt,
-      ...(last?.Block.Time ? { latest_trade_at: last.Block.Time } : {}),
-    };
-  });
-  const { error } = await db.from("bitquery_migration_test")
-    .upsert(updates, { onConflict: "token_address" });
-  if (error) throw new Error(`Save live Bitquery metrics batch: ${error.message}`);
-}
-
-async function updateMetrics(candidate: { token_address: string; migrated_at: string; metadata_updated_at: string | null }) {
-  const payload = await queryBitquery<MarketPayload>(marketQuery(candidate.token_address, candidate.migrated_at));
-  const rows = payload.data?.Trading?.Tokens ?? [];
-  if (!rows.length) {
-    const { error } = await db.from("bitquery_migration_test").update({
-      metrics_updated_at: new Date().toISOString(),
-      raw_market: payload,
-    }).eq("token_address", candidate.token_address);
-    if (error) throw new Error(`Mark empty Bitquery metrics: ${error.message}`);
-    return;
-  }
-
-  const first = rows[0];
-  const last = rows[rows.length - 1];
-  const migrationPrice = number(first.Price?.Ohlc?.Open);
-  const currentPrice = number(last.Price?.Ohlc?.Close);
-  const highs = rows.map((row) => number(row.Price?.Ohlc?.High)).filter((value): value is number => value != null);
-  const athPrice = highs.length ? Math.max(...highs) : null;
-  const volumeUsd = rows.reduce((total, row) => total + (number(row.Volume?.Usd) ?? 0), 0);
-  const tradeCount = rows.reduce((total, row) => total + (number(row.trades) ?? 0), 0);
-  const flow = payload.data?.Trading?.Flow?.[0];
-  const tokenName = last.Token?.Name ?? first.Token?.Name;
-  const tokenSymbol = last.Token?.Symbol ?? first.Token?.Symbol;
-  const { error } = await db.from("bitquery_migration_test").update({
-    ...(tokenName ? { name: tokenName } : {}),
-    ...(tokenSymbol ? { symbol: tokenSymbol } : {}),
-    migration_price_usd: migrationPrice,
-    current_price_usd: currentPrice,
-    ath_price_usd: athPrice,
-    migration_market_cap_usd: migrationPrice == null ? null : migrationPrice * PONS_SUPPLY,
-    current_market_cap_usd: currentPrice == null ? null : currentPrice * PONS_SUPPLY,
-    ath_market_cap_usd: athPrice == null ? null : athPrice * PONS_SUPPLY,
-    volume_usd: volumeUsd,
-    trade_count: Math.round(tradeCount),
-    buys: Math.round(number(flow?.buys) ?? 0),
-    sells: Math.round(number(flow?.sells) ?? 0),
-    buy_volume_usd: number(flow?.buyVolume),
-    sell_volume_usd: number(flow?.sellVolume),
-    unique_traders: Math.round(number(flow?.uniqueTraders) ?? 0),
-    trade_flow_updated_at: new Date().toISOString(),
-    latest_trade_at: last.Block.Time,
-    metrics_updated_at: new Date().toISOString(),
-    raw_market: payload,
-  }).eq("token_address", candidate.token_address);
-  if (error) throw new Error(`Save Bitquery market metrics: ${error.message}`);
-}
+type Stage = {
+  name: string;
+  intervalMs: number;
+  run: () => Promise<void>;
+  nextRunAt: number;
+  failures: number;
+};
 
 export async function runBitqueryMigrationTest() {
   if (!config.BITQUERY_MIGRATION_TEST_ENABLED) return;
+
   void runLivePriceStream();
-  await setStatus("connecting", "Backfilling PONS migrations from the last 24 hours");
-  let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
-  // Keep recent launches current independently from the deeper recovery pass.
-  // A single old-to-new cursor can leave new token metadata waiting for hours.
-  let launchCursor = new Date(Date.now() - 60 * 60_000);
-  let launchBackfillCursor = new Date(Date.now() - 7 * 24 * 60 * 60_000);
-  let nextMigrationPoll = 0;
-  let nextLaunchPoll = 0;
-  let nextLaunchBackfillPoll = 0;
-  let nextMetadataSync = 0;
-  let nextMetricsPoll = 0;
-  let nextLiveMetricsPoll = 0;
 
-  while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
-    const now = Date.now();
-    try {
-      if (now >= nextMigrationPoll) {
+  const startedAt = Date.now();
+  await setStatus("connecting", `Backfilling PONS migrations from the last ${config.BITQUERY_BACKFILL_HOURS} hours`);
+
+  // Seed the window once, paging through the whole history rather than relying
+  // on a single capped request, then let the forward cursor take over.
+  let migrationCursor = new Date(startedAt - BACKFILL_WINDOW_MS);
+  let launchCursor = new Date(startedAt - 60 * 60_000);
+  let launchBackfillCursor = new Date(startedAt - BACKFILL_WINDOW_MS);
+
+  const stages: Stage[] = [
+    {
+      name: "migrations",
+      intervalMs: config.BITQUERY_MIGRATION_POLL_MS,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
         const till = new Date();
-        const payload = await queryBitquery<MigrationPayload>(migrationQuery(migrationCursor.toISOString(), till.toISOString()));
-        const count = await saveMigrations(payload);
+        const count = await collectMigrations(migrationCursor, till);
+        // Overlap by a minute so an event landing on the boundary is not missed.
         migrationCursor = new Date(till.getTime() - 60_000);
-        nextMigrationPoll = Date.now() + config.BITQUERY_MIGRATION_POLL_MS;
         await setStatus("connected", `${count} migration events received in latest scan`);
-      }
-
-      if (now >= nextLaunchPoll) {
-        const current = new Date();
-        const payload = await queryBitquery<LaunchPayload>(launchMetadataQuery(launchCursor.toISOString(), current.toISOString()));
-        await saveLaunchMetadata(payload);
-        launchCursor = new Date(current.getTime() - 60_000);
-        if (now >= nextMetadataSync) {
-          const { error } = await db.rpc("sync_bitquery_migration_metadata");
-          if (error) throw new Error(`Sync Bitquery migration metadata: ${error.message}`);
-          nextMetadataSync = Date.now() + 15_000;
+      },
+    },
+    {
+      name: "launch-metadata",
+      intervalMs: 15_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const till = new Date();
+        await collectLaunchMetadata(launchCursor, till);
+        launchCursor = new Date(till.getTime() - 60_000);
+      },
+    },
+    {
+      name: "launch-backfill",
+      intervalMs: 10_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const recentCutoff = new Date(Date.now() - 60 * 60_000);
+        if (launchBackfillCursor >= recentCutoff) return;
+        const till = new Date(Math.min(recentCutoff.getTime(), launchBackfillCursor.getTime() + 30 * 60_000));
+        await collectLaunchMetadata(launchBackfillCursor, till);
+        launchBackfillCursor = till;
+      },
+    },
+    {
+      name: "metadata-sync",
+      intervalMs: 15_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const { error } = await db.rpc("sync_bitquery_migration_metadata");
+        if (error) throw new Error(`Sync Bitquery migration metadata: ${error.message}`);
+      },
+    },
+    {
+      name: "live-metrics",
+      intervalMs: config.BITQUERY_METRICS_POLL_MS,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const candidates = await trackedTokens(150, "trade_flow_updated_at");
+        const batches = Array.from(
+          { length: Math.ceil(candidates.length / 25) },
+          (_, index) => candidates.slice(index * 25, (index + 1) * 25),
+        );
+        const results = await mapWithConcurrency(batches, 3, updateLiveMetrics);
+        const failed = results.filter((result) => result.status === "rejected");
+        // One bad batch must not discard the batches that succeeded.
+        if (failed.length === batches.length && batches.length > 0) {
+          throw (failed[0] as PromiseRejectedResult).reason;
         }
-        nextLaunchPoll = Date.now() + 15_000;
-      }
-
-      if (now >= nextLaunchBackfillPoll) {
-        const current = new Date();
-        const recentCutoff = new Date(current.getTime() - 60 * 60_000);
-        if (launchBackfillCursor < recentCutoff) {
-          const till = new Date(Math.min(recentCutoff.getTime(), launchBackfillCursor.getTime() + 30 * 60_000));
-          const payload = await queryBitquery<LaunchPayload>(launchMetadataQuery(launchBackfillCursor.toISOString(), till.toISOString()));
-          await saveLaunchMetadata(payload);
-          launchBackfillCursor = till;
+        for (const failure of failed) {
+          console.error("Live metrics batch failed", (failure as PromiseRejectedResult).reason);
         }
-        nextLaunchBackfillPoll = Date.now() + 10_000;
-      }
+      },
+    },
+    {
+      name: "history",
+      intervalMs: 2_000,
+      nextRunAt: 0,
+      failures: 0,
+      run: async () => {
+        const candidates = await historyCandidates(12);
+        if (!candidates.length) return;
+        const results = await mapWithConcurrency(candidates, 4, measureHistory);
+        for (const failure of results.filter((result) => result.status === "rejected")) {
+          console.error("History measurement failed", (failure as PromiseRejectedResult).reason);
+        }
+      },
+    },
+  ];
 
-      if (now >= nextLiveMetricsPoll) {
-        const candidates = await nextLiveMetricsCandidates();
-        const batches = Array.from({ length: Math.ceil(candidates.length / 25) }, (_, index) =>
-          candidates.slice(index * 25, (index + 1) * 25));
-        await Promise.all(batches.map((batch) => updateLiveMetrics(batch)));
-        nextLiveMetricsPoll = Date.now() + config.BITQUERY_METRICS_POLL_MS;
-      }
+  while (running) {
+    const now = Date.now();
 
-      if (now >= nextMetricsPoll) {
-        const candidate = await nextMetricsCandidate();
-        if (candidate) await updateMetrics(candidate);
-        // Full post-migration history is much heavier than the live summary.
-        // Keep it off the critical path used by the dashboard columns.
-        nextMetricsPoll = Date.now() + Math.max(30_000, config.BITQUERY_METRICS_POLL_MS * 2);
+    for (const stage of stages) {
+      if (!running || now < stage.nextRunAt) continue;
+      try {
+        await stage.run();
+        stage.failures = 0;
+        stage.nextRunAt = Date.now() + stage.intervalMs;
+      } catch (error) {
+        // Stages are independent. A failure here must not stop the others:
+        // losing metadata sync should never stop graduations being recorded.
+        stage.failures += 1;
+        const backoff = Math.min(stage.intervalMs * 2 ** stage.failures, 5 * 60_000);
+        stage.nextRunAt = Date.now() + backoff;
+        console.error(`Bitquery stage "${stage.name}" failed (${stage.failures} in a row, retrying in ${Math.round(backoff / 1000)}s)`, error);
+        if (error instanceof BitqueryAuthError) invalidateAccessToken();
+        if (stage.name === "migrations") {
+          await setStatus("error", error instanceof Error ? error.message : String(error)).catch(() => undefined);
+        }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error("Bitquery migration test failed", error);
-      await setStatus("error", message).catch(() => undefined);
-      accessToken = null;
-      await delay(10_000);
-      nextMigrationPoll = 0;
     }
-    await delay(500);
+
+    await delay(250);
   }
+
+  console.log("Bitquery migration recorder stopped cleanly");
 }

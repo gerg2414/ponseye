@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getBitqueryMigrationTest } from "../../../lib/database";
+import { getBitqueryMigrationTest, type BitqueryMigrationSort } from "../../../lib/database";
 import { AutoRefresh } from "../../auto-refresh";
 import { LabHeader } from "../lab-header";
 import { DatabaseCopyAddress } from "../database/database-copy-address";
@@ -10,11 +10,14 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Bitquery Migration Test | PonsEye Lab",
-  description: "A separate 24 hour test of Bitquery PONS migration events and market data.",
+  description: "A rolling window of Bitquery PONS migration events and post-migration market data.",
 };
 
 function money(value: number | null) {
-  if (value == null || value <= 0) return "Pending";
+  // Only a missing value is pending. A real zero is a measurement, not an
+  // absence, and hiding it makes an untraded token look unrecorded.
+  if (value == null) return "Pending";
+  if (value === 0) return "$0";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -41,45 +44,46 @@ function shortAddress(value: string | null) {
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
 
-function multiple(entry: number | null, peak: number | null) {
-  if (!entry || !peak) return "Pending";
-  return `${(peak / entry).toFixed(2)}×`;
+function multiple(value: number | null) {
+  if (value == null) return "Pending";
+  return `${value.toFixed(2)}×`;
 }
 
-type SortKey = "newest" | "ath" | "multiple" | "current" | "migration" | "volume" | "trades" | "buys" | "sells";
+const SORT_KEYS = [
+  "newest", "ath", "multiple", "current", "migration", "volume", "trades", "buys", "sells",
+] as const satisfies readonly BitqueryMigrationSort[];
+
+const WINDOW_OPTIONS = [24, 48, 72] as const;
+
+/** Query strings are user input: fall back rather than letting NaN through. */
+function positiveNumber(value: string, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
 
 export default async function BitqueryMigrationTestPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { migrations, status, metricsReady } = await getBitqueryMigrationTest();
-  const lastMigration = migrations[0]?.migrated_at ?? null;
   const params = await searchParams;
   const value = (key: string) => typeof params[key] === "string" ? params[key] : "";
-  const sort = (value("sort") || "newest") as SortKey;
-  const minAth = Number(value("minAth") || 0);
-  const minMultiple = Number(value("minMultiple") || 0);
+  const requestedSort = value("sort") as BitqueryMigrationSort;
+  const sort: BitqueryMigrationSort = SORT_KEYS.includes(requestedSort) ? requestedSort : "newest";
+  const requestedWindow = positiveNumber(value("window"), 48);
+  const windowHours = (WINDOW_OPTIONS as readonly number[]).includes(requestedWindow) ? requestedWindow : 48;
+  const minAth = positiveNumber(value("minAth"));
+  const minMultiple = positiveNumber(value("minMultiple"));
   const readyOnly = value("ready") === "1";
-  const shown = migrations.filter((token) => {
-    const peakMultiple = token.migration_market_cap_usd && token.ath_market_cap_usd
-      ? token.ath_market_cap_usd / token.migration_market_cap_usd
-      : 0;
-    if (readyOnly && !token.metrics_updated_at) return false;
-    if (sort === "ath" && !token.ath_market_cap_usd) return false;
-    if ((token.ath_market_cap_usd ?? 0) < minAth) return false;
-    return peakMultiple >= minMultiple;
-  }).sort((a, b) => {
-    const aMultiple = a.migration_market_cap_usd && a.ath_market_cap_usd ? a.ath_market_cap_usd / a.migration_market_cap_usd : 0;
-    const bMultiple = b.migration_market_cap_usd && b.ath_market_cap_usd ? b.ath_market_cap_usd / b.migration_market_cap_usd : 0;
-    const fields: Record<Exclude<SortKey, "newest" | "multiple">, keyof typeof a> = {
-      ath: "ath_market_cap_usd", current: "current_market_cap_usd", migration: "migration_market_cap_usd",
-      volume: "volume_usd", trades: "trade_count", buys: "buys", sells: "sells",
-    };
-    if (sort === "newest") return Date.parse(b.migrated_at) - Date.parse(a.migrated_at);
-    if (sort === "multiple") return bMultiple - aMultiple;
-    return Number(b[fields[sort]] ?? 0) - Number(a[fields[sort]] ?? 0);
-  });
+
+  const { migrations: shown, status, metricsReady, totalInWindow, filteredCount } =
+    await getBitqueryMigrationTest({ windowHours, sort, minAth, minMultiple, readyOnly, limit: 500 });
+  const lastMigration = shown.length && sort === "newest"
+    ? shown[0].migrated_at
+    : shown.reduce<string | null>(
+      (latest, row) => !latest || row.migrated_at > latest ? row.migrated_at : latest,
+      null,
+    );
 
   return (
     <main className="databasePage bitqueryTestPage">
@@ -90,7 +94,7 @@ export default async function BitqueryMigrationTestPage({
         <div>
           <small>Isolated source test</small>
           <h1>Bitquery migrations</h1>
-          <p>Only PONS pool graduation events from the last 24 hours. No launch feed or bonding curve trades are collected.</p>
+          <p>PONS pool graduation events from the last {windowHours} hours, with post-migration market data. No launch feed or bonding curve trades are collected.</p>
         </div>
         <span className={status?.status === "connected" ? "connected" : ""}>
           <i />{status?.status ?? "Waiting"}
@@ -98,18 +102,21 @@ export default async function BitqueryMigrationTestPage({
       </section>
 
       <section className="databaseStats bitqueryTestStats">
-        <article><small>Migrations</small><strong>{migrations.length}</strong></article>
-        <article><small>Market data ready</small><strong>{metricsReady}</strong></article>
+        <article><small>Migrations</small><strong>{totalInWindow.toLocaleString("en-GB")}</strong></article>
+        <article><small>Market data ready</small><strong>{metricsReady.toLocaleString("en-GB")}</strong></article>
         <article><small>Latest migration</small><strong>{lastMigration ? time(lastMigration).replace(/^\d{2} \w{3},? /, "") : "Waiting"}</strong></article>
         <article><small>Listener</small><strong>{status?.status === "connected" ? "Live" : status?.status ?? "Waiting"}</strong></article>
       </section>
 
       <section className="databaseLedger bitqueryTestLedger">
         <header>
-          <div><small>Bitquery event rows</small><strong>{shown.length.toLocaleString("en-GB")} of {migrations.length.toLocaleString("en-GB")} migrations</strong></div>
+          <div><small>Bitquery event rows</small><strong>{shown.length.toLocaleString("en-GB")} shown of {filteredCount.toLocaleString("en-GB")} matching, {totalInWindow.toLocaleString("en-GB")} in window</strong></div>
           <span>{status?.message ?? "Waiting for the first Bitquery scan"}</span>
         </header>
         <form className="bitqueryFilters">
+          <label><span>Window</span><select name="window" defaultValue={String(windowHours)}>
+            {WINDOW_OPTIONS.map((hours) => <option key={hours} value={hours}>{hours}h</option>)}
+          </select></label>
           <label><span>Sort by</span><select name="sort" defaultValue={sort}>
             <option value="newest">Newest</option><option value="ath">Highest ATH</option><option value="multiple">Highest multiple</option>
             <option value="current">Highest current MC</option><option value="migration">Highest migration MC</option>
@@ -148,7 +155,7 @@ export default async function BitqueryMigrationTestPage({
                   <td><strong>{money(token.migration_market_cap_usd)}</strong></td>
                   <td><strong>{money(token.current_market_cap_usd)}</strong></td>
                   <td><strong className="peakValue">{money(token.ath_market_cap_usd)}</strong></td>
-                  <td><strong className="peakValue">{multiple(token.migration_market_cap_usd, token.ath_market_cap_usd)}</strong></td>
+                  <td><strong className="peakValue">{multiple(token.peak_multiple)}</strong></td>
                   <td>{money(token.volume_usd)}</td>
                   <td><strong className="buyValue">{token.buys.toLocaleString("en-GB")}</strong><small>{money(token.buy_volume_usd)}</small></td>
                   <td><strong className="sellValue">{token.sells.toLocaleString("en-GB")}</strong><small>{money(token.sell_volume_usd)}</small></td>
