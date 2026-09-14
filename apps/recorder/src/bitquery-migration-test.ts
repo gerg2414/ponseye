@@ -15,6 +15,7 @@ import { BACKFILL_WINDOW_MS, TRACKING_WINDOW_MS, config } from "./config.js";
 import { db } from "./db.js";
 import { curveCandidates, updateCurveStats } from "./curve.js";
 import { budgetLevel, getBitqueryUsage, stageAllowed, type BudgetLevel } from "./usage.js";
+import { refreshSnapshotOutcomes } from "./snapshots.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -1235,6 +1236,17 @@ export async function runBitqueryMigrationTest() {
         const tokens = await curveCandidates(400);
         if (!tokens.length) return;
         await updateCurveStats(tokens.slice(0, 3));
+      },
+    },
+    {
+      name: "snapshot-refresh",
+      // Outcomes only extend forwards, so this reads new candles only. Pure
+      // research upkeep, so it yields first when the budget tightens.
+      intervalMs: 10 * 60_000,
+      nextRunAt: 60_000,
+      failures: 0,
+      run: async () => {
+        await refreshSnapshotOutcomes({ limit: 60, log: () => undefined });
       },
     },
     {

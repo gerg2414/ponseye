@@ -111,6 +111,7 @@ export const STAGE_PRIORITY: Record<string, BudgetLevel> = {
   // Pure backfill, entirely deferrable.
   "launch-backfill": "full",
   "curve-stats": "full",
+  "snapshot-refresh": "full",
   history: "full",
 };
 

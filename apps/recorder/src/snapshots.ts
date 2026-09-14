@@ -145,9 +145,133 @@ export function buildSnapshots(token: SnapshotToken, candles: Candle[]) {
 
       observed_horizon_minutes: Math.round((lastAt - boundary) / 60_000),
       candles_seen: past.length,
+      last_candle_at: new Date(lastAt).toISOString(),
       computed_at: computedAt,
     }];
   });
+}
+
+type ExistingSnapshot = {
+  token_address: string;
+  age_seconds: number;
+  market_cap_usd: number | string | null;
+  future_high_market_cap_usd: number | string | null;
+  minutes_to_future_high: number | null;
+  market_cap_1h_later: number | string | null;
+  market_cap_6h_later: number | string | null;
+  market_cap_24h_later: number | string | null;
+  last_candle_at: string | null;
+};
+
+/**
+ * Extends the outcome half of existing snapshots using only candles recorded
+ * since the last pass.
+ *
+ * Every candle after the watermark lies after every age boundary already
+ * stored, so each one can only raise a future high, never change a feature.
+ * That makes the merge a maximum rather than a recomputation, and means the
+ * expensive full history never has to be read twice.
+ */
+export async function refreshSnapshotOutcomes({
+  log = console.log,
+  limit = 400,
+}: { log?: (message: string) => void; limit?: number } = {}) {
+  const ages = SNAPSHOT_AGES_SECONDS.length;
+
+  const { data, error } = await db.from("bitquery_migration_snapshots")
+    .select("token_address,age_seconds,market_cap_usd,future_high_market_cap_usd,minutes_to_future_high,market_cap_1h_later,market_cap_6h_later,market_cap_24h_later,last_candle_at")
+    .order("last_candle_at", { ascending: true, nullsFirst: true })
+    .limit(limit * ages);
+  if (error) throw new Error(`Read snapshots to refresh: ${error.message}`);
+
+  const byToken = new Map<string, ExistingSnapshot[]>();
+  for (const row of (data ?? []) as ExistingSnapshot[]) {
+    if (!byToken.has(row.token_address)) byToken.set(row.token_address, []);
+    byToken.get(row.token_address)!.push(row);
+  }
+
+  const tokenList = [...byToken.keys()];
+  const { data: tokenRows, error: tokenError } = await db.from("bitquery_migration_test")
+    .select("token_address,migrated_at,migration_market_cap_usd,token_supply")
+    .in("token_address", tokenList.slice(0, 500));
+  if (tokenError) throw new Error(`Read tokens to refresh: ${tokenError.message}`);
+  const tokens = new Map((tokenRows ?? []).map((row) => [row.token_address as string, row as SnapshotToken]));
+
+  let updated = 0;
+  let unchanged = 0;
+
+  for (const [address, rows] of byToken) {
+    const token = tokens.get(address);
+    if (!token) continue;
+
+    // A token younger than the widest age has not earned all its rows yet, so
+    // it still needs the full pass rather than an extension.
+    if (rows.length < ages) continue;
+
+    const watermark = rows.reduce<number | null>((oldest, row) => {
+      const at = row.last_candle_at ? Date.parse(row.last_candle_at) : null;
+      if (at == null) return oldest;
+      return oldest == null || at < oldest ? at : oldest;
+    }, null);
+    if (watermark == null) continue;
+
+    const fresh = await fetchHistory({ ...token, migrated_at: new Date(watermark + 1000).toISOString() });
+    if (!fresh.length) { unchanged += 1; continue; }
+
+    const supply = number(token.token_supply) ?? DEFAULT_SUPPLY;
+    const migratedAt = Date.parse(token.migrated_at);
+    const points = fresh
+      .map((candle) => ({
+        at: Date.parse(candle.Block.Time),
+        close: number(candle.Price?.Ohlc?.Close),
+        high: number(candle.Price?.Ohlc?.High),
+      }))
+      .filter((point) => Number.isFinite(point.at) && point.close != null);
+    if (!points.length) { unchanged += 1; continue; }
+
+    const lastAt = Math.max(...points.map((point) => point.at));
+    const bestNew = points.reduce((best, point) =>
+      (point.high ?? point.close!) > (best.high ?? best.close!) ? point : best, points[0]!);
+    const bestNewMc = (bestNew.high ?? bestNew.close!) * supply;
+
+    const capAt = (target: number) => {
+      if (lastAt < target) return null;
+      const point = points.filter((candidate) => candidate.at <= target).at(-1);
+      return point?.close != null ? point.close * supply : null;
+    };
+
+    const updates = rows.map((row) => {
+      const boundary = migratedAt + row.age_seconds * 1_000;
+      const marketCap = number(row.market_cap_usd);
+      const oldHigh = number(row.future_high_market_cap_usd);
+      const improved = oldHigh == null || bestNewMc > oldHigh;
+      const futureHigh = improved ? bestNewMc : oldHigh;
+
+      return {
+        token_address: row.token_address,
+        age_seconds: row.age_seconds,
+        future_high_market_cap_usd: futureHigh,
+        future_multiple: marketCap && marketCap > 0 ? futureHigh / marketCap : null,
+        minutes_to_future_high: improved
+          ? Math.round((bestNew.at - boundary) / 60_000)
+          : row.minutes_to_future_high,
+        market_cap_1h_later: number(row.market_cap_1h_later) ?? capAt(boundary + 3_600_000),
+        market_cap_6h_later: number(row.market_cap_6h_later) ?? capAt(boundary + 6 * 3_600_000),
+        market_cap_24h_later: number(row.market_cap_24h_later) ?? capAt(boundary + 24 * 3_600_000),
+        observed_horizon_minutes: Math.round((lastAt - boundary) / 60_000),
+        last_candle_at: new Date(lastAt).toISOString(),
+      };
+    });
+
+    const { error: saveError } = await db.from("bitquery_migration_snapshots")
+      .upsert(updates, { onConflict: "token_address,age_seconds" });
+    if (saveError) throw new Error(`Extend snapshots: ${saveError.message}`);
+    updated += 1;
+    if (updated % 25 === 0) log(`  ${updated} tokens extended`);
+  }
+
+  log(`Snapshot refresh complete: ${updated} tokens extended, ${unchanged} already current`);
+  return { updated, unchanged };
 }
 
 async function snapshotCandidates(limit: number) {
