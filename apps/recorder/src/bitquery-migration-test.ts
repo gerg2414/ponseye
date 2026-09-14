@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
-import { fetchOneMinuteCandles, fetchTokenInfo } from "./gmgn.js";
+import { fetchOneMinuteCandles } from "./gmgn.js";
 
 const PONS_FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const PONS_HOOK = "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044";
@@ -77,10 +77,6 @@ function delay(ms: number) {
 function number(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function object(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function argumentMap(args: BitqueryArgument[] = []) {
@@ -201,7 +197,7 @@ async function queryBitquery<T>(query: string): Promise<T> {
 function migrationQuery(since: string, till: string) {
   return `
     query PonsMigrationTest {
-      EVM(network: robinhood) {
+      EVM(network: robinhood, dataset: combined) {
         Graduations: Events(
           limit: {count: 1000}
           orderBy: {ascending: Block_Time}
@@ -379,45 +375,6 @@ async function nextMetricsCandidate() {
   return data as { token_address: string; migrated_at: string; metrics_updated_at: string | null; metadata_updated_at: string | null; trade_flow_updated_at: string | null } | null;
 }
 
-async function nextMetadataCandidate() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { data, error } = await db.from("bitquery_migration_test")
-    .select("token_address")
-    .gte("migrated_at", cutoff)
-    .is("metadata_updated_at", null)
-    .order("migrated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(`Choose token metadata candidate: ${error.message}`);
-  return data as { token_address: string } | null;
-}
-
-async function updateMetadata(tokenAddress: string) {
-  try {
-    const info = await fetchTokenInfo(tokenAddress);
-    const link = object(info.link);
-    const { error } = await db.from("bitquery_migration_test").update({
-      name: info.name ?? null,
-      symbol: info.symbol ?? null,
-      image_url: info.logo ?? null,
-      description: link.description ?? null,
-      twitter_url: link.twitter_username ? `https://x.com/${String(link.twitter_username).replace(/^@/, "")}` : null,
-      telegram_url: link.telegram ?? null,
-      discord_url: link.discord ?? null,
-      website_url: link.website ?? null,
-      metadata_updated_at: new Date().toISOString(),
-      metadata_source: "gmgn_token_info",
-    }).eq("token_address", tokenAddress);
-    if (error) throw new Error(`Save token metadata: ${error.message}`);
-  } catch (error) {
-    await db.from("bitquery_migration_test").update({
-      metadata_updated_at: new Date().toISOString(),
-      metadata_source: "gmgn_unavailable",
-    }).eq("token_address", tokenAddress);
-    throw error;
-  }
-}
-
 async function nextChartCandidate() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const { data, error } = await db.from("bitquery_migration_test")
@@ -512,24 +469,12 @@ export async function runBitqueryMigrationTest() {
   let migrationCursor = new Date(Date.now() - 24 * 60 * 60_000);
   let nextMigrationPoll = 0;
   let nextMetricsPoll = 0;
-  let nextMetadataPoll = 0;
-  let metadataWorkerRunning = false;
   let nextChartPoll = 0;
   let chartWorkerRunning = false;
 
   while (config.BITQUERY_MIGRATION_TEST_ENABLED) {
     const now = Date.now();
     try {
-      if (now >= nextMetadataPoll && !metadataWorkerRunning) {
-        metadataWorkerRunning = true;
-        void nextMetadataCandidate()
-          .then((candidate) => candidate ? updateMetadata(candidate.token_address) : undefined)
-          .catch((error) => console.warn("Token metadata backfill failed", error))
-          .finally(() => {
-            metadataWorkerRunning = false;
-            nextMetadataPoll = Date.now() + 1_100;
-          });
-      }
       if (now >= nextChartPoll && !chartWorkerRunning) {
         chartWorkerRunning = true;
         void nextChartCandidate()
