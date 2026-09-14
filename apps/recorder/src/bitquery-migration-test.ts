@@ -431,6 +431,35 @@ function livePriceSubscriptionQuery(addresses: string[]) {
 // Writes
 // ---------------------------------------------------------------------------
 
+/**
+ * Scan positions survive a restart.
+ *
+ * Without this every deploy restarted each scan at the far edge of its window,
+ * so a day of deploys re-read the same forty-eight hours of launches once per
+ * deploy. A stored position is only ever used when it sits inside the window;
+ * anything older would leave a gap, so the window edge wins in that case.
+ */
+async function loadCursor(name: string, fallback: Date, earliest: Date) {
+  const { data, error } = await db.from("bitquery_recorder_cursors")
+    .select("position").eq("name", name).maybeSingle();
+  if (error) {
+    console.warn(`Could not read cursor "${name}", starting from the window edge: ${error.message}`);
+    return fallback;
+  }
+  if (!data?.position) return fallback;
+  const stored = new Date(data.position);
+  if (!Number.isFinite(stored.getTime()) || stored < earliest) return fallback;
+  // Never resume ahead of now, which a clock skew could otherwise cause.
+  return stored > new Date() ? fallback : stored;
+}
+
+async function saveCursor(name: string, position: Date) {
+  const { error } = await db.from("bitquery_recorder_cursors")
+    .upsert({ name, position: position.toISOString(), updated_at: new Date().toISOString() },
+      { onConflict: "name" });
+  if (error) console.warn(`Could not save cursor "${name}": ${error.message}`);
+}
+
 async function setStatus(status: "connecting" | "connected" | "error", message: string) {
   const { error } = await db.from("stream_status").upsert({
     feed: "bitquery_migration_test",
@@ -1126,9 +1155,14 @@ export async function runBitqueryMigrationTest() {
 
   // Seed the window once, paging through the whole history rather than relying
   // on a single capped request, then let the forward cursor take over.
-  let migrationCursor = new Date(startedAt - BACKFILL_WINDOW_MS);
-  let launchCursor = new Date(startedAt - 60 * 60_000);
-  let launchBackfillCursor = new Date(startedAt - BACKFILL_WINDOW_MS);
+  const windowEdge = new Date(startedAt - BACKFILL_WINDOW_MS);
+  let migrationCursor = await loadCursor("migrations", windowEdge, windowEdge);
+  let launchCursor = await loadCursor("launch-metadata", new Date(startedAt - 60 * 60_000), windowEdge);
+  let launchBackfillCursor = await loadCursor("launch-backfill", windowEdge, windowEdge);
+  console.log(
+    `Resuming scans from migrations ${migrationCursor.toISOString()}, ` +
+    `launch backfill ${launchBackfillCursor.toISOString()}`,
+  );
 
   const stages: Stage[] = [
     {
@@ -1141,6 +1175,7 @@ export async function runBitqueryMigrationTest() {
         const count = await collectMigrations(migrationCursor, till);
         // Overlap by a minute so an event landing on the boundary is not missed.
         migrationCursor = new Date(till.getTime() - 60_000);
+        await saveCursor("migrations", migrationCursor);
         await setStatus("connected", `${count} migration events received in latest scan`);
       },
     },
@@ -1153,6 +1188,7 @@ export async function runBitqueryMigrationTest() {
         const till = new Date();
         await collectLaunchMetadata(launchCursor, till);
         launchCursor = new Date(till.getTime() - 60_000);
+        await saveCursor("launch-metadata", launchCursor);
       },
     },
     {
@@ -1166,6 +1202,7 @@ export async function runBitqueryMigrationTest() {
         const till = new Date(Math.min(recentCutoff.getTime(), launchBackfillCursor.getTime() + 30 * 60_000));
         await collectLaunchMetadata(launchBackfillCursor, till);
         launchBackfillCursor = till;
+        await saveCursor("launch-backfill", launchBackfillCursor);
       },
     },
     {
